@@ -69,7 +69,7 @@ public sealed class FixedLengthRecordParser : IRecordParser
             }
             else
             {
-                (reasons ??= new List<RejectReason>()).Add(conversion.Reason!);
+                (reasons ??= []).Add(conversion.Reason!);
             }
         }
 
