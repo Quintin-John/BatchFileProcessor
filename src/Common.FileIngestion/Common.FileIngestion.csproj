@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common.Messaging.Contracts\Common.Messaging.Contracts.csproj" />
+    <ProjectReference Include="..\Common.Security.DataProtection\Common.Security.DataProtection.csproj" />
   </ItemGroup>
 
 </Project>
