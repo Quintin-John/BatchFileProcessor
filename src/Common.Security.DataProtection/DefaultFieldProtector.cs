@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -12,35 +11,28 @@ namespace Common.Security.DataProtection;
 /// configured <see cref="ICryptoProvider"/>, binding each ciphertext to its
 /// <see cref="FieldProtectionContext"/>. Clear values are serialized through the messaging
 /// contract's JSON so typed values (string, number, boolean, null) round-trip losslessly.
+/// Masking is a separate concern handled by <see cref="DefaultFieldMasker"/>.
 /// </summary>
 public sealed class DefaultFieldProtector : IFieldProtector
 {
     private readonly ICryptoProvider _crypto;
     private readonly IKeyProvider _keys;
     private readonly DataProtectionPolicy _policy;
-    private readonly Dictionary<string, IMasker> _maskers;
 
     /// <summary>Creates the protector.</summary>
     /// <param name="crypto">Crypto provider.</param>
     /// <param name="keys">Key provider.</param>
     /// <param name="policy">Data-protection policy.</param>
-    /// <param name="maskers">Available maskers, keyed by their strategy name.</param>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    public DefaultFieldProtector(
-        ICryptoProvider crypto,
-        IKeyProvider keys,
-        DataProtectionPolicy policy,
-        IEnumerable<IMasker> maskers)
+    public DefaultFieldProtector(ICryptoProvider crypto, IKeyProvider keys, DataProtectionPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(crypto);
         ArgumentNullException.ThrowIfNull(keys);
         ArgumentNullException.ThrowIfNull(policy);
-        ArgumentNullException.ThrowIfNull(maskers);
 
         _crypto = crypto;
         _keys = keys;
         _policy = policy;
-        _maskers = maskers.ToDictionary(m => m.Name, StringComparer.Ordinal);
     }
 
     /// <inheritdoc />
@@ -85,28 +77,6 @@ public sealed class DefaultFieldProtector : IFieldProtector
             ?? throw new InvalidOperationException("Decrypted field value was null.");
     }
 
-    /// <inheritdoc />
-    public string Mask(FieldProtectionContext context, FieldValue value)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(value);
-
-        var protection = _policy.GetProtection(context.Field);
-        var clear = ClearString(value);
-
-        if (protection.MaskStrategy is null)
-        {
-            return clear;
-        }
-
-        if (!_maskers.TryGetValue(protection.MaskStrategy, out var masker))
-        {
-            throw new InvalidOperationException($"Unknown mask strategy '{protection.MaskStrategy}'.");
-        }
-
-        return masker.Mask(clear);
-    }
-
     private static byte[] Aad(FieldProtectionContext context)
     {
         // Length-prefixed encoding so distinct (fileId, recordSeq, field) triples can never
@@ -129,13 +99,4 @@ public sealed class DefaultFieldProtector : IFieldProtector
 
         return buffer;
     }
-
-    private static string ClearString(FieldValue value) => value switch
-    {
-        EncryptedFieldValue => throw new InvalidOperationException("Cannot mask an already-encrypted value."),
-        ClearFieldValue { Value: null } => string.Empty,
-        ClearFieldValue { Value: string s } => s,
-        ClearFieldValue clear => Convert.ToString(clear.Value, CultureInfo.InvariantCulture) ?? string.Empty,
-        _ => throw new InvalidOperationException($"Unsupported field value type '{value.GetType()}'."),
-    };
 }

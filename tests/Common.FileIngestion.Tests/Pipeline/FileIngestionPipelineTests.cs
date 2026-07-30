@@ -159,7 +159,6 @@ public sealed class FileIngestionPipelineTests
 
         public FieldValue Unprotect(FieldProtectionContext context, FieldValue value) => value;
 
-        public string Mask(FieldProtectionContext context, FieldValue value) => string.Empty;
     }
 
     private sealed class CapturingPublisher : IMessagePublisher

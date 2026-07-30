@@ -15,8 +15,7 @@ public sealed class DefaultFieldProtectorTests
     private static (DefaultFieldProtector Protector, InMemoryKeyProvider Keys) Build(DataProtectionPolicy? policy = null)
     {
         var keys = new InMemoryKeyProvider();
-        var protector = new DefaultFieldProtector(
-            new AesGcmCryptoProvider(), keys, policy ?? DefaultPolicy(), new IMasker[] { new PanMasker() });
+        var protector = new DefaultFieldProtector(new AesGcmCryptoProvider(), keys, policy ?? DefaultPolicy());
         return (protector, keys);
     }
 
@@ -121,54 +120,14 @@ public sealed class DefaultFieldProtectorTests
     }
 
     [Fact]
-    public void Mask_WithStrategy_MasksValue()
-    {
-        var (protector, _) = Build();
-
-        Assert.Equal("123456******3456", protector.Mask(Ctx("pan"), new ClearFieldValue("1234567890123456")));
-    }
-
-    [Fact]
-    public void Mask_WithoutStrategy_ReturnsClearString()
-    {
-        var (protector, _) = Build();
-
-        Assert.Equal("221.73", protector.Mask(Ctx("amount"), new ClearFieldValue(221.73m)));
-    }
-
-    [Fact]
-    public void Mask_EncryptedValue_Throws()
-    {
-        var (protector, _) = Build();
-        var encrypted = new EncryptedFieldValue(
-            new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn"));
-
-        Assert.Throws<InvalidOperationException>(() => protector.Mask(Ctx("pan"), encrypted));
-    }
-
-    [Fact]
-    public void Mask_UnknownStrategy_Throws()
-    {
-        var policy = new DataProtectionPolicy(new Dictionary<string, FieldProtection>
-        {
-            ["x"] = new(ProtectionAction.Clear, "ghost-strategy", RedactInLogs: false),
-        });
-        var (protector, _) = Build(policy);
-
-        Assert.Throws<InvalidOperationException>(() => protector.Mask(Ctx("x"), new ClearFieldValue("value")));
-    }
-
-    [Fact]
     public void Constructor_WithNullArgument_Throws()
     {
         var crypto = new AesGcmCryptoProvider();
         var keys = new InMemoryKeyProvider();
         var policy = DefaultPolicy();
-        var maskers = new IMasker[] { new PanMasker() };
 
-        Assert.Throws<ArgumentNullException>(() => new DefaultFieldProtector(null!, keys, policy, maskers));
-        Assert.Throws<ArgumentNullException>(() => new DefaultFieldProtector(crypto, null!, policy, maskers));
-        Assert.Throws<ArgumentNullException>(() => new DefaultFieldProtector(crypto, keys, null!, maskers));
-        Assert.Throws<ArgumentNullException>(() => new DefaultFieldProtector(crypto, keys, policy, null!));
+        Assert.Throws<ArgumentNullException>(() => new DefaultFieldProtector(null!, keys, policy));
+        Assert.Throws<ArgumentNullException>(() => new DefaultFieldProtector(crypto, null!, policy));
+        Assert.Throws<ArgumentNullException>(() => new DefaultFieldProtector(crypto, keys, null!));
     }
 }

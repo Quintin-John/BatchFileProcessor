@@ -65,6 +65,5 @@ public sealed class RecordProtectorTests
 
         public FieldValue Unprotect(FieldProtectionContext context, FieldValue value) => value;
 
-        public string Mask(FieldProtectionContext context, FieldValue value) => string.Empty;
     }
 }

@@ -3,9 +3,10 @@ using Common.Messaging.Contracts;
 namespace Common.Security.DataProtection;
 
 /// <summary>
-/// Applies the data-protection policy to individual field values: encrypting or passing through
-/// per classification, reversing it, and producing masked forms for diagnostics. The single
-/// place field protection is enforced, so it cannot be applied inconsistently.
+/// Reversible cryptographic protection of individual field values: encrypting or passing through per
+/// classification, and reversing it. The single place field encryption is enforced, so it cannot be
+/// applied inconsistently. Producing masked display forms is a separate concern — see
+/// <see cref="IFieldMasker"/> — so a producer that only encrypts does not depend on masking.
 /// </summary>
 public interface IFieldProtector
 {
@@ -20,11 +21,4 @@ public interface IFieldProtector
     /// <param name="context">The same context supplied at protection time.</param>
     /// <param name="value">The value to unprotect.</param>
     FieldValue Unprotect(FieldProtectionContext context, FieldValue value);
-
-    /// <summary>Produces a masked, safe-to-display form of a clear value for diagnostics.</summary>
-    /// <param name="context">Field context (selects the masking strategy).</param>
-    /// <param name="value">The clear value to mask.</param>
-    /// <exception cref="KeyNotFoundException">The field is unclassified (fail-closed).</exception>
-    /// <exception cref="InvalidOperationException">The value is encrypted, or its mask strategy is unknown.</exception>
-    string Mask(FieldProtectionContext context, FieldValue value);
 }
