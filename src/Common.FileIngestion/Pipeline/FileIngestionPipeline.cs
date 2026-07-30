@@ -167,10 +167,14 @@ public sealed class FileIngestionPipeline
         _heartbeat.Beat();
         counters.Batches++;
 
-        var last = batch.Records[^1];
-        var confirmedOffset = last.Locator.ByteOffset + stride;
+        // Resume position = one stride past the highest-offset record in the batch. LastByteOffset is the
+        // authoritative max (not Records[^1]), so this does not depend on batch insertion order. For the
+        // terminator-less final record this overshoots by the terminator length, which is immaterial: it
+        // is always the last batch and the watermark is cleared on completion (a crash in that window
+        // resumes past EOF, having already confirmed every record).
+        var confirmedOffset = batch.LastByteOffset + stride;
         await _checkpointStore.SaveAsync(
-            new Watermark(sourceKey, batch.Provenance.FileId, confirmedOffset, last.Locator.RecordSeq, batch.BatchSeq),
+            new Watermark(sourceKey, batch.Provenance.FileId, confirmedOffset, batch.LastRecordSeq, batch.BatchSeq),
             cancellationToken)
             .ConfigureAwait(false);
     }

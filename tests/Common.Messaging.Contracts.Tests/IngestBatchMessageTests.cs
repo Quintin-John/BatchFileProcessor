@@ -40,6 +40,15 @@ public sealed class IngestBatchMessageTests
     }
 
     [Fact]
+    public void LastByteOffset_IsMax_RegardlessOfOrder()
+    {
+        // Records supplied out of offset order; LastByteOffset must be the max (103*1200), not the last element.
+        var message = Create(new[] { Record(103), Record(101), Record(102) });
+
+        Assert.Equal(103 * 1200, message.LastByteOffset);
+    }
+
+    [Fact]
     public void Records_AreDefensivelyCopied()
     {
         var source = new List<IngestRecord> { Record(1), Record(2) };
