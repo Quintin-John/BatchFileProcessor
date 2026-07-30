@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.DataProtect
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.DataProtection.Tests", "tests\Common.Security.DataProtection.Tests\Common.Security.DataProtection.Tests.csproj", "{5F1459A8-714F-4457-95B7-45A37BB55F14}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Observability", "src\Common.Observability\Common.Observability.csproj", "{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Observability.Tests", "tests\Common.Observability.Tests\Common.Observability.Tests.csproj", "{9B74FB76-8333-4104-A441-15C89415D8A4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,11 +44,21 @@ Global
 		{5F1459A8-714F-4457-95B7-45A37BB55F14}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5F1459A8-714F-4457-95B7-45A37BB55F14}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5F1459A8-714F-4457-95B7-45A37BB55F14}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B74FB76-8333-4104-A441-15C89415D8A4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B74FB76-8333-4104-A441-15C89415D8A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B74FB76-8333-4104-A441-15C89415D8A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B74FB76-8333-4104-A441-15C89415D8A4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{FC077102-5A2D-4E19-8D1C-A40486D7DFAC} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
 		{F29E2D56-CBD7-4365-8B9D-C9FE022A603A} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{5F1459A8-714F-4457-95B7-45A37BB55F14} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
+		{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
+		{9B74FB76-8333-4104-A441-15C89415D8A4} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
 	EndGlobalSection
 EndGlobal
