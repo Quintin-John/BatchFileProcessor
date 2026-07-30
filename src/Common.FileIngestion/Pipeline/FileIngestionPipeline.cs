@@ -134,7 +134,7 @@ public sealed class FileIngestionPipeline
             // A publisher fault cancels the producer so it cannot deadlock on a full channel; that surfaces
             // here as cancellation, but the publisher's fault is the real error and must win.
             channel.Writer.TryComplete();
-            pipelineCts.Cancel();
+            await pipelineCts.CancelAsync().ConfigureAwait(false);
             var publisherError = await CaptureExceptionAsync(publisher).ConfigureAwait(false);
             if (publisherError is not null and not OperationCanceledException)
             {
@@ -164,7 +164,7 @@ public sealed class FileIngestionPipeline
 #pragma warning disable CA1031 // any publisher fault must unblock the producer, then propagate
         catch (Exception)
         {
-            pipelineCts.Cancel(); // unblock the producer so a full channel can't deadlock the run
+            await pipelineCts.CancelAsync().ConfigureAwait(false); // unblock producer so a full channel can't deadlock
             throw;
         }
 #pragma warning restore CA1031
