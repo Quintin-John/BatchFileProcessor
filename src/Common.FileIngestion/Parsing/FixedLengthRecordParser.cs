@@ -48,8 +48,11 @@ public sealed class FixedLengthRecordParser : IRecordParser
         var recordDefinition = _layout.ResolveByDiscriminator(discriminator);
         if (recordDefinition is null)
         {
+            // A blank discriminator has no usable type label; fall back to the unknown-type placeholder
+            // so the reject still carries a non-blank record type (RecordLocator requires one).
+            var recordType = string.IsNullOrWhiteSpace(discriminator) ? UnknownRecordType : discriminator;
             var reason = new RejectReason(RecordField, RecordTypeRule, UnknownRecordTypeCode, actual: discriminator);
-            return RecordParseResult.Rejected(discriminator, record.ToString(), new[] { reason });
+            return RecordParseResult.Rejected(recordType, record.ToString(), new[] { reason });
         }
 
         var fields = new Dictionary<string, FieldValue>(recordDefinition.Fields.Count, StringComparer.Ordinal);

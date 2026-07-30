@@ -82,10 +82,19 @@ public sealed class LayoutModelTests
         Assert.Null(layout.ResolveByDiscriminator("XX"));
     }
 
-    [Fact]
-    public void Layout_ResolveByDiscriminator_BlankValue_Throws()
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Layout_ResolveByDiscriminator_BlankValue_ReturnsNull(string blank)
     {
-        Assert.ThrowsAny<ArgumentException>(() => ValidLayout().ResolveByDiscriminator(" "));
+        // Blank is data (an empty type field), not a caller bug — unknown, so null (not a throw).
+        Assert.Null(ValidLayout().ResolveByDiscriminator(blank));
+    }
+
+    [Fact]
+    public void Layout_ResolveByDiscriminator_Null_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => ValidLayout().ResolveByDiscriminator(null!));
     }
 
     [Fact]

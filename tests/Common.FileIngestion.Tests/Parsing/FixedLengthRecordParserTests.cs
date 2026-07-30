@@ -57,6 +57,18 @@ public sealed class FixedLengthRecordParserTests
     }
 
     [Fact]
+    public void Parse_BlankDiscriminator_RejectsOneRecord_DoesNotThrow()
+    {
+        // BUG-2: a blank record-type field must reject this one record, not throw and fault the file.
+        var result = Parser().Parse(1, 0, "  00000000".AsSpan());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("?", result.RecordType); // non-blank placeholder so RecordLocator accepts it
+        Assert.Equal("UNKNOWN_RECORD_TYPE", result.Reasons![0].Code);
+        Assert.Equal("  00000000", result.RawRecord);
+    }
+
+    [Fact]
     public void Parse_WrongLength_Rejects()
     {
         var result = Parser().Parse(1, 0, "HD1".AsSpan());

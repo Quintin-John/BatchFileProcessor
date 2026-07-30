@@ -85,11 +85,17 @@ public sealed class Layout
         RecordTypes = new ReadOnlyCollection<RecordDefinition>(new List<RecordDefinition>(recordTypes));
     }
 
-    /// <summary>Resolves the record type for a discriminator value, or null if unknown.</summary>
+    /// <summary>
+    /// Resolves the record type for a discriminator value, or null if unknown. A blank/whitespace
+    /// value is data (an empty record-type field), not a programming error, so it resolves to null
+    /// (unknown) rather than throwing — the caller quarantines that one record instead of faulting
+    /// the whole file. Only a null reference is a caller bug.
+    /// </summary>
     /// <param name="discriminatorValue">The discriminator value read from a record.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="discriminatorValue"/> is null.</exception>
     public RecordDefinition? ResolveByDiscriminator(string discriminatorValue)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(discriminatorValue);
+        ArgumentNullException.ThrowIfNull(discriminatorValue);
         return _byMatch.GetValueOrDefault(discriminatorValue);
     }
 
