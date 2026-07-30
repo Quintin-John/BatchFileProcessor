@@ -37,7 +37,7 @@ services.AddInMemoryKeyProvider();
 services.AddSingleton(TimeProvider.System);
 services.AddSingleton<IRecordParser>(new FixedLengthRecordParser(layout));
 services.AddSingleton(new StreamRecordReader(layout.RecordLength, ingestion.GetValue<int>("TerminatorLength"), encoding));
-services.AddSingleton(new ObservabilityInstrumentation("ingestion-worker", layout.Version));
+services.AddObservability(builder.Configuration.GetSection("Observability")); // binds name/version, registers OTel export
 services.AddSingleton<IngestionMetrics>();
 services.AddSingleton<Heartbeat>();
 services.AddSingleton(new IngestionOptions(
@@ -51,14 +51,16 @@ services.AddSingleton(new WorkerOptions(
     Required(ingestion, "ProfileId"), layout.Version, TimeSpan.FromSeconds(ingestion.GetValue<int>("PollIntervalSeconds"))));
 
 // Bus publishes batches/rejects to the broker; mediator dispatches IngestFile in-process.
+var resilience = new MessagingResilienceOptions();
+messaging.GetSection("Resilience").Bind(resilience); // retry/circuit-breaker policy is config, not hardcoded
 services.AddMessaging(
     new MessagingTransportOptions
     {
-        Transport = MessagingTransport.RabbitMq,
+        Transport = messaging.GetValue<MessagingTransport>("Transport"),
         ConnectionString = Required(messaging, "ConnectionString"),
         EndpointPrefix = messaging["EndpointPrefix"],
     },
-    new MessagingResilienceOptions());
+    resilience);
 services.AddMediator(cfg => cfg.AddConsumer<IngestFileConsumer>());
 
 services.AddHostedService<FolderIngestionWorker>();
