@@ -23,6 +23,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.MassTransi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.MassTransit.Tests", "tests\Common.Messaging.MassTransit.Tests\Common.Messaging.MassTransit.Tests.csproj", "{9F3FC301-0CA7-4D4B-941A-F4E8CEA0255D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion", "src\Common.FileIngestion\Common.FileIngestion.csproj", "{66550F15-5AD6-457A-AF8B-68E47346A4E4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Tests", "tests\Common.FileIngestion.Tests\Common.FileIngestion.Tests.csproj", "{AE2F3AEC-6571-43B0-9656-1167AF16CA34}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -64,6 +68,14 @@ Global
 		{9F3FC301-0CA7-4D4B-941A-F4E8CEA0255D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F3FC301-0CA7-4D4B-941A-F4E8CEA0255D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F3FC301-0CA7-4D4B-941A-F4E8CEA0255D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{66550F15-5AD6-457A-AF8B-68E47346A4E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66550F15-5AD6-457A-AF8B-68E47346A4E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66550F15-5AD6-457A-AF8B-68E47346A4E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66550F15-5AD6-457A-AF8B-68E47346A4E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE2F3AEC-6571-43B0-9656-1167AF16CA34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE2F3AEC-6571-43B0-9656-1167AF16CA34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE2F3AEC-6571-43B0-9656-1167AF16CA34}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE2F3AEC-6571-43B0-9656-1167AF16CA34}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
@@ -74,5 +86,7 @@ Global
 		{9B74FB76-8333-4104-A441-15C89415D8A4} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
 		{8BCD819A-CB15-4552-AD96-6DCA52FB0F3F} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{9F3FC301-0CA7-4D4B-941A-F4E8CEA0255D} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
+		{66550F15-5AD6-457A-AF8B-68E47346A4E4} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
+		{AE2F3AEC-6571-43B0-9656-1167AF16CA34} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
 	EndGlobalSection
 EndGlobal
