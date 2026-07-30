@@ -616,3 +616,34 @@ Dependency direction: `Contracts` ← `DataProtection` / `Observability`\* / `Ma
 - **Resilience:** MassTransit built-in (Polly-based); `Microsoft.Extensions.Resilience` if needed outside the bus.
 - **Time:** `TimeProvider` (built-in; injected for deterministic tests).
 - **Testing:** xUnit, FluentAssertions, NSubstitute, coverlet, Stryker.NET.
+
+---
+
+## 13. Build status (POC)
+
+All slices 0–14 implemented, `main` green: **418 tests**, per-assembly line-coverage gates met
+(`Common.FileIngestion` 97.4%, `Ingestion.Worker` 91.4%, shared libs 98–100%).
+
+**Delivered:** generic layout model + loader; fixed-length parser; streaming reader (O(1),
+SHA-256 FileId); config-driven profile router; positional watermark checkpoint (keyed by stable
+source key) + file store; batcher; field-protection stage; reject sink; ingestion metrics/lineage
+tags; worker-host health state (heartbeat/liveness/readiness); the end-to-end `FileIngestionPipeline`
+(hash → resume → parse → protect → batch → confirmed publish → watermark, fail-closed); folder file
+source (claim/complete/fail + orphan recovery); and the `Ingestion.Worker` host wiring a
+**MassTransit.Mediator** command boundary, composition root, and Dockerfile.
+
+**Decisions:** worker host for the POC (Azure Functions deferred — see [[host-and-mediator-decision]]);
+mediator = MassTransit.Mediator (OSS) at the host boundary so the library stays transport-agnostic;
+publisher port `IMessagePublisher` relocated to Contracts (DIP).
+
+**Backlog (not blocking the POC):**
+- Azure Functions host (isolated worker, Blob/Event Grid trigger) — deferred by decision.
+- Real G266 **data-protection policy** classifying every field (security-owned) — the fail-closed
+  policy rejects unclassified fields; the POC composition loads it from a configured path.
+- **Reject-payload encryption:** the reject raw record is currently carried clear (`ClearFieldValue`);
+  encrypt sensitive raw content before the reject queue.
+- **Shared checkpoint store** (Redis/Blob/DB) for cross-instance resume (§12/Q8) — file store today.
+- **EBCDIC / code-page** encodings: register `CodePagesEncodingProvider` when a layout needs a
+  non–built-in single-byte encoding.
+- Byte-cap uses a content-length proxy (documented in `Batcher`); tighten if a transport limit is hit.
+- **V4.11 layout** (external dependency) — V4.8 done.
