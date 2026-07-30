@@ -1,0 +1,19 @@
+<Project>
+
+  <!-- Solution-wide defaults. One authoritative source for build/quality settings (DRY). -->
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Zero-tech-debt gates: warnings are errors, analyzers on and enforced in build. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Reproducible builds. -->
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>
