@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Common.FileIngestion.Batching;
 using Common.Messaging.Contracts;
 
@@ -44,14 +45,32 @@ public sealed class BatcherTests
     }
 
     [Fact]
-    public void Add_ExceedingByteCap_Seals()
+    public void Add_MeasuresTrueSerializedSize_NotCharProxy_Seals()
     {
-        var batcher = new Batcher(maxRecords: 1000, maxContentBytes: 5, Provenance());
+        // The char-length proxy of this record is ~2 bytes, but its serialized JSON is far larger;
+        // a 50-byte cap must trip on the real wire size (M1 poison-batch guard).
+        var batcher = new Batcher(maxRecords: 1000, maxContentBytes: 50, Provenance());
 
-        var batch = batcher.Add(Record(1, "long-value")); // "v"(1) + 10 chars > 5
+        var batch = batcher.Add(Record(1));
 
         Assert.NotNull(batch);
         Assert.Single(batch!.Records);
+    }
+
+    [Fact]
+    public void Add_SealsBeforeExceedingByteCap_KeepingBatchUnderLimit()
+    {
+        var recordSize = JsonSerializer.SerializeToUtf8Bytes(Record(1), MessagingJson.Options).Length;
+        var batcher = new Batcher(maxRecords: 1000, maxContentBytes: recordSize * 2 + 1, Provenance());
+
+        Assert.Null(batcher.Add(Record(1)));      // 1 record fits
+        Assert.Null(batcher.Add(Record(2)));      // 2 records fit (2*size <= cap)
+        var sealed3 = batcher.Add(Record(3));     // 3rd would exceed -> seal prior two, keep the 3rd
+
+        Assert.NotNull(sealed3);
+        Assert.Equal(2, sealed3!.Count);          // sealed batch holds only what fit under the cap
+        var remaining = batcher.Flush();
+        Assert.Equal(3, remaining!.Records[0].Locator.RecordSeq); // record 3 opened the next batch
     }
 
     [Fact]

@@ -1,10 +1,15 @@
+using System.Text.Json;
 using Common.Messaging.Contracts;
 
 namespace Common.FileIngestion.Batching;
 
 /// <summary>
-/// Accumulates records into <see cref="IngestBatchMessage"/> batches, sealing one when it reaches
-/// the record count or the estimated content-byte cap. Deterministic ids: <c>{FileId}-{BatchSeq}</c>,
+/// Accumulates records into <see cref="IngestBatchMessage"/> batches, sealing one when it reaches the
+/// record count or would exceed the content-byte cap. Each record's contribution is the exact size of
+/// its serialized wire form (via <see cref="MessagingJson.Options"/>, the same options the transport
+/// uses), not a proxy — so a batch never overruns the transport limit through an undercount. The cap
+/// is applied <em>before</em> a record is admitted (seal-before-exceed); only a single record larger
+/// than the whole cap forms an over-cap batch on its own. Deterministic ids: <c>{FileId}-{BatchSeq}</c>,
 /// batch sequence 0-based. Stateful and not thread-safe — one instance drives one file's read loop.
 /// </summary>
 public sealed class Batcher
@@ -15,12 +20,12 @@ public sealed class Batcher
     private readonly int _maxContentBytes;
     private readonly MessageProvenance _provenance;
     private readonly List<IngestRecord> _pending;
-    private long _estimatedBytes;
+    private long _accumulatedBytes;
     private long _batchSeq;
 
     /// <summary>Creates a batcher.</summary>
     /// <param name="maxRecords">Max records per batch; must be at least 1.</param>
-    /// <param name="maxContentBytes">Max estimated content bytes per batch (set below the transport limit); at least 1.</param>
+    /// <param name="maxContentBytes">Max serialized record bytes per batch (set below the transport limit, leaving margin for the fixed batch envelope); at least 1.</param>
     /// <param name="provenance">Provenance stamped on every batch; required.</param>
     /// <param name="firstBatchSeq">Sequence for the first sealed batch; on resume this continues past the
     /// last confirmed batch so message ids never collide with already-published batches. Non-negative.</param>
@@ -47,10 +52,23 @@ public sealed class Batcher
     {
         ArgumentNullException.ThrowIfNull(record);
 
-        _pending.Add(record);
-        _estimatedBytes += EstimateContentBytes(record);
+        var recordBytes = SerializedSize(record);
 
-        return _pending.Count >= _maxRecords || _estimatedBytes >= _maxContentBytes ? Seal() : null;
+        // Seal the in-progress batch before this record would push it past the byte cap, so a batch
+        // never exceeds the transport limit; this record then opens the next batch.
+        if (_pending.Count > 0 && _accumulatedBytes + recordBytes > _maxContentBytes)
+        {
+            var sealedBatch = Seal();
+            _pending.Add(record);
+            _accumulatedBytes = recordBytes;
+            return sealedBatch;
+        }
+
+        _pending.Add(record);
+        _accumulatedBytes += recordBytes;
+
+        // Record-count cap, or a single record that alone meets/exceeds the byte cap.
+        return _pending.Count >= _maxRecords || _accumulatedBytes >= _maxContentBytes ? Seal() : null;
     }
 
     /// <summary>Seals any pending records into a final batch, or returns null if none are pending.</summary>
@@ -64,26 +82,10 @@ public sealed class Batcher
 
         _batchSeq++;
         _pending.Clear();
-        _estimatedBytes = 0;
+        _accumulatedBytes = 0;
         return batch;
     }
 
-    private static long EstimateContentBytes(IngestRecord record)
-    {
-        long bytes = 0;
-        foreach (var pair in record.Fields)
-        {
-            bytes += pair.Key.Length + ValueLength(pair.Value);
-        }
-
-        return bytes;
-    }
-
-    private static long ValueLength(FieldValue value) => value switch
-    {
-        ClearFieldValue clear => clear.Value?.ToString()?.Length ?? 0,
-        EncryptedFieldValue encrypted =>
-            encrypted.Value.Ciphertext.Length + encrypted.Value.Nonce.Length + encrypted.Value.Tag.Length,
-        _ => 0,
-    };
+    private static long SerializedSize(IngestRecord record) =>
+        JsonSerializer.SerializeToUtf8Bytes(record, MessagingJson.Options).Length;
 }
