@@ -84,7 +84,7 @@ public sealed class FolderIngestionWorkerTests
     private sealed class SpyState
     {
         private readonly List<string> _received = [];
-        public IReadOnlyList<string> Received => _received;
+        public List<string> Received => _received;
         public void Record(string name) => _received.Add(name);
     }
 

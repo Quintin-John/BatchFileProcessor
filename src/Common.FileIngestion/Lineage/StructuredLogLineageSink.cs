@@ -33,16 +33,23 @@ public sealed partial class StructuredLogLineageSink : ILineageSink
     {
         ArgumentNullException.ThrowIfNull(lineageEvent);
 
-        // Serialize only when the sink category is actually logging (CA1873): the JSON is an expensive
-        // argument evaluated at the call site, before the source-generated LogLineage checks IsEnabled.
-        if (_logger.IsEnabled(LogLevel.Information))
-        {
-            LogLineage(JsonSerializer.Serialize(lineageEvent, JsonOptions));
-        }
+        // Pass a cheap wrapper, not a pre-serialized string: the JSON is produced by the wrapper's
+        // ToString(), which the source-generated LogLineage calls only after its own IsEnabled gate.
+        // So serialization never runs when the sink category is disabled (CA1873), with no manual guard.
+        LogLineage(new LineageLogValue(lineageEvent));
 
         return Task.CompletedTask;
     }
 
     [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "lineage {Lineage}")]
-    private partial void LogLineage(string lineage);
+    private partial void LogLineage(LineageLogValue lineage);
+
+    /// <summary>
+    /// Deferred JSON rendering of a lineage event. The serialize runs in <see cref="ToString"/>, which the
+    /// logging pipeline invokes only when the message is actually emitted — never on the disabled path.
+    /// </summary>
+    private readonly record struct LineageLogValue(LineageEvent Event)
+    {
+        public override string ToString() => JsonSerializer.Serialize(Event, JsonOptions);
+    }
 }

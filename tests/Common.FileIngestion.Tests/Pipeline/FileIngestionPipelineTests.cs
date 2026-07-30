@@ -418,9 +418,9 @@ public sealed class FileIngestionPipelineTests
         private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _publishCalls;
 
-        public IReadOnlyList<IngestBatchMessage> Batches
+        public List<IngestBatchMessage> Batches
         {
-            get { lock (_batches) { return _batches.ToArray(); } }
+            get { lock (_batches) { return _batches.ToList(); } }
         }
 
         public IReadOnlyList<RejectMessage> Rejects
