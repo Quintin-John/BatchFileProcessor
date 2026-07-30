@@ -34,7 +34,7 @@ public sealed class MessagingResilienceTests : IAsyncLifetime
                 {
                     bus.ConfigureJsonSerializerOptions(options =>
                     {
-                        MessagingSerialization.Configure(options);
+                        MessagingJson.Configure(options);
                         return options;
                     });
                     bus.ReceiveEndpoint("failing", endpoint =>

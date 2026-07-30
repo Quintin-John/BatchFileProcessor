@@ -180,10 +180,10 @@ public sealed class SerializationTests
     // ---- golden shape ----
 
     [Fact]
-    public void RegisterConverters_AddsFieldValueConverter_ToExternalOptions()
+    public void Configure_AppliesFieldValueConverter_ToExternalOptions()
     {
         var external = new JsonSerializerOptions();
-        MessagingJson.RegisterConverters(external);
+        MessagingJson.Configure(external);
 
         var json = JsonSerializer.Serialize<FieldValue>(new ClearFieldValue(221.73m), external);
 
@@ -191,9 +191,26 @@ public sealed class SerializationTests
     }
 
     [Fact]
-    public void RegisterConverters_NullOptions_Throws()
+    public void Configure_NullOptions_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => MessagingJson.RegisterConverters(null!));
+        Assert.Throws<ArgumentNullException>(() => MessagingJson.Configure(null!));
+    }
+
+    [Fact]
+    public void Configure_ProducesWireFormatIdenticalToAuthoritativeOptions()
+    {
+        // A freshly-configured serializer (the transport path) must match Options byte-for-byte, or the
+        // Batcher's size accounting — which measures via Options — diverges from what is actually sent.
+        var transport = new JsonSerializerOptions();
+        MessagingJson.Configure(transport);
+        var sample = new RejectReason("a+b", "rule", "code"); // nullable fields null; '+' inside a value
+
+        var viaTransport = JsonSerializer.Serialize(sample, transport);
+
+        Assert.Equal(JsonSerializer.Serialize(sample, MessagingJson.Options), viaTransport);
+        Assert.DoesNotContain("expected", viaTransport, StringComparison.Ordinal);        // WhenWritingNull omits nulls
+        Assert.Contains("a+b", viaTransport, StringComparison.Ordinal);                   // relaxed encoder keeps '+'
+        Assert.DoesNotContain("002B", viaTransport, StringComparison.OrdinalIgnoreCase);  // not escaped to +
     }
 
     [Fact]

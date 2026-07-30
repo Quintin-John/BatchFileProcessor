@@ -21,7 +21,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
                 {
                     bus.ConfigureJsonSerializerOptions(options =>
                     {
-                        MessagingSerialization.Configure(options);
+                        MessagingJson.Configure(options);
                         return options;
                     });
                     bus.ConfigureEndpoints(context);

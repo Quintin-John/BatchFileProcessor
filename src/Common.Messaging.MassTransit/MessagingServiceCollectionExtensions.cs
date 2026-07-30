@@ -52,7 +52,7 @@ public static class MessagingServiceCollectionExtensions
                         rabbit.Host(new Uri(transport.ConnectionString));
                         rabbit.ConfigureJsonSerializerOptions(options =>
                         {
-                            MessagingSerialization.Configure(options);
+                            MessagingJson.Configure(options);
                             return options;
                         });
                         rabbit.ConfigureEndpoints(context);
