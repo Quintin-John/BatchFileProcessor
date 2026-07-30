@@ -83,7 +83,7 @@ public sealed class FolderIngestionWorkerTests
 
     private sealed class SpyState
     {
-        private readonly List<string> _received = new();
+        private readonly List<string> _received = [];
         public IReadOnlyList<string> Received => _received;
         public void Record(string name) => _received.Add(name);
     }
@@ -105,11 +105,11 @@ public sealed class FolderIngestionWorkerTests
 
     private sealed class FakeFileSource : IFileSource
     {
-        private readonly List<string> _completed = new();
-        private readonly List<string> _failed = new();
+        private readonly List<string> _completed = [];
+        private readonly List<string> _failed = [];
         private bool _claimed;
 
-        public List<ClaimedFile> Orphans { get; } = new();
+        public List<ClaimedFile> Orphans { get; } = [];
         public IReadOnlyList<string> Completed => _completed;
         public IReadOnlyList<string> Failed => _failed;
 

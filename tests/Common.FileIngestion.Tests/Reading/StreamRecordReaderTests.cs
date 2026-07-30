@@ -108,7 +108,9 @@ public sealed class StreamRecordReaderTests
     [Fact]
     public void Constructor_SingleByteEncoding_Accepted()
     {
-        _ = new StreamRecordReader(4, 1, Encoding.Latin1); // does not throw
+        var reader = new StreamRecordReader(4, 1, Encoding.Latin1); // single-byte: accepted
+
+        Assert.Equal(5, reader.Stride);
     }
 
     [Fact]

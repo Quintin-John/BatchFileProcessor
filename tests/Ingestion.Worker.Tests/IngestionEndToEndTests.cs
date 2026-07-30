@@ -86,8 +86,8 @@ public sealed class IngestionEndToEndTests : IDisposable
 
     private sealed class CapturingPublisher : IMessagePublisher
     {
-        public List<IngestBatchMessage> Batches { get; } = new();
-        public List<RejectMessage> Rejects { get; } = new();
+        public List<IngestBatchMessage> Batches { get; } = [];
+        public List<RejectMessage> Rejects { get; } = [];
 
         public Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
         {

@@ -41,7 +41,7 @@ public sealed class RejectSinkTests
 
     private sealed class CapturingPublisher : IMessagePublisher
     {
-        public List<RejectMessage> Rejects { get; } = new();
+        public List<RejectMessage> Rejects { get; } = [];
 
         public Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken) =>
             Task.CompletedTask;

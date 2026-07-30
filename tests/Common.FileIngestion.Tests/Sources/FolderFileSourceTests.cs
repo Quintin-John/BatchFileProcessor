@@ -148,7 +148,9 @@ public sealed class FolderFileSourceTests : IDisposable
         var first = new FolderFileSource(_root);
         first.Dispose();
 
-        using var second = new FolderFileSource(_root); // lock released, does not throw
+        using var second = new FolderFileSource(_root); // lock released, ownership re-acquired
+
+        Assert.Empty(second.Claim()); // usable: a fresh instance can operate on the root
     }
 
     [Fact]
