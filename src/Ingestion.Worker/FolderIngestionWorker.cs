@@ -1,3 +1,4 @@
+using Common.FileIngestion.Health;
 using Common.FileIngestion.Sources;
 using Ingestion.Worker.Messages;
 using MassTransit;
@@ -15,21 +16,28 @@ public sealed partial class FolderIngestionWorker : BackgroundService
 {
     private readonly IFileSource _source;
     private readonly IMediator _mediator;
+    private readonly ReadinessGate _readiness;
     private readonly WorkerOptions _options;
     private readonly ILogger<FolderIngestionWorker> _logger;
 
     /// <summary>Creates the worker.</summary>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
     public FolderIngestionWorker(
-        IFileSource source, IMediator mediator, WorkerOptions options, ILogger<FolderIngestionWorker> logger)
+        IFileSource source,
+        IMediator mediator,
+        ReadinessGate readiness,
+        WorkerOptions options,
+        ILogger<FolderIngestionWorker> logger)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(mediator);
+        ArgumentNullException.ThrowIfNull(readiness);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
         _source = source;
         _mediator = mediator;
+        _readiness = readiness;
         _options = options;
         _logger = logger;
     }
@@ -78,6 +86,7 @@ public sealed partial class FolderIngestionWorker : BackgroundService
 
             await _mediator.Send(command, cancellationToken).ConfigureAwait(false);
             _source.Complete(file);
+            _readiness.MarkHealthy(); // a clean publish means downstream is reachable
             LogIngested(file.Name);
         }
 #pragma warning disable CA1031 // fail-closed: any ingestion failure quarantines the file and the loop continues
@@ -85,6 +94,7 @@ public sealed partial class FolderIngestionWorker : BackgroundService
 #pragma warning restore CA1031
         {
             _source.Fail(file);
+            _readiness.MarkDegraded(); // the pipeline could not complete this file (publish/infra impaired)
             LogFailed(ex, file.Name);
         }
     }

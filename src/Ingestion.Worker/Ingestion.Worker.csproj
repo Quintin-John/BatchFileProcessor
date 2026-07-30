@@ -13,6 +13,11 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
   </ItemGroup>
 
+  <!-- ASP.NET Core for the K8s liveness/readiness HTTP probe endpoints. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Ingestion.Worker.Tests" />
   </ItemGroup>

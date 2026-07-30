@@ -1,3 +1,4 @@
+using Common.FileIngestion.Health;
 using Common.FileIngestion.Sources;
 using Ingestion.Worker;
 using Ingestion.Worker.Messages;
@@ -27,7 +28,7 @@ public sealed class FolderIngestionWorkerTests
         var (mediator, spy, provider) = Mediator();
         await using var _ = provider;
         var source = new FakeFileSource();
-        var worker = new FolderIngestionWorker(source, mediator, Options(), NullLogger<FolderIngestionWorker>.Instance);
+        var worker = new FolderIngestionWorker(source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
 
         var files = new List<ClaimedFile>
         {
@@ -50,7 +51,7 @@ public sealed class FolderIngestionWorkerTests
         var (mediator, spy, provider) = Mediator();
         await using var _ = provider;
         var source = new FakeFileSource { Orphans = { new ClaimedFile("orphan.dat", "p/orphan.dat") } };
-        var worker = new FolderIngestionWorker(source, mediator, Options(), NullLogger<FolderIngestionWorker>.Instance);
+        var worker = new FolderIngestionWorker(source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
 
         await worker.StartAsync(CancellationToken.None);
         await WaitUntil(() => source.Completed.Contains("orphan.dat"));
@@ -58,6 +59,22 @@ public sealed class FolderIngestionWorkerTests
 
         Assert.Contains("orphan.dat", spy.Received);
         Assert.Contains("orphan.dat", source.Completed);
+    }
+
+    [Fact]
+    public async Task Dispatch_MarksReadiness_HealthyOnSuccess_DegradedOnFailure()
+    {
+        var (mediator, _, provider) = Mediator();
+        await using var __ = provider;
+        var gate = new ReadinessGate();
+        var worker = new FolderIngestionWorker(
+            new FakeFileSource(), mediator, gate, Options(), NullLogger<FolderIngestionWorker>.Instance);
+
+        await worker.ProcessAsync(new List<ClaimedFile> { new("ok.dat", "p/ok.dat") }, CancellationToken.None);
+        Assert.Equal(HealthStatus.Healthy, gate.Status);
+
+        await worker.ProcessAsync(new List<ClaimedFile> { new("boom.dat", "p/boom.dat") }, CancellationToken.None);
+        Assert.Equal(HealthStatus.Degraded, gate.Status);
     }
 
     private static async Task WaitUntil(Func<bool> condition)

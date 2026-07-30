@@ -14,13 +14,15 @@ using Common.Observability;
 using Common.Security.DataProtection;
 using Ingestion.Worker;
 using Ingestion.Worker.Consumers;
+using Ingestion.Worker.Health;
 using MassTransit;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 // Composition root — wiring only (excluded from coverage). Fails fast on missing configuration.
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
 var ingestion = builder.Configuration.GetSection("Ingestion");
 var messaging = builder.Configuration.GetSection("Messaging");
@@ -50,6 +52,16 @@ services.AddSingleton<IFileSource>(_ => new FolderFileSource(Required(ingestion,
 services.AddSingleton(new WorkerOptions(
     Required(ingestion, "ProfileId"), layout.Version, TimeSpan.FromSeconds(ingestion.GetValue<int>("PollIntervalSeconds"))));
 
+// Health: liveness from heartbeat staleness, readiness from the publish-outcome gate.
+services.AddSingleton(sp => new LivenessProbe(
+    sp.GetRequiredService<Heartbeat>(), TimeSpan.FromSeconds(ingestion.GetValue<int>("LivenessStalenessSeconds"))));
+services.AddSingleton<ReadinessGate>();
+string[] liveTags = ["live"];
+string[] readyTags = ["ready"];
+services.AddHealthChecks()
+    .AddCheck<LivenessHealthCheck>("liveness", tags: liveTags)
+    .AddCheck<ReadinessHealthCheck>("readiness", tags: readyTags);
+
 // Bus publishes batches/rejects to the broker; mediator dispatches IngestFile in-process.
 var resilience = new MessagingResilienceOptions();
 messaging.GetSection("Resilience").Bind(resilience); // retry/circuit-breaker policy is config, not hardcoded
@@ -65,7 +77,10 @@ services.AddMediator(cfg => cfg.AddConsumer<IngestFileConsumer>());
 
 services.AddHostedService<FolderIngestionWorker>();
 
-await builder.Build().RunAsync().ConfigureAwait(false);
+var app = builder.Build();
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+await app.RunAsync().ConfigureAwait(false);
 
 static string Required(IConfigurationSection section, string key) =>
     section[key] ?? throw new InvalidOperationException($"Missing required configuration '{section.Key}:{key}'.");
