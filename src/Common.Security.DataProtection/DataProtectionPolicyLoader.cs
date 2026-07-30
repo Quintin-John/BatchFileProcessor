@@ -1,66 +1,56 @@
-using System.Diagnostics.CodeAnalysis;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 
 namespace Common.Security.DataProtection;
 
 /// <summary>
 /// Loads a <see cref="DataProtectionPolicy"/> from soft-coded YAML. Fail-closed: unknown actions,
-/// missing actions, or a policy with no fields are rejected.
+/// missing actions, invalid flags, or a policy with no fields are rejected.
 /// </summary>
 public static class DataProtectionPolicyLoader
 {
+    private const string FieldsKey = "fields";
+    private const string ActionKey = "action";
+    private const string MaskKey = "mask";
+    private const string RedactKey = "redactInLogs";
+
     /// <summary>Loads and validates a policy from a YAML string.</summary>
     /// <param name="yaml">The policy YAML; required, non-blank.</param>
     /// <exception cref="ArgumentException"><paramref name="yaml"/> is null, empty, or whitespace.</exception>
-    /// <exception cref="FormatException">The YAML is malformed or a field's action is missing/unknown.</exception>
+    /// <exception cref="FormatException">The YAML is malformed or a field's action/flags are missing or invalid.</exception>
     public static DataProtectionPolicy Load(string yaml)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(yaml);
 
-        var deserializer = new DeserializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .IgnoreUnmatchedProperties()
-            .Build();
+        var deserializer = new DeserializerBuilder().Build();
 
-        PolicyDto? dto;
+        Dictionary<string, Dictionary<string, Dictionary<string, string>>>? root;
         try
         {
-            dto = deserializer.Deserialize<PolicyDto>(yaml);
+            root = deserializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(yaml);
         }
         catch (YamlException ex)
         {
             throw new FormatException("Invalid data-protection policy YAML.", ex);
         }
 
-        if (dto?.Fields is null || dto.Fields.Count == 0)
+        if (root is null
+            || !root.TryGetValue(FieldsKey, out var fieldNodes)
+            || fieldNodes is null
+            || fieldNodes.Count == 0)
         {
             throw new FormatException("Data-protection policy must define at least one field.");
         }
 
         var fields = new Dictionary<string, FieldProtection>(StringComparer.Ordinal);
-        foreach (var pair in dto.Fields)
+        foreach (var (name, props) in fieldNodes)
         {
-            if (string.IsNullOrWhiteSpace(pair.Key))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 throw new FormatException("Field names must be non-blank.");
             }
 
-            var entry = pair.Value;
-            if (entry is null || string.IsNullOrWhiteSpace(entry.Action))
-            {
-                throw new FormatException($"Field '{pair.Key}' must specify an action.");
-            }
-
-            if (!Enum.TryParse<ProtectionAction>(entry.Action, ignoreCase: true, out var action)
-                || !Enum.IsDefined(action))
-            {
-                throw new FormatException($"Field '{pair.Key}' has unknown action '{entry.Action}'.");
-            }
-
-            var mask = string.IsNullOrWhiteSpace(entry.Mask) ? null : entry.Mask;
-            fields[pair.Key] = new FieldProtection(action, mask, entry.RedactInLogs);
+            fields[name] = ParseField(name, props);
         }
 
         return new DataProtectionPolicy(fields);
@@ -74,21 +64,31 @@ public static class DataProtectionPolicyLoader
         return Load(File.ReadAllText(path));
     }
 
-    [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
-        Justification = "Instantiated by YamlDotNet via reflection.")]
-    private sealed class PolicyDto
+    private static FieldProtection ParseField(string name, Dictionary<string, string>? props)
     {
-        public Dictionary<string, FieldDto>? Fields { get; set; }
-    }
+        if (props is null
+            || !props.TryGetValue(ActionKey, out var actionText)
+            || string.IsNullOrWhiteSpace(actionText))
+        {
+            throw new FormatException($"Field '{name}' must specify an action.");
+        }
 
-    [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
-        Justification = "Instantiated by YamlDotNet via reflection.")]
-    private sealed class FieldDto
-    {
-        public string? Action { get; set; }
+        if (!Enum.TryParse<ProtectionAction>(actionText, ignoreCase: true, out var action) || !Enum.IsDefined(action))
+        {
+            throw new FormatException($"Field '{name}' has unknown action '{actionText}'.");
+        }
 
-        public string? Mask { get; set; }
+        props.TryGetValue(MaskKey, out var maskText);
+        var mask = string.IsNullOrWhiteSpace(maskText) ? null : maskText;
 
-        public bool RedactInLogs { get; set; }
+        var redact = false;
+        if (props.TryGetValue(RedactKey, out var redactText)
+            && !string.IsNullOrWhiteSpace(redactText)
+            && !bool.TryParse(redactText, out redact))
+        {
+            throw new FormatException($"Field '{name}' has invalid {RedactKey} '{redactText}'.");
+        }
+
+        return new FieldProtection(action, mask, redact);
     }
 }
