@@ -23,10 +23,7 @@ public sealed class ObservabilityOptions
     public void Validate()
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ServiceName);
-
-        if (SamplingRatio is < 0.0 or > 1.0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(SamplingRatio), SamplingRatio, "Sampling ratio must be between 0 and 1.");
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(SamplingRatio, 0.0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(SamplingRatio, 1.0);
     }
 }
