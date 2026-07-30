@@ -1,0 +1,188 @@
+# =============================================================================
+# G266 fixed-width layout — version 4.8 (ACI EPS-ISSUER / CMM)
+# Transcribed 2026-07-30 from the ACI mapping workbook, sheet "G266_4.8.2".
+#
+# AUTHORITATIVE in this file (read directly from the spec):
+#   - record types (FHR / PER / AER / FTR), each exactly 1200 bytes
+#   - every field's NAME, START (1-based), and LENGTH
+#   - internal check passed: each field's start == previous end + 1; each record sums to 1200
+#
+# PROVISIONAL — must be confirmed against the ACI data-element definitions
+# (NOT shown in the layout images), do NOT use for money math until confirmed:
+#   - `type` is INFERRED from the field-name suffix (-AMT -> decimal, -DTE -> date,
+#     -TME -> time, everything else -> string)
+#   - amount `scale` and sign convention are UNKNOWN (deliberately omitted)
+#   - date/time formats are inferred (sample data used yyyy-MM-dd / HH:mm:ss)
+#
+# Discriminator VALUE -> record type (confirmed):
+#   HEAD -> fhr,  TRAN -> per,  AUTH -> aer,  TRAI -> ftr
+#
+# Positions here are 1-based `start` + `length` to match the ACI spec exactly and
+# minimise transcription error (the ingestion mapper converts to 0-based offsets).
+# =============================================================================
+version: "4.8"
+recordLength: 1200
+encoding: ascii
+discriminator: { start: 1, length: 4 }
+
+recordTypes:
+
+  fhr:                       # File Header Record
+    match: "HEAD"            # observed in sample
+    fields:
+      - { name: W136-ECT-HDR-IDN-CDE, start: 1,  length: 4,    type: string }
+      - { name: W136-ECT-HDR-DTE,     start: 5,  length: 10,   type: date }
+      - { name: W136-ECT-HDR-TME,     start: 15, length: 8,    type: time }
+      - { name: FILLER,               start: 23, length: 1178, type: filler }
+
+  per:                       # Posting Extract Record
+    match: "TRAN"            # observed in sample
+    fields:
+      - { name: W136-ECT-PTG-RCD-IDN-CDE,     start: 1,    length: 4,   type: string }
+      - { name: W136-ECT-PTG-ITN-IDN-CDE,     start: 5,    length: 4,   type: string }
+      - { name: W136-ECT-PTG-PDT-IDN-CDE,     start: 9,    length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACT-TYP-CDE,     start: 13,   length: 4,   type: string }
+      - { name: W136-ECT-PTG-AGT-RFE-TXT,     start: 17,   length: 30,  type: string }
+      - { name: W136-ECT-PTG-ACT-RFE-NBR-TXT, start: 47,   length: 20,  type: string }
+      - { name: W136-ECT-PTG-ACT-OPE-BCH,     start: 67,   length: 4,   type: string }
+      - { name: W136-ECT-PTG-TXN-EXT-SLT-IND, start: 71,   length: 1,   type: string }
+      - { name: W136-ECT-PTG-EXT-ACT-NBR,     start: 72,   length: 34,  type: string }
+      - { name: W136-ECT-PTG-CLE-NBR,         start: 106,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-TXN-SMY-IDN-NBR, start: 110,  length: 9,   type: string }
+      - { name: W136-ECT-PTG-GTG-TXN-SMY-NBR, start: 119,  length: 9,   type: string }
+      - { name: W136-ECT-PTG-TXN-DTE,         start: 128,  length: 10,  type: date }
+      - { name: W136-ECT-PTG-OGL-TXN-CRY-CDE, start: 138,  length: 3,   type: string }
+      - { name: W136-ECT-PTG-OGL-TXN-AMT,     start: 141,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-SCM-SLT-DTE,     start: 158,  length: 10,  type: date }
+      - { name: W136-ECT-PTG-ITN-DFT-CRY-CDE, start: 168,  length: 3,   type: string }
+      - { name: W136-ECT-PTG-ITN-DFT-AMT,     start: 171,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-PTG-ACT-RFE-NBR, start: 188,  length: 20,  type: string }
+      - { name: W136-ECT-PTG-PTG-DTE,         start: 208,  length: 10,  type: date }
+      - { name: W136-ECT-PTG-PTG-CRY-CDE,     start: 218,  length: 3,   type: string }
+      - { name: W136-ECT-PTG-PTG-AMT,         start: 221,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-PTG-CVT-RTE,     start: 238,  length: 9,   type: decimal }
+      - { name: W136-ECT-PTG-SLT-ACT-RFE-NBR, start: 247,  length: 20,  type: string }
+      - { name: W136-ECT-PTG-SLT-CRY-CDE,     start: 267,  length: 3,   type: string }
+      - { name: W136-ECT-PTG-SLT-AMT,         start: 270,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-TXN-CDE,         start: 287,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ICE-RFE-NBR,     start: 291,  length: 16,  type: string }
+      - { name: W136-ECT-PTG-GTG-ICE-RFE-NBR, start: 307,  length: 16,  type: string }
+      - { name: W136-ECT-PTG-PAN-TXT,         start: 323,  length: 28,  type: string }
+      - { name: W136-ECT-PTG-CRD-BLK-DTE,     start: 351,  length: 10,  type: date }
+      - { name: W136-ECT-PTG-DBT-CDT-CDE,     start: 361,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-TXN-SRC-CDE,     start: 365,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ATH-CDE-TXT,     start: 369,  length: 6,   type: string }
+      - { name: W136-ECT-PTG-ATH-MCH-IND,     start: 375,  length: 1,   type: string }
+      - { name: W136-ECT-PTG-MCC-TXT,         start: 376,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-TXN-ON-SMT-IND,  start: 380,  length: 1,   type: string }
+      - { name: W136-ECT-PTG-TXN-TME,         start: 381,  length: 8,   type: time }
+      - { name: W136-ECT-PTG-TXN-DES-TXT,     start: 389,  length: 43,  type: string }
+      - { name: W136-ECT-PTG-ADL-SLT-MCH-TXT, start: 432,  length: 15,  type: string }
+      - { name: W136-ECT-PTG-PSV-DTA-CDE-TXT, start: 447,  length: 12,  type: string }
+      - { name: W136-ECT-PTG-PCS-CDE-NBR,     start: 459,  length: 2,   type: string }
+      - { name: W136-ECT-PTG-CRD-ACR-TML-TXT, start: 461,  length: 8,   type: string }
+      - { name: W136-ECT-PTG-CRD-ACR-IDN-TXT, start: 469,  length: 15,  type: string }
+      - { name: W136-ECT-PTG-SCM-BLG-AMT,     start: 484,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-SCM-BLG-CRY-CDE, start: 501,  length: 3,   type: string }
+      - { name: W136-ECT-PTG-CHQ-NBR,         start: 504,  length: 9,   type: string }
+      - { name: W136-ECT-PTG-APM-RTN-RSN-CDE, start: 513,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-SGLTXNLMT-ERR-FLG, start: 517, length: 1,  type: string }
+      - { name: W136-ECT-PTG-MTH-SDL-ERR-FLG, start: 518,  length: 1,   type: string }
+      - { name: W136-ECT-PTG-MCC-BLK-ERR-FLG, start: 519,  length: 1,   type: string }
+      - { name: W136-ECT-PTG-PMY-CDR-VER-MHD, start: 520,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-TXN-DMN-CDE,     start: 524,  length: 4,   type: string }
+      - { name: W136-ECT-ALT-PAN-TXT,         start: 528,  length: 28,  type: string }
+      - { name: W136-ECT-PTG-RPP-IDN-CDE,     start: 556,  length: 4,   type: string }
+      - { name: W136-ECT-OGL-AQR-SVF-AMT,     start: 560,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-AQR-SVF-AMT,     start: 577,  length: 17,  type: decimal }
+      - { name: W136-ECT-SLT-AQR-SVF-AMT,     start: 594,  length: 17,  type: decimal }
+      - { name: W136-ECT-OGL-AQR-FEF-AMT,     start: 611,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-AQR-FEF-AMT,     start: 628,  length: 17,  type: decimal }
+      - { name: W136-ECT-SLT-AQR-FEF-AMT,     start: 645,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-MSV-PTK-TYP-CDE, start: 662,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-MSV-PTK-TXT,     start: 666,  length: 28,  type: string }
+      - { name: W136-ECT-PTG-TKN-RQR-IDN-TXT, start: 694,  length: 11,  type: string }
+      - { name: W136-ECT-PTG-DVE-TYP-CDE,     start: 705,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-WLT-IDN-CDE,     start: 709,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACY-FEE-1-CDE,   start: 713,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACY-FEE-1-AMT,   start: 717,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-ACY-FEE-2-CDE,   start: 734,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACY-FEE-2-AMT,   start: 738,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-ACY-FEE-3-CDE,   start: 755,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACY-FEE-3-AMT,   start: 759,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-ACY-FEE-4-CDE,   start: 776,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACY-FEE-4-AMT,   start: 780,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-ACY-FEE-5-CDE,   start: 797,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACY-FEE-5-AMT,   start: 801,  length: 17,  type: decimal }
+      - { name: W136-ECT-PTG-ACY-FEE-6-CDE,   start: 818,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-ACY-FEE-6-AMT,   start: 822,  length: 17,  type: decimal }
+      - { name: W136-ECT-PAS-TGH-DTA-TXT,     start: 839,  length: 100, type: string }
+      - { name: W136-ECT-MTE-CRG-SEQ-NBR,     start: 939,  length: 4,   type: string }
+      - { name: W136-ECT-MTE-CRG-SEQ-CNT-NBR, start: 943,  length: 4,   type: string }
+      - { name: W136-ECT-PTG-CRT-BAL-AMT,     start: 947,  length: 18,  type: decimal }
+      - { name: W136-ECT-PTG-AVE-BAL-AMT,     start: 965,  length: 18,  type: decimal }
+      - { name: W136-ECT-PTG-PTG-MHE-DTE,     start: 983,  length: 10,  type: date }
+      - { name: W136-ECT-PTG-PTG-MHE-TME,     start: 993,  length: 8,   type: time }
+      - { name: W136-ECT-PTG-MSG-TYP-IDN-CDE, start: 1001, length: 4,   type: string }
+      - { name: W136-ECT-NWK-IDN-TXT,         start: 1005, length: 6,   type: string }
+      - { name: W136-ECT-RTV-RFE-NBR-TXT,     start: 1011, length: 12,  type: string }
+      - { name: W136-ECT-ATH-RTV-RFE-NBR-TXT, start: 1023, length: 12,  type: string }
+      - { name: W136-ECT-CSB-TXN-AMT,         start: 1035, length: 17,  type: decimal }
+      - { name: W136-ECT-CSB-PTG-AMT,         start: 1052, length: 17,  type: decimal }
+      - { name: W136-ECT-EXX-TXN-DES-TXT,     start: 1069, length: 82,  type: string }
+      - { name: FILLER,                       start: 1151, length: 50,  type: filler }
+
+  aer:                       # Authorisation Extract Record
+    match: "AUTH"            # confirmed: authorisation records start with AUTH
+    fields:
+      - { name: W136-ECT-ATH-RCD-IDN-CDE,     start: 1,    length: 4,   type: string }
+      - { name: W136-ECT-ATH-ITN-IDN-CDE,     start: 5,    length: 4,   type: string }
+      - { name: W136-ECT-ATH-PDT-IDN-CDE,     start: 9,    length: 4,   type: string }
+      - { name: W136-ECT-ATH-ACT-TYP-IDN-CDE, start: 13,   length: 4,   type: string }
+      - { name: W136-ECT-ATH-ACT-OPE-BCH,     start: 17,   length: 4,   type: string }
+      - { name: W136-ECT-ATH-TXN-EXT-SLT-IND, start: 21,   length: 1,   type: string }
+      - { name: W136-ECT-ATH-SRT-CDE,         start: 22,   length: 6,   type: string }
+      - { name: W136-ECT-ATH-ACT-NBR,         start: 28,   length: 20,  type: string }
+      - { name: W136-ECT-ATH-IBAN,            start: 48,   length: 34,  type: string }
+      - { name: W136-ECT-ATH-BIC,             start: 82,   length: 11,  type: string }
+      - { name: W136-ECT-ATH-EXT-ACT-NBR,     start: 93,   length: 34,  type: string }
+      - { name: W136-ECT-ATH-IXS-RFE-TXT,     start: 127,  length: 16,  type: string }
+      - { name: W136-ECT-ATH-ATH-RTN-DTE,     start: 143,  length: 10,  type: date }
+      - { name: W136-ECT-ATH-ACT-RFE-NBR,     start: 153,  length: 20,  type: string }
+      - { name: W136-ECT-ATH-PAN-TXT,         start: 173,  length: 28,  type: string }
+      - { name: W136-ECT-ATH-ADL-SLT-MCH-CTA, start: 201,  length: 15,  type: string }
+      - { name: W136-ECT-ATH-ATH-DTE,         start: 216,  length: 10,  type: date }
+      - { name: W136-ECT-ATH-ATH-TME,         start: 226,  length: 8,   type: time }
+      - { name: W136-ECT-ATH-TXN-CDE,         start: 234,  length: 4,   type: string }
+      - { name: W136-ECT-ATH-MCC-TXT,         start: 238,  length: 4,   type: string }
+      - { name: W136-ECT-ATH-BLG-CRY-CDE,     start: 242,  length: 3,   type: string }
+      - { name: W136-ECT-ATH-BLG-AMT,         start: 245,  length: 17,  type: decimal }
+      - { name: W136-ECT-ATH-TXN-CRY-CDE,     start: 262,  length: 3,   type: string }
+      - { name: W136-ECT-ATH-TXN-AMT,         start: 265,  length: 17,  type: decimal }
+      - { name: W136-ECT-ATH-APR-CDE,         start: 282,  length: 6,   type: string }
+      - { name: W136-ECT-ATH-CNY-CDE,         start: 288,  length: 3,   type: string }
+      - { name: W136-ECT-ATH-PSV-DTA-CDE,     start: 291,  length: 12,  type: string }
+      - { name: W136-ECT-ATH-ATN-CDE,         start: 303,  length: 3,   type: string }
+      - { name: W136-ECT-ATH-CRD-ACR-TML,     start: 306,  length: 8,   type: string }
+      - { name: W136-ECT-ATH-CRD-ACR-IDN,     start: 314,  length: 15,  type: string }
+      - { name: W136-ECT-ATH-TXN-DES-TXT,     start: 329,  length: 43,  type: string }
+      - { name: W136-ECT-ATH-CHP-BSE-ATH-IND, start: 372,  length: 1,   type: string }
+      - { name: W136-ECT-ATH-PMY-CDR-VER-MHD, start: 373,  length: 4,   type: string }
+      - { name: W136-ECT-ATH-CSB-TXN-AMT,     start: 377,  length: 17,  type: decimal }
+      - { name: W136-ECT-ATH-CSB-BLG-AMT,     start: 394,  length: 17,  type: decimal }
+      - { name: W136-ECT-ATH-AQR-SVF-AMT,     start: 411,  length: 17,  type: decimal }
+      - { name: W136-ECT-ATH-RQT-TXN-AMT,     start: 428,  length: 17,  type: decimal }
+      - { name: W136-ECT-ATH-RQT-BLG-AMT,     start: 445,  length: 17,  type: decimal }
+      - { name: W136-ECT-ATH-AQR-FEF-AMT,     start: 462,  length: 17,  type: decimal }
+      - { name: FILLER,                       start: 479,  length: 722, type: filler }
+
+  ftr:                       # File Trailer Record
+    match: "TRAI"            # observed in sample
+    fields:
+      - { name: W136-ECT-TLR-IDN-CDE, start: 1,  length: 4,    type: string }
+      - { name: FILLER,               start: 5,  length: 5,    type: filler }
+      - { name: W136-ECT-TLR-PTG-NBR, start: 10, length: 17,   type: string }
+      - { name: FILLER,               start: 27, length: 5,    type: filler }
+      - { name: W136-ECT-TLR-ATH-NBR, start: 32, length: 17,   type: string }
+      - { name: W136-ECT-TLR-LST-CDE, start: 49, length: 4,    type: string }
+      - { name: FILLER,               start: 53, length: 1148, type: filler }

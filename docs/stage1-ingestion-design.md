@@ -112,8 +112,8 @@ profiles:
 Empirically confirmed from the sample `g266tpeo_T000001_20221107`:
 
 - ASCII text, **fixed-length records of exactly 1200 bytes** + newline terminator.
-- Record type discriminator at **offset 0, length 4**: `HEAD`, `TRAN`, `TRAI`.
-- Sample structure: 1 × `HEAD`, 20,296 × `TRAN`, 1 × `TRAI` (single outer frame; the expected ~1k-record intermediate framing is **absent** in the sample — see §12/Q6).
+- Record type discriminator at **offset 0, length 4**. Per the V4.8 spec the record types are **FHR / PER / AER / FTR** (File Header / Posting Extract / Authorisation Extract / File Trailer); the discriminator **values** map as `HEAD`→FHR, `TRAN`→PER, `AUTH`→AER, `TRAI`→FTR. See [`docs/layouts/g266-v4.8.yaml`](layouts/g266-v4.8.yaml) and §12/Q1.
+- Sample structure: 1 × `HEAD` (FHR), 20,296 × `TRAN` (PER), 1 × `TRAI` (FTR) (single outer frame; the expected ~1k-record intermediate framing is **absent** in the sample — see §12/Q6).
 - Trailer sample: `TRAI ...000000043...000000000 LAST` — the count field does **not** reconcile with the body count under the obvious reading (see §12/Q6).
 - **Files may be hundreds of GB** → tens/hundreds of millions of records; a single run may last hours. Design target is **constant memory in file size** and sustained streaming throughput, never in-memory load. See §3.1.
 
@@ -565,7 +565,7 @@ Built against a **synthetic fixture layout** until the real G266 tables (V4.8/V4
 
 | # | Question | Impact | Default if unanswered |
 |---|---|---|---|
-| **Q1** | **OPEN — Real G266 field layout, for BOTH CMM V4.8 and V4.11** (offsets/lengths/types/sign) from ACI Issuer Interfaces/Batch Guide. Two versions ⇒ **versioned layouts** (`g266-v4.8.yaml`, `g266-v4.11.yaml`); how the active version is selected (config vs detected from `HEAD`) is part of this question. | Blocks *correct* layout(s); wrong offsets = silent money/date bugs. Version drift between 4.8/4.11 must not be hardcoded. | Build & test on synthetic fixture; layouts stay stubs, one per version, selected via profile/config. To be proven later. |
+| **Q1** | **PARTIAL — V4.8 received; V4.11 still pending.** V4.8 layout transcribed to [`docs/layouts/g266-v4.8.yaml`](layouts/g266-v4.8.yaml) from the ACI mapping workbook (sheet `G266_4.8.2`). Record types are **FHR / PER / AER / FTR** (each 1200 bytes); the 4-char discriminator at start 1 maps to the type — **confirmed: HEAD→FHR, TRAN→PER, AUTH→AER, TRAI→FTR**. Positional integrity verified (all 144 fields chain; each record sums to 1200). **Still open:** (a) V4.11 layout, (b) confirm data **types/decimal scale/sign** and date/time formats against the ACI data-element spec (the layout images show positions only — types in the YAML are inferred), (c) active-version selection (config vs detected). | Positions/lengths authoritative; **types/scale/sign provisional** — wrong scale = silent money bug. | V4.8 positional layout done; treat types as provisional until confirmed; V4.11 to follow. |
 | ~~Q2~~ | **RESOLVED** — Trigger model = **Mode B folder-watch worker** over a configured path (Windows/macOS local + Azure Files SMB); Azure Blob = future `IFileSource` (Mode C). See §3.2.1–3.2.3. | — | — |
 | ~~Q2b~~ | **RESOLVED** — **Signal-driven completion is first-class**: prefer producer **atomic-rename** / **`.done` sentinel**; **stable-size + lock-probe is fallback only**. Every discovery/claim/complete/fail transition is **logged** (feeds lineage/Datadog). Signals + logs both required. | — | — |
 | ~~Q3~~ | **RESOLVED (approach)** — batch size `N` + payload-byte cap are **per-profile config**, resolved per transport, with the ASB 256 KB ceiling enforced. Concrete default values are finalized when the ingestion component is built (they don't affect the contract or shared libraries). | — | — |
