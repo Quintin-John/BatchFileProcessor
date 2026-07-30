@@ -117,6 +117,69 @@ public sealed class FileIngestionPipelineTests
     }
 
     [Fact]
+    public async Task Ingest_PublishFaultMidRun_FailsClosed_WatermarkStaysAtLastConfirmedBatch()
+    {
+        var harness = new Harness();
+        harness.Publisher.FailOnBatchNumber = 2; // the final-flush batch faults; batch 0 already confirmed
+        var bytes = Bytes(FileText);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Build(maxRecords: 2).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
+
+        var watermark = await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None);
+        Assert.NotNull(watermark);                    // not cleared — the file did not complete
+        Assert.Equal(0, watermark!.BatchSeq);          // advanced only across the broker-confirmed batch 0
+        Assert.Equal(2 * Stride, watermark.ByteOffset); // one stride past batch 0's last record
+    }
+
+    [Fact]
+    public async Task Ingest_ResumesAfterPublishFault_CompletesWithoutLossOrDuplication()
+    {
+        var harness = new Harness();
+        var bytes = Bytes(FileText);
+
+        // Run 1: the second batch's publish faults after batch 0 is broker-confirmed.
+        harness.Publisher.FailOnBatchNumber = 2;
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Build(maxRecords: 2).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
+
+        // Run 2: broker recovered; resume from the batch-0 watermark and finish.
+        harness.Publisher.FailOnBatchNumber = int.MaxValue;
+        var outcome = await harness.Build(maxRecords: 2)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        Assert.Equal(1, outcome.RecordsAccepted); // only the unconfirmed tail (record 4)
+        Assert.Equal(1, outcome.RecordsRejected); // record 3
+        Assert.Equal(1, outcome.BatchesPublished);
+        // batch 0 (run 1) is never re-published and the sequence continues at 1 → no duplication, no loss.
+        Assert.Equal($"{outcome.FileId}-0", harness.Publisher.Batches[0].MessageId);
+        Assert.Equal($"{outcome.FileId}-1", harness.Publisher.Batches[1].MessageId);
+        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None)); // completed, cleared
+    }
+
+    [Fact]
+    public async Task Ingest_RejectPublishFault_FailsClosed()
+    {
+        var harness = new Harness();
+        harness.Publisher.FailOnReject = true;
+        var bytes = Bytes(FileText);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Build().IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Ingest_CheckpointSaveFault_FailsClosed()
+    {
+        var harness = new Harness();
+        harness.Checkpoints.FailOnSave = true;
+        var bytes = Bytes(FileText);
+
+        await Assert.ThrowsAsync<IOException>(
+            () => harness.Build().IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Ingest_ContentChangesBetweenPasses_FailsClosed()
     {
         var harness = new Harness();
@@ -173,15 +236,27 @@ public sealed class FileIngestionPipelineTests
     {
         public List<IngestBatchMessage> Batches { get; } = [];
         public List<RejectMessage> Rejects { get; } = [];
+        public int FailOnBatchNumber { get; set; } = int.MaxValue; // 1-based publish attempt that faults
+        public bool FailOnReject { get; set; }
 
         public Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
         {
+            if (Batches.Count + 1 == FailOnBatchNumber)
+            {
+                return Task.FromException(new InvalidOperationException("broker publish fault"));
+            }
+
             Batches.Add(batch);
             return Task.CompletedTask;
         }
 
         public Task PublishRejectAsync(RejectMessage reject, CancellationToken cancellationToken)
         {
+            if (FailOnReject)
+            {
+                return Task.FromException(new InvalidOperationException("broker reject fault"));
+            }
+
             Rejects.Add(reject);
             return Task.CompletedTask;
         }
@@ -191,11 +266,18 @@ public sealed class FileIngestionPipelineTests
     {
         private readonly Dictionary<string, Watermark> _watermarks = new(StringComparer.Ordinal);
 
+        public bool FailOnSave { get; set; }
+
         public Task<Watermark?> LoadAsync(string sourceKey, CancellationToken cancellationToken) =>
             Task.FromResult(_watermarks.GetValueOrDefault(sourceKey));
 
         public Task SaveAsync(Watermark watermark, CancellationToken cancellationToken)
         {
+            if (FailOnSave)
+            {
+                return Task.FromException(new IOException("checkpoint write fault"));
+            }
+
             _watermarks[watermark.SourceKey] = watermark;
             return Task.CompletedTask;
         }
