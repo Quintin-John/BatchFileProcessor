@@ -180,6 +180,23 @@ public sealed class SerializationTests
     // ---- golden shape ----
 
     [Fact]
+    public void RegisterConverters_AddsFieldValueConverter_ToExternalOptions()
+    {
+        var external = new JsonSerializerOptions();
+        MessagingJson.RegisterConverters(external);
+
+        var json = JsonSerializer.Serialize<FieldValue>(new ClearFieldValue(221.73m), external);
+
+        Assert.Equal("221.73", json);
+    }
+
+    [Fact]
+    public void RegisterConverters_NullOptions_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => MessagingJson.RegisterConverters(null!));
+    }
+
+    [Fact]
     public void GoldenShape_UsesCamelCase_NestedProvenanceAndLocator_ClearScalars_EncryptedObject()
     {
         var json = JsonSerializer.Serialize(SampleBatch(), Options);

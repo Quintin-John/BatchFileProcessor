@@ -19,6 +19,19 @@ public static class MessagingJson
     /// </summary>
     public static JsonSerializerOptions Options { get; } = CreateOptions();
 
+    /// <summary>
+    /// Registers the contract's converters onto external serializer options — e.g. a message
+    /// transport's own <see cref="JsonSerializerOptions"/> — so it serializes contract types
+    /// (notably <see cref="FieldValue"/>) with the same wire shape.
+    /// </summary>
+    /// <param name="options">The options to add converters to.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is null.</exception>
+    public static void RegisterConverters(JsonSerializerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        options.Converters.Add(new FieldValueJsonConverter());
+    }
+
     private static JsonSerializerOptions CreateOptions()
     {
         var options = new JsonSerializerOptions
