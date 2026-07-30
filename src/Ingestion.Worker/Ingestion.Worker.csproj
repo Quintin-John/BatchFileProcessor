@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <!-- Nullable / ImplicitUsings / analyzers inherited from Directory.Build.props (DRY). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>ingestion-worker</UserSecretsId>
+    <RootNamespace>Ingestion.Worker</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MassTransit" Version="8.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ingestion.Worker.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common.FileIngestion\Common.FileIngestion.csproj" />
+    <ProjectReference Include="..\Common.Messaging.Contracts\Common.Messaging.Contracts.csproj" />
+    <ProjectReference Include="..\Common.Messaging.MassTransit\Common.Messaging.MassTransit.csproj" />
+    <ProjectReference Include="..\Common.Observability\Common.Observability.csproj" />
+    <ProjectReference Include="..\Common.Security.DataProtection\Common.Security.DataProtection.csproj" />
+  </ItemGroup>
+
+</Project>
