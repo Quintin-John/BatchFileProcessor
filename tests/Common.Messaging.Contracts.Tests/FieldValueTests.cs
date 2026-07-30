@@ -11,7 +11,7 @@ public sealed class FieldValueTests
         var value = new ClearFieldValue(221.73m);
 
         Assert.Equal(221.73m, value.Value);
-        Assert.IsAssignableFrom<FieldValue>(value);
+        Assert.IsType<FieldValue>(value, exactMatch: false);
     }
 
     [Fact]
@@ -29,7 +29,7 @@ public sealed class FieldValueTests
         var value = new EncryptedFieldValue(envelope);
 
         Assert.Same(envelope, value.Value);
-        Assert.IsAssignableFrom<FieldValue>(value);
+        Assert.IsType<FieldValue>(value, exactMatch: false);
     }
 
     [Fact]

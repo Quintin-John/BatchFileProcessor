@@ -11,6 +11,9 @@
   <ItemGroup>
     <PackageReference Include="MassTransit" Version="8.3.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <!-- Pin patched System.Text.Json: Microsoft.Extensions.Hosting 8.0.0 pulls 8.0.0 transitively,
+         which carries GHSA-hh2w-p6rv-4g7w / GHSA-8g4q-xg66-9fp4 (High). 8.0.5 resolves both. -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
   <!-- ASP.NET Core for the K8s liveness/readiness HTTP probe endpoints. -->

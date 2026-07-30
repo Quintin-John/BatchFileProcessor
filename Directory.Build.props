@@ -12,6 +12,13 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
+    <!-- Supply-chain gate: audit direct AND transitive dependencies against the advisory DB. Combined
+         with TreatWarningsAsErrors, any known-vulnerable package (NU1901-NU1904) fails the build, so a
+         new advisory forces triage rather than silently shipping (fail-closed). Default mode is
+         direct-only, which is why transitive advisories did not break the build before. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+
     <!-- Reproducible builds. -->
     <Deterministic>true</Deterministic>
   </PropertyGroup>
