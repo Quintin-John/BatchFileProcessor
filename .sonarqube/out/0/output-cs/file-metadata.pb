@@ -5,7 +5,9 @@
 {/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/Serialization/FieldValueJsonConverter.csutf-8k
 b/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectReason.csutf-8l
 c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectMessage.csutf-8l
-c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/MessagingJson.csutf-8k
+c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RecordLocator.csutf-8l
+c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/MessagingJson.csutf-8p
+g/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/MessageProvenance.csutf-8k
 b/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestRecord.csutf-8q
 h/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestBatchMessage.csutf-8i
 `/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/FieldValue.csutf-8m

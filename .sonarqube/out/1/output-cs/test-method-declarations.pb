@@ -1,4 +1,4 @@
-Ó
+å
 p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/SerializationTests.cs Common.Messaging.Contracts.TestsT
 3Common.Messaging.Contracts.Tests.SerializationTestsWrite_ClearNull_EmitsJsonNullX
 3Common.Messaging.Contracts.Tests.SerializationTests!Write_ClearString_EmitsJsonStringT
@@ -18,8 +18,8 @@ p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Cont
 3Common.Messaging.Contracts.Tests.SerializationTests#Write_Encrypted_EmitsEnvelopeObject\
 3Common.Messaging.Contracts.Tests.SerializationTests%RoundTrip_Encrypted_PreservesEnvelopen
 3Common.Messaging.Contracts.Tests.SerializationTests7RoundTrip_IngestBatchMessage_PreservesEnvelopeAndFieldsk
-3Common.Messaging.Contracts.Tests.SerializationTests4RoundTrip_RejectMessage_PreservesReasonsAndRawRecordw
-3Common.Messaging.Contracts.Tests.SerializationTests@GoldenShape_UsesCamelCase_ClearScalars_And_NestedEncryptedObject¬
+3Common.Messaging.Contracts.Tests.SerializationTests4RoundTrip_RejectMessage_PreservesReasonsAndRawRecordˆ
+3Common.Messaging.Contracts.Tests.SerializationTestsQGoldenShape_UsesCamelCase_NestedProvenanceAndLocator_ClearScalars_EncryptedObject¬
 o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectReasonTests.cs Common.Messaging.Contracts.Testsa
 2Common.Messaging.Contracts.Tests.RejectReasonTests+Constructor_WithAllArguments_SetsPropertieso
 2Common.Messaging.Contracts.Tests.RejectReasonTests9Constructor_WithOnlyRequiredArguments_LeavesOptionalsNullb
@@ -27,33 +27,44 @@ o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Cont
 2Common.Messaging.Contracts.Tests.RejectReasonTests%Constructor_WithNegativeOffset_Throws^
 2Common.Messaging.Contracts.Tests.RejectReasonTests(Constructor_WithNonPositiveLength_ThrowsZ
 2Common.Messaging.Contracts.Tests.RejectReasonTests$Constructor_WithZeroOffset_IsAllowedF
-2Common.Messaging.Contracts.Tests.RejectReasonTestsEquality_ByValueÝ
+2Common.Messaging.Contracts.Tests.RejectReasonTestsEquality_ByValueµ
 p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectMessageTests.cs Common.Messaging.Contracts.Testsd
 3Common.Messaging.Contracts.Tests.RejectMessageTests-Constructor_WithValidArguments_SetsPropertiesX
 3Common.Messaging.Contracts.Tests.RejectMessageTests!RawRecord_AcceptsEncryptedContentS
-3Common.Messaging.Contracts.Tests.RejectMessageTestsReasons_AreDefensivelyCopied[
-3Common.Messaging.Contracts.Tests.RejectMessageTests$Constructor_WithBlankIdentity_Throws`
-3Common.Messaging.Contracts.Tests.RejectMessageTests)Constructor_WithOutOfRangePosition_Throws[
+3Common.Messaging.Contracts.Tests.RejectMessageTestsReasons_AreDefensivelyCopied\
+3Common.Messaging.Contracts.Tests.RejectMessageTests%Constructor_WithBlankMessageId_Throws\
+3Common.Messaging.Contracts.Tests.RejectMessageTests%Constructor_WithNullProvenance_ThrowsY
+3Common.Messaging.Contracts.Tests.RejectMessageTests"Constructor_WithNullLocator_Throws[
 3Common.Messaging.Contracts.Tests.RejectMessageTests$Constructor_WithNullRawRecord_ThrowsY
 3Common.Messaging.Contracts.Tests.RejectMessageTests"Constructor_WithNullReasons_ThrowsZ
 3Common.Messaging.Contracts.Tests.RejectMessageTests#Constructor_WithEmptyReasons_Throws_
-3Common.Messaging.Contracts.Tests.RejectMessageTests(Constructor_WithNullReasonElement_Throwsî
+3Common.Messaging.Contracts.Tests.RejectMessageTests(Constructor_WithNullReasonElement_ThrowsÆ
+p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RecordLocatorTests.cs Common.Messaging.Contracts.Testsd
+3Common.Messaging.Contracts.Tests.RecordLocatorTests-Constructor_WithValidArguments_SetsProperties_
+3Common.Messaging.Contracts.Tests.RecordLocatorTests(Constructor_WithRecordSeqBelowOne_Throws`
+3Common.Messaging.Contracts.Tests.RecordLocatorTests)Constructor_WithNegativeByteOffset_Throws]
+3Common.Messaging.Contracts.Tests.RecordLocatorTests&Constructor_WithBlankRecordType_Throws_
+3Common.Messaging.Contracts.Tests.RecordLocatorTests(Constructor_WithZeroByteOffset_IsAllowedG
+3Common.Messaging.Contracts.Tests.RecordLocatorTestsEquality_ByValue°
+t/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/MessageProvenanceTests.cs Common.Messaging.Contracts.Testsh
+7Common.Messaging.Contracts.Tests.MessageProvenanceTests-Constructor_WithValidArguments_SetsProperties_
+7Common.Messaging.Contracts.Tests.MessageProvenanceTests$Constructor_WithBlankArgument_ThrowsK
+7Common.Messaging.Contracts.Tests.MessageProvenanceTestsEquality_ByValue©
 o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestRecordTests.cs Common.Messaging.Contracts.Testsc
 2Common.Messaging.Contracts.Tests.IngestRecordTests-Constructor_WithValidArguments_SetsPropertiesm
 2Common.Messaging.Contracts.Tests.IngestRecordTests7Fields_AreDefensivelyCopied_SoCallerMutationDoesNotLeakS
-2Common.Messaging.Contracts.Tests.IngestRecordTestsConstructor_AllowsEmptyFields^
-2Common.Messaging.Contracts.Tests.IngestRecordTests(Constructor_WithRecordSeqBelowOne_Throws_
-2Common.Messaging.Contracts.Tests.IngestRecordTests)Constructor_WithNegativeByteOffset_Throws\
-2Common.Messaging.Contracts.Tests.IngestRecordTests&Constructor_WithBlankRecordType_ThrowsW
+2Common.Messaging.Contracts.Tests.IngestRecordTestsConstructor_AllowsEmptyFieldsX
+2Common.Messaging.Contracts.Tests.IngestRecordTests"Constructor_WithNullLocator_ThrowsW
 2Common.Messaging.Contracts.Tests.IngestRecordTests!Constructor_WithNullFields_Throws[
 2Common.Messaging.Contracts.Tests.IngestRecordTests%Constructor_WithBlankFieldName_Throws[
-2Common.Messaging.Contracts.Tests.IngestRecordTests%Constructor_WithNullFieldValue_Throws–
+2Common.Messaging.Contracts.Tests.IngestRecordTests%Constructor_WithNullFieldValue_Throwsú
 u/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestBatchMessageTests.cs Common.Messaging.Contracts.Testsi
 8Common.Messaging.Contracts.Tests.IngestBatchMessageTests-Constructor_WithValidArguments_SetsPropertiesV
 8Common.Messaging.Contracts.Tests.IngestBatchMessageTestsCount_IsDerivedFromRecordsp
 8Common.Messaging.Contracts.Tests.IngestBatchMessageTests4FirstAndLastRecordSeq_AreMinAndMax_RegardlessOfOrderX
-8Common.Messaging.Contracts.Tests.IngestBatchMessageTestsRecords_AreDefensivelyCopied`
-8Common.Messaging.Contracts.Tests.IngestBatchMessageTests$Constructor_WithBlankIdentity_Throwsc
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTestsRecords_AreDefensivelyCopieda
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests%Constructor_WithBlankMessageId_Throwsa
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests%Constructor_WithNullProvenance_Throwsc
 8Common.Messaging.Contracts.Tests.IngestBatchMessageTests'Constructor_WithNegativeBatchSeq_Throws^
 8Common.Messaging.Contracts.Tests.IngestBatchMessageTests"Constructor_WithNullRecords_Throws_
 8Common.Messaging.Contracts.Tests.IngestBatchMessageTests#Constructor_WithEmptyRecords_Throwsd

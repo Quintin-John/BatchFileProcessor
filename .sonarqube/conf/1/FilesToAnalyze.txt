@@ -3,6 +3,8 @@
 /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/HarnessSmokeTests.cs
 /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestBatchMessageTests.cs
 /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestRecordTests.cs
+/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/MessageProvenanceTests.cs
+/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RecordLocatorTests.cs
 /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectMessageTests.cs
 /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectReasonTests.cs
 /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/SerializationTests.cs
@@ -11,3 +13,4 @@
 /Users/quintin-johnsmith/.nuget/packages/xunit.runner.visualstudio/2.5.3/build/net6.0/xunit.runner.reporters.netcoreapp10.dll
 /Users/quintin-johnsmith/.nuget/packages/xunit.runner.visualstudio/2.5.3/build/net6.0/xunit.runner.utility.netcoreapp10.dll
 /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/coverage.cobertura.xml
+/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/coverage.opencover.xml

@@ -652,7 +652,7 @@ b/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contra
 lengthFF 
 ;FF 
 }GG 
-}HH È2
+}HH Š
 c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectMessage.cs
 	namespace 	
 Common
@@ -676,346 +676,320 @@ c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contra
 ;! "
 }# $
 public 
-
-string 
-CorrelationId 
-{  !
-get" %
-;% &
-}' (
+
+MessageProvenance 
+
+Provenance '
+{( )
+get* -
+;- .
+}/ 0
 public 
-
-string 
-FileId 
-{ 
-get 
-; 
-}  !
-public 
-
-string 
-FileName 
-{ 
-get  
-;  !
-}" #
-public 
-
-string 
-Profile 
-{ 
-get 
-;  
-}! "
-public 
-
-string 
-LayoutVersion 
-{  !
-get" %
-;% &
-}' (
-public   
-
-long   
-	RecordSeq   
-{   
-get   
-;    
-}  ! "
-public## 
-
-long## 
-
-ByteOffset## 
-{## 
-get##  
-;##  !
-}##" #
-public&& 
-
-string&& 
-
-RecordType&& 
-{&& 
-get&& "
-;&&" #
-}&&$ %
-public-- 
+
+RecordLocator 
+Locator  
+{! "
+get# &
+;& '
+}( )
+public 
 
 
-FieldValue-- 
-	RawRecord-- 
-{--  !
-get--" %
-;--% &
-}--' (
-public00 
+FieldValue 
+	RawRecord 
+{  !
+get" %
+;% &
+}' (
+public 
 
-IReadOnlyList00 
-<00 
-RejectReason00 %
->00% &
-Reasons00' .
-{00/ 0
-get001 4
-;004 5
-}006 7
-publicAA 
+IReadOnlyList 
+< 
+RejectReason %
+>% &
+Reasons' .
+{/ 0
+get1 4
+;4 5
+}6 7
+public(( 
 
-RejectMessageAA 
-(AA 
-stringBB 
-	messageIdBB 
-,BB 
-stringCC 
-correlationIdCC 
-,CC 
-stringDD 
-fileIdDD 
-,DD 
-stringEE 
-fileNameEE 
-,EE 
-stringFF 
-profileFF 
-,FF 
-stringGG 
-layoutVersionGG 
-,GG 
-longHH 
-	recordSeqHH 
-,HH 
-longII 
+RejectMessage(( 
+((( 
+string)) 
+	messageId)) 
+,)) 
+MessageProvenance** 
 
-byteOffsetII 
-,II 
-stringJJ 
+provenance** $
+,**$ %
+RecordLocator++ 
+locator++ 
+,++ 
 
-recordTypeJJ 
-,JJ 
+FieldValue,, 
+	rawRecord,, 
+,,, 
+IReadOnlyList-- 
+<-- 
+RejectReason-- "
+>--" #
+reasons--$ +
+)--+ ,
+{.. 
+ArgumentException// 
+.// #
+ThrowIfNullOrWhiteSpace// 1
+(//1 2
+	messageId//2 ;
+)//; <
+;//< =!
+ArgumentNullException00 
+.00 
+ThrowIfNull00 )
+(00) *
 
-FieldValueKK 
-	rawRecordKK 
-,KK 
-IReadOnlyListLL 
-<LL 
-RejectReasonLL "
->LL" #
-reasonsLL$ +
-)LL+ ,
-{MM 
-ArgumentExceptionNN 
-.NN #
-ThrowIfNullOrWhiteSpaceNN 1
-(NN1 2
-	messageIdNN2 ;
-)NN; <
-;NN< =
-ArgumentExceptionOO 
-.OO #
-ThrowIfNullOrWhiteSpaceOO 1
-(OO1 2
-correlationIdOO2 ?
-)OO? @
-;OO@ A
-ArgumentExceptionPP 
-.PP #
-ThrowIfNullOrWhiteSpacePP 1
-(PP1 2
-fileIdPP2 8
-)PP8 9
-;PP9 :
-ArgumentExceptionQQ 
-.QQ #
-ThrowIfNullOrWhiteSpaceQQ 1
-(QQ1 2
-fileNameQQ2 :
-)QQ: ;
-;QQ; <
-ArgumentExceptionRR 
-.RR #
-ThrowIfNullOrWhiteSpaceRR 1
-(RR1 2
-profileRR2 9
-)RR9 :
-;RR: ;
-ArgumentExceptionSS 
-.SS #
-ThrowIfNullOrWhiteSpaceSS 1
-(SS1 2
-layoutVersionSS2 ?
-)SS? @
-;SS@ A'
-ArgumentOutOfRangeExceptionTT #
-.TT# $
-ThrowIfLessThanTT$ 3
-(TT3 4
-	recordSeqTT4 =
-,TT= >
-$numTT? @
-)TT@ A
-;TTA B'
-ArgumentOutOfRangeExceptionUU #
-.UU# $
-ThrowIfNegativeUU$ 3
-(UU3 4
-
-byteOffsetUU4 >
-)UU> ?
-;UU? @
-ArgumentExceptionVV 
-.VV #
-ThrowIfNullOrWhiteSpaceVV 1
-(VV1 2
-
-recordTypeVV2 <
-)VV< =
-;VV= >!
-ArgumentNullExceptionWW 
-.WW 
-ThrowIfNullWW )
-(WW) *
-	rawRecordWW* 3
-)WW3 4
-;WW4 5!
-ArgumentNullExceptionXX 
-.XX 
-ThrowIfNullXX )
-(XX) *
-reasonsXX* 1
-)XX1 2
-;XX2 3
-ifZZ 
+provenance00* 4
+)004 5
+;005 6!
+ArgumentNullException11 
+.11 
+ThrowIfNull11 )
+(11) *
+locator11* 1
+)111 2
+;112 3!
+ArgumentNullException22 
+.22 
+ThrowIfNull22 )
+(22) *
+	rawRecord22* 3
+)223 4
+;224 5!
+ArgumentNullException33 
+.33 
+ThrowIfNull33 )
+(33) *
+reasons33* 1
+)331 2
+;332 3
+if55 
 
-(ZZ 
-reasonsZZ 
-.ZZ 
-CountZZ 
-==ZZ 
-$numZZ 
-)ZZ 
-{[[ 	
-throw\\ 
-new\\ 
-ArgumentException\\ '
-(\\' (
-$str\\( Q
-,\\Q R
-nameof\\S Y
-(\\Y Z
-reasons\\Z a
-)\\a b
-)\\b c
-;\\c d
-}]] 	
-var__ 
-copy__ 
-=__ 
-new__ 
-List__ 
-<__ 
-RejectReason__ (
->__( )
-(__) *
-reasons__* 1
-.__1 2
-Count__2 7
-)__7 8
-;__8 9
-foreach`` 
-(`` 
-var`` 
-reason`` 
-in`` 
-reasons`` &
-)``& '
-{aa 	
-ifbb 
-(bb 
-reasonbb 
-isbb 
-nullbb 
-)bb 
-{cc 
-throwdd 
-newdd 
-ArgumentExceptiondd +
-(dd+ ,
-$strdd, U
-,ddU V
-nameofddW ]
-(dd] ^
-reasonsdd^ e
-)dde f
-)ddf g
-;ddg h
-}ee 
-copygg 
-.gg 
-Addgg 
-(gg 
-reasongg 
-)gg 
-;gg 
-}hh 	
-	MessageIdjj 
-=jj 
-	messageIdjj 
-;jj 
-CorrelationIdkk 
-=kk 
-correlationIdkk %
-;kk% &
-FileIdll 
-=ll 
-fileIdll 
-;ll 
-FileNamemm 
-=mm 
-fileNamemm 
-;mm 
-Profilenn 
-=nn 
-profilenn 
-;nn 
-LayoutVersionoo 
-=oo 
-layoutVersionoo %
-;oo% &
-	RecordSeqpp 
-=pp 
-	recordSeqpp 
-;pp 
+(55 
+reasons55 
+.55 
+Count55 
+==55 
+$num55 
+)55 
+{66 	
+throw77 
+new77 
+ArgumentException77 '
+(77' (
+$str77( Q
+,77Q R
+nameof77S Y
+(77Y Z
+reasons77Z a
+)77a b
+)77b c
+;77c d
+}88 	
+var:: 
+copy:: 
+=:: 
+new:: 
+List:: 
+<:: 
+RejectReason:: (
+>::( )
+(::) *
+reasons::* 1
+.::1 2
+Count::2 7
+)::7 8
+;::8 9
+foreach;; 
+(;; 
+var;; 
+reason;; 
+in;; 
+reasons;; &
+);;& '
+{<< 	
+if== 
+(== 
+reason== 
+is== 
+null== 
+)== 
+{>> 
+throw?? 
+new?? 
+ArgumentException?? +
+(??+ ,
+$str??, U
+,??U V
+nameof??W ]
+(??] ^
+reasons??^ e
+)??e f
+)??f g
+;??g h
+}@@ 
+copyBB 
+.BB 
+AddBB 
+(BB 
+reasonBB 
+)BB 
+;BB 
+}CC 	
+	MessageIdEE 
+=EE 
+	messageIdEE 
+;EE 
 
-ByteOffsetqq 
-=qq 
+ProvenanceFF 
+=FF 
 
-byteOffsetqq 
-;qq  
+provenanceFF 
+;FF  
+LocatorGG 
+=GG 
+locatorGG 
+;GG 
+	RawRecordHH 
+=HH 
+	rawRecordHH 
+;HH 
+ReasonsII 
+=II 
+newII 
+ReadOnlyCollectionII (
+<II( )
+RejectReasonII) 5
+>II5 6
+(II6 7
+copyII7 ;
+)II; <
+;II< =
+}JJ 
+}KK ©
+c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RecordLocator.cs
+	namespace 	
+Common
+ 
+. 
+	Messaging 
+. 
+	Contracts $
+;$ %
+public 
+sealed 
+record 
+RecordLocator "
+{ 
+public
+
+ 
+
+long
+
+ 
+	RecordSeq
+
+ 
+{
+
+ 
+get
+
+ 
+;
+
+  
+}
+
+! "
+public 
+
+long 
 
-RecordTyperr 
-=rr 
+ByteOffset 
+{ 
+get  
+;  !
+}" #
+public 
+
+string 
 
-recordTyperr 
-;rr  
-	RawRecordss 
-=ss 
-	rawRecordss 
-;ss 
-Reasonstt 
-=tt 
-newtt 
-ReadOnlyCollectiontt (
-<tt( )
-RejectReasontt) 5
->tt5 6
-(tt6 7
-copytt7 ;
-)tt; <
-;tt< =
-}uu 
-}vv æ
+RecordType 
+{ 
+get "
+;" #
+}$ %
+public 
+
+RecordLocator 
+( 
+long 
+	recordSeq '
+,' (
+long) -
+
+byteOffset. 8
+,8 9
+string: @
+
+recordTypeA K
+)K L
+{ '
+ArgumentOutOfRangeException #
+.# $
+ThrowIfLessThan$ 3
+(3 4
+	recordSeq4 =
+,= >
+$num? @
+)@ A
+;A B'
+ArgumentOutOfRangeException #
+.# $
+ThrowIfNegative$ 3
+(3 4
+
+byteOffset4 >
+)> ?
+;? @
+ArgumentException 
+. #
+ThrowIfNullOrWhiteSpace 1
+(1 2
+
+recordType2 <
+)< =
+;= >
+	RecordSeq 
+= 
+	recordSeq 
+; 
+
+ByteOffset 
+= 
+
+byteOffset 
+;  
+
+RecordType   
+=   
+
+recordType   
+;    
+}!! 
+}"" æ
 c/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/MessagingJson.cs
 	namespace 	
 Common
@@ -1104,7 +1078,138 @@ Converters   
 options"" 
 ;"" 
 }## 
-}$$ û
+}$$ Ì
+g/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/MessageProvenance.cs
+	namespace 	
+Common
+ 
+. 
+	Messaging 
+. 
+	Contracts $
+;$ %
+public 
+sealed 
+record 
+MessageProvenance &
+{		 
+public 
+
+string 
+CorrelationId 
+{  !
+get" %
+;% &
+}' (
+public 
+
+string 
+FileId 
+{ 
+get 
+; 
+}  !
+public 
+
+string 
+FileName 
+{ 
+get  
+;  !
+}" #
+public 
+
+string 
+Profile 
+{ 
+get 
+;  
+}! "
+public 
+
+string 
+LayoutVersion 
+{  !
+get" %
+;% &
+}' (
+public   
+
+MessageProvenance   
+(   
+string!! 
+correlationId!! 
+,!! 
+string"" 
+fileId"" 
+,"" 
+string## 
+fileName## 
+,## 
+string$$ 
+profile$$ 
+,$$ 
+string%% 
+layoutVersion%% 
+)%% 
+{&& 
+ArgumentException'' 
+.'' #
+ThrowIfNullOrWhiteSpace'' 1
+(''1 2
+correlationId''2 ?
+)''? @
+;''@ A
+ArgumentException(( 
+.(( #
+ThrowIfNullOrWhiteSpace(( 1
+(((1 2
+fileId((2 8
+)((8 9
+;((9 :
+ArgumentException)) 
+.)) #
+ThrowIfNullOrWhiteSpace)) 1
+())1 2
+fileName))2 :
+))): ;
+;)); <
+ArgumentException** 
+.** #
+ThrowIfNullOrWhiteSpace** 1
+(**1 2
+profile**2 9
+)**9 :
+;**: ;
+ArgumentException++ 
+.++ #
+ThrowIfNullOrWhiteSpace++ 1
+(++1 2
+layoutVersion++2 ?
+)++? @
+;++@ A
+CorrelationId-- 
+=-- 
+correlationId-- %
+;--% &
+FileId.. 
+=.. 
+fileId.. 
+;.. 
+FileName// 
+=// 
+fileName// 
+;// 
+Profile00 
+=00 
+profile00 
+;00 
+LayoutVersion11 
+=11 
+layoutVersion11 %
+;11% &
+}22 
+}33 œ
 b/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestRecord.cs
 	namespace 	
 Common
@@ -1120,223 +1225,167 @@ b/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contra
 IngestRecord  
 { 
 public 
-
-long 
-	RecordSeq 
-{ 
-get 
-;  
-}! "
+
+RecordLocator 
+Locator  
+{! "
+get# &
+;& '
+}( )
 public 
-
-long 
-
-ByteOffset 
-{ 
-get  
-;  !
-}" #
-public 
-
-string 
-
-RecordType 
-{ 
-get "
-;" #
-}$ %
-public 
 
-IReadOnlyDictionary 
-< 
-string %
-,% &
+IReadOnlyDictionary 
+< 
+string %
+,% &
 
-FieldValue' 1
->1 2
-Fields3 9
-{: ;
-get< ?
-;? @
-}A B
-public"" 
+FieldValue' 1
+>1 2
+Fields3 9
+{: ;
+get< ?
+;? @
+}A B
+public 
 
-IngestRecord"" 
-("" 
-long## 
-	recordSeq## 
-,## 
-long$$ 
+IngestRecord 
+( 
+RecordLocator %
+locator& -
+,- .
+IReadOnlyDictionary/ B
+<B C
+stringC I
+,I J
 
-byteOffset$$ 
-,$$ 
-string%% 
+FieldValueK U
+>U V
+fieldsW ]
+)] ^
+{ !
+ArgumentNullException 
+. 
+ThrowIfNull )
+() *
+locator* 1
+)1 2
+;2 3!
+ArgumentNullException 
+. 
+ThrowIfNull )
+() *
+fields* 0
+)0 1
+;1 2
+var 
+copy 
+= 
+new 
 
-recordType%% 
-,%% 
-IReadOnlyDictionary&& 
-<&& 
-string&& "
-,&&" #
+Dictionary !
+<! "
+string" (
+,( )
 
-FieldValue&&$ .
->&&. /
-fields&&0 6
-)&&6 7
-{'' '
-ArgumentOutOfRangeException(( #
-.((# $
-ThrowIfLessThan(($ 3
-(((3 4
-	recordSeq((4 =
-,((= >
-$num((? @
-)((@ A
-;((A B'
-ArgumentOutOfRangeException)) #
-.))# $
-ThrowIfNegative))$ 3
-())3 4
+FieldValue* 4
+>4 5
+(5 6
+fields6 <
+.< =
+Count= B
+,B C
+StringComparerD R
+.R S
+OrdinalS Z
+)Z [
+;[ \
+foreach 
+( 
+var 
+pair 
+in 
+fields #
+)# $
+{   	
+if!! 
+(!! 
+string!! 
+.!! 
+IsNullOrWhiteSpace!! )
+(!!) *
+pair!!* .
+.!!. /
+Key!!/ 2
+)!!2 3
+)!!3 4
+{"" 
+throw## 
+new## 
+ArgumentException## +
+(##+ ,
+$str##, L
+,##L M
+nameof##N T
+(##T U
+fields##U [
+)##[ \
+)##\ ]
+;##] ^
+}$$ 
+if&& 
+(&& 
+pair&& 
+.&& 
+Value&& 
+is&& 
+null&& "
+)&&" #
+{'' 
+throw(( 
+new(( 
+ArgumentException(( +
+(((+ ,
+$str((, L
+,((L M
+nameof((N T
+(((T U
+fields((U [
+)(([ \
+)((\ ]
+;((] ^
+})) 
+copy++ 
+[++ 
+pair++ 
+.++ 
+Key++ 
+]++ 
+=++ 
+pair++ !
+.++! "
+Value++" '
+;++' (
+},, 	
+Locator.. 
+=.. 
+locator.. 
+;.. 
+Fields// 
+=// 
+new// 
+ReadOnlyDictionary// '
+<//' (
+string//( .
+,//. /
 
-byteOffset))4 >
-)))> ?
-;))? @
-ArgumentException** 
-.** #
-ThrowIfNullOrWhiteSpace** 1
-(**1 2
-
-recordType**2 <
-)**< =
-;**= >!
-ArgumentNullException++ 
-.++ 
-ThrowIfNull++ )
-(++) *
-fields++* 0
-)++0 1
-;++1 2
-var-- 
-copy-- 
-=-- 
-new-- 
-
-Dictionary-- !
-<--! "
-string--" (
-,--( )
-
-FieldValue--* 4
->--4 5
-(--5 6
-fields--6 <
-.--< =
-Count--= B
-,--B C
-StringComparer--D R
-.--R S
-Ordinal--S Z
-)--Z [
-;--[ \
-foreach.. 
-(.. 
-var.. 
-pair.. 
-in.. 
-fields.. #
-)..# $
-{// 	
-if00 
-(00 
-string00 
-.00 
-IsNullOrWhiteSpace00 )
-(00) *
-pair00* .
-.00. /
-Key00/ 2
-)002 3
-)003 4
-{11 
-throw22 
-new22 
-ArgumentException22 +
-(22+ ,
-$str22, L
-,22L M
-nameof22N T
-(22T U
-fields22U [
-)22[ \
-)22\ ]
-;22] ^
-}33 
-if55 
-(55 
-pair55 
-.55 
-Value55 
-is55 
-null55 "
-)55" #
-{66 
-throw77 
-new77 
-ArgumentException77 +
-(77+ ,
-$str77, L
-,77L M
-nameof77N T
-(77T U
-fields77U [
-)77[ \
-)77\ ]
-;77] ^
-}88 
-copy:: 
-[:: 
-pair:: 
-.:: 
-Key:: 
-]:: 
-=:: 
-pair:: !
-.::! "
-Value::" '
-;::' (
-};; 	
-	RecordSeq== 
-=== 
-	recordSeq== 
-;== 
-
-ByteOffset>> 
-=>> 
-
-byteOffset>> 
-;>>  
-
-RecordType?? 
-=?? 
-
-recordType?? 
-;??  
-Fields@@ 
-=@@ 
-new@@ 
-ReadOnlyDictionary@@ '
-<@@' (
-string@@( .
-,@@. /
-
-FieldValue@@0 :
->@@: ;
-(@@; <
-copy@@< @
-)@@@ A
-;@@A B
-}AA 
-}BB ©2
+FieldValue//0 :
+>//: ;
+(//; <
+copy//< @
+)//@ A
+;//A B
+}00 
+}11 ’&
 h/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestBatchMessage.cs
 	namespace 	
 Common
@@ -1360,339 +1409,260 @@ h/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contra
 ;! "
 }# $
 public 
-
-string 
-CorrelationId 
-{  !
-get" %
-;% &
-}' (
+
+MessageProvenance 
+
+Provenance '
+{( )
+get* -
+;- .
+}/ 0
 public 
-
-string 
-FileId 
+
+long 
+BatchSeq 
 { 
 get 
 ; 
 }  !
 public 
-
-string 
-FileName 
-{ 
-get  
-;  !
-}" #
+
+IReadOnlyList 
+< 
+IngestRecord %
+>% &
+Records' .
+{/ 0
+get1 4
+;4 5
+}6 7
 public 
-
-string 
-Profile 
-{ 
-get 
-;  
-}! "
+
+int 
+Count 
+=> 
+Records 
+.  
+Count  %
+;% &
 public 
-
-string 
-LayoutVersion 
-{  !
-get" %
-;% &
-}' (
+
+long 
+FirstRecordSeq 
+{  
+get! $
+;$ %
+}& '
 public   
 
-long   
-BatchSeq   
-{   
-get   
-;   
-}    !
-public## 
-
-IReadOnlyList## 
-<## 
-IngestRecord## %
->##% &
-Records##' .
-{##/ 0
-get##1 4
-;##4 5
-}##6 7
-public&& 
-
-int&& 
-Count&& 
-=>&& 
-Records&& 
-.&&  
-Count&&  %
-;&&% &
-public)) 
-
-long)) 
-FirstRecordSeq)) 
-{))  
-get))! $
-;))$ %
-}))& '
-public,, 
-
-long,, 
-LastRecordSeq,, 
-{,, 
-get,,  #
-;,,# $
-},,% &
-public:: 
+long   
+LastRecordSeq   
+{   
+get    #
+;  # $
+}  % &
+public** 
 
-IngestBatchMessage:: 
-(:: 
-string;; 
-	messageId;; 
-,;; 
-string<< 
-correlationId<< 
-,<< 
-string== 
-fileId== 
-,== 
-string>> 
-fileName>> 
-,>> 
-string?? 
-profile?? 
-,?? 
-string@@ 
-layoutVersion@@ 
-,@@ 
-longAA 
-batchSeqAA 
-,AA 
-IReadOnlyListBB 
-<BB 
-IngestRecordBB "
->BB" #
-recordsBB$ +
-)BB+ ,
-{CC 
-ArgumentExceptionDD 
-.DD #
-ThrowIfNullOrWhiteSpaceDD 1
-(DD1 2
-	messageIdDD2 ;
-)DD; <
-;DD< =
-ArgumentExceptionEE 
-.EE #
-ThrowIfNullOrWhiteSpaceEE 1
-(EE1 2
-correlationIdEE2 ?
-)EE? @
-;EE@ A
-ArgumentExceptionFF 
-.FF #
-ThrowIfNullOrWhiteSpaceFF 1
-(FF1 2
-fileIdFF2 8
-)FF8 9
-;FF9 :
-ArgumentExceptionGG 
-.GG #
-ThrowIfNullOrWhiteSpaceGG 1
-(GG1 2
-fileNameGG2 :
-)GG: ;
-;GG; <
-ArgumentExceptionHH 
-.HH #
-ThrowIfNullOrWhiteSpaceHH 1
-(HH1 2
-profileHH2 9
-)HH9 :
-;HH: ;
-ArgumentExceptionII 
-.II #
-ThrowIfNullOrWhiteSpaceII 1
-(II1 2
-layoutVersionII2 ?
-)II? @
-;II@ A'
-ArgumentOutOfRangeExceptionJJ #
-.JJ# $
-ThrowIfNegativeJJ$ 3
-(JJ3 4
-batchSeqJJ4 <
-)JJ< =
-;JJ= >!
-ArgumentNullExceptionKK 
-.KK 
-ThrowIfNullKK )
-(KK) *
-recordsKK* 1
-)KK1 2
-;KK2 3
-ifMM 
+IngestBatchMessage** 
+(** 
+string++ 
+	messageId++ 
+,++ 
+MessageProvenance,, 
+
+provenance,, $
+,,,$ %
+long-- 
+batchSeq-- 
+,-- 
+IReadOnlyList.. 
+<.. 
+IngestRecord.. "
+>.." #
+records..$ +
+)..+ ,
+{// 
+ArgumentException00 
+.00 #
+ThrowIfNullOrWhiteSpace00 1
+(001 2
+	messageId002 ;
+)00; <
+;00< =!
+ArgumentNullException11 
+.11 
+ThrowIfNull11 )
+(11) *
+
+provenance11* 4
+)114 5
+;115 6'
+ArgumentOutOfRangeException22 #
+.22# $
+ThrowIfNegative22$ 3
+(223 4
+batchSeq224 <
+)22< =
+;22= >!
+ArgumentNullException33 
+.33 
+ThrowIfNull33 )
+(33) *
+records33* 1
+)331 2
+;332 3
+if55 
 
-(MM 
-recordsMM 
-.MM 
-CountMM 
-==MM 
-$numMM 
-)MM 
-{NN 	
-throwOO 
-newOO 
-ArgumentExceptionOO '
-(OO' (
-$strOO( S
-,OOS T
-nameofOOU [
-(OO[ \
-recordsOO\ c
-)OOc d
-)OOd e
-;OOe f
-}PP 	
-varRR 
-copyRR 
-=RR 
-newRR 
-ListRR 
-<RR 
-IngestRecordRR (
->RR( )
-(RR) *
-recordsRR* 1
-.RR1 2
-CountRR2 7
-)RR7 8
-;RR8 9
-varSS 
-firstSS 
-=SS 
-longSS 
-.SS 
-MaxValueSS !
-;SS! "
-varTT 
-lastTT 
-=TT 
-longTT 
-.TT 
-MinValueTT  
-;TT  !
-foreachUU 
-(UU 
-varUU 
-recordUU 
-inUU 
-recordsUU &
-)UU& '
-{VV 	
-ifWW 
-(WW 
-recordWW 
-isWW 
-nullWW 
-)WW 
-{XX 
-throwYY 
-newYY 
-ArgumentExceptionYY +
-(YY+ ,
-$strYY, U
-,YYU V
-nameofYYW ]
-(YY] ^
-recordsYY^ e
-)YYe f
-)YYf g
-;YYg h
-}ZZ 
-first\\ 
-=\\ 
-Math\\ 
-.\\ 
-Min\\ 
-(\\ 
-first\\ "
-,\\" #
-record\\$ *
-.\\* +
-	RecordSeq\\+ 4
-)\\4 5
-;\\5 6
-last]] 
-=]] 
-Math]] 
-.]] 
-Max]] 
-(]] 
-last]]  
-,]]  !
-record]]" (
-.]]( )
-	RecordSeq]]) 2
-)]]2 3
-;]]3 4
-copy^^ 
-.^^ 
-Add^^ 
-(^^ 
-record^^ 
-)^^ 
-;^^ 
-}__ 	
-	MessageIdaa 
-=aa 
-	messageIdaa 
-;aa 
-CorrelationIdbb 
-=bb 
-correlationIdbb %
-;bb% &
-FileIdcc 
-=cc 
-fileIdcc 
-;cc 
-FileNamedd 
-=dd 
-fileNamedd 
-;dd 
-Profileee 
-=ee 
-profileee 
-;ee 
-LayoutVersionff 
-=ff 
-layoutVersionff %
-;ff% &
-BatchSeqgg 
-=gg 
-batchSeqgg 
-;gg 
-Recordshh 
-=hh 
-newhh 
-ReadOnlyCollectionhh (
-<hh( )
-IngestRecordhh) 5
->hh5 6
-(hh6 7
-copyhh7 ;
-)hh; <
-;hh< =
-FirstRecordSeqii 
-=ii 
-firstii 
-;ii 
-LastRecordSeqjj 
-=jj 
-lastjj 
-;jj 
-}kk 
-}ll Á
+(55 
+records55 
+.55 
+Count55 
+==55 
+$num55 
+)55 
+{66 	
+throw77 
+new77 
+ArgumentException77 '
+(77' (
+$str77( S
+,77S T
+nameof77U [
+(77[ \
+records77\ c
+)77c d
+)77d e
+;77e f
+}88 	
+var:: 
+copy:: 
+=:: 
+new:: 
+List:: 
+<:: 
+IngestRecord:: (
+>::( )
+(::) *
+records::* 1
+.::1 2
+Count::2 7
+)::7 8
+;::8 9
+var;; 
+first;; 
+=;; 
+long;; 
+.;; 
+MaxValue;; !
+;;;! "
+var<< 
+last<< 
+=<< 
+long<< 
+.<< 
+MinValue<<  
+;<<  !
+foreach== 
+(== 
+var== 
+record== 
+in== 
+records== &
+)==& '
+{>> 	
+if?? 
+(?? 
+record?? 
+is?? 
+null?? 
+)?? 
+{@@ 
+throwAA 
+newAA 
+ArgumentExceptionAA +
+(AA+ ,
+$strAA, U
+,AAU V
+nameofAAW ]
+(AA] ^
+recordsAA^ e
+)AAe f
+)AAf g
+;AAg h
+}BB 
+firstDD 
+=DD 
+MathDD 
+.DD 
+MinDD 
+(DD 
+firstDD "
+,DD" #
+recordDD$ *
+.DD* +
+LocatorDD+ 2
+.DD2 3
+	RecordSeqDD3 <
+)DD< =
+;DD= >
+lastEE 
+=EE 
+MathEE 
+.EE 
+MaxEE 
+(EE 
+lastEE  
+,EE  !
+recordEE" (
+.EE( )
+LocatorEE) 0
+.EE0 1
+	RecordSeqEE1 :
+)EE: ;
+;EE; <
+copyFF 
+.FF 
+AddFF 
+(FF 
+recordFF 
+)FF 
+;FF 
+}GG 	
+	MessageIdII 
+=II 
+	messageIdII 
+;II 
+
+ProvenanceJJ 
+=JJ 
+
+provenanceJJ 
+;JJ  
+BatchSeqKK 
+=KK 
+batchSeqKK 
+;KK 
+RecordsLL 
+=LL 
+newLL 
+ReadOnlyCollectionLL (
+<LL( )
+IngestRecordLL) 5
+>LL5 6
+(LL6 7
+copyLL7 ;
+)LL; <
+;LL< =
+FirstRecordSeqMM 
+=MM 
+firstMM 
+;MM 
+LastRecordSeqNN 
+=NN 
+lastNN 
+;NN 
+}OO 
+}PP Á
 
 `/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/FieldValue.cs
 	namespace 	
