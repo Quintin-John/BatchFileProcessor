@@ -36,6 +36,18 @@ public sealed class StructuredLogLineageSinkTests
     }
 
     [Fact]
+    public async Task ExportAsync_InformationDisabled_DoesNotSerializeOrLog()
+    {
+        var logger = new CapturingLogger<StructuredLogLineageSink>(enabled: false);
+        var sink = new StructuredLogLineageSink(logger);
+        var lineageEvent = new LineageEvent("run-1", "FILE1", new RecordLocator(1, 0, "TRAN"), LineageState.Consumed, When);
+
+        await sink.ExportAsync(lineageEvent, CancellationToken.None);
+
+        Assert.Empty(logger.Messages); // guard skips the (unnecessary) serialize + log when the category is off (CA1873)
+    }
+
+    [Fact]
     public void Constructor_NullLogger_Throws() =>
         Assert.Throws<ArgumentNullException>(() => new StructuredLogLineageSink(null!));
 
@@ -45,13 +57,13 @@ public sealed class StructuredLogLineageSinkTests
             new StructuredLogLineageSink(new CapturingLogger<StructuredLogLineageSink>())
                 .ExportAsync(null!, CancellationToken.None));
 
-    private sealed class CapturingLogger<T> : ILogger<T>
+    private sealed class CapturingLogger<T>(bool enabled = true) : ILogger<T>
     {
         public List<string> Messages { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel) => enabled;
 
         public void Log<TState>(
             LogLevel logLevel, EventId eventId, TState state, Exception? exception,

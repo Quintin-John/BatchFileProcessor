@@ -32,7 +32,14 @@ public sealed partial class StructuredLogLineageSink : ILineageSink
     public Task ExportAsync(LineageEvent lineageEvent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(lineageEvent);
-        LogLineage(JsonSerializer.Serialize(lineageEvent, JsonOptions));
+
+        // Serialize only when the sink category is actually logging (CA1873): the JSON is an expensive
+        // argument evaluated at the call site, before the source-generated LogLineage checks IsEnabled.
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            LogLineage(JsonSerializer.Serialize(lineageEvent, JsonOptions));
+        }
+
         return Task.CompletedTask;
     }
 
