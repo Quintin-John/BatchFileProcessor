@@ -17,19 +17,26 @@ public sealed record IngestionOptions
     /// <summary>Capacity of the bounded batch channel between reader and publisher(s).</summary>
     public int BatchChannelCapacity { get; }
 
+    /// <summary>Number of concurrent publisher tasks draining the batch channel (design §3 fan-out).</summary>
+    public int PublisherConcurrency { get; }
+
     /// <summary>Creates validated options.</summary>
     /// <param name="maxRecordsPerBatch">Max records per batch; at least 1.</param>
     /// <param name="maxContentBytesPerBatch">Max content bytes per batch; at least 1.</param>
     /// <param name="batchChannelCapacity">Bounded batch-channel capacity; at least 1.</param>
+    /// <param name="publisherConcurrency">Concurrent publisher tasks; at least 1.</param>
     /// <exception cref="ArgumentOutOfRangeException">Any value is less than 1.</exception>
-    public IngestionOptions(int maxRecordsPerBatch, int maxContentBytesPerBatch, int batchChannelCapacity)
+    public IngestionOptions(
+        int maxRecordsPerBatch, int maxContentBytesPerBatch, int batchChannelCapacity, int publisherConcurrency)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxRecordsPerBatch, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxContentBytesPerBatch, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(batchChannelCapacity, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(publisherConcurrency, 1);
 
         MaxRecordsPerBatch = maxRecordsPerBatch;
         MaxContentBytesPerBatch = maxContentBytesPerBatch;
         BatchChannelCapacity = batchChannelCapacity;
+        PublisherConcurrency = publisherConcurrency;
     }
 }

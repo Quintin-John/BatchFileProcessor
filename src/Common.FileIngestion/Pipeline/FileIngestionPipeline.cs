@@ -92,21 +92,23 @@ public sealed class FileIngestionPipeline
         ArgumentNullException.ThrowIfNull(request);
 
         var fileId = await ComputeFileIdAsync(request, cancellationToken).ConfigureAwait(false);
-        var run = await BeginRunAsync(request, fileId, cancellationToken).ConfigureAwait(false);
+        using var run = await BeginRunAsync(request, fileId, cancellationToken).ConfigureAwait(false);
 
         // Run span covers the whole file; batch spans nest under it and carry traceparent into headers.
         using var fileSpan = _tracing.StartFileActivity(run.Provenance);
 
-        // Decouple read/map from publishing: sealed batches flow through a bounded channel to a publisher
-        // task. The bound caps in-flight memory regardless of file size (§3.1) and backpressures the reader.
+        // Decouple read/map from publishing: sealed batches flow through a bounded channel to N concurrent
+        // publishers. The bound caps in-flight memory regardless of file size (§3.1) and backpressures the
+        // reader; fan-out parallelises the network-bound publish (the sole bottleneck, §3). Confirms arrive
+        // out of order, so the watermark advances only across the contiguous confirmed prefix (tracker).
         var channel = Channel.CreateBounded<IngestBatchMessage>(new BoundedChannelOptions(_options.BatchChannelCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = true,
         });
         using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var publisher = ConsumeAndPublishAsync(run, channel.Reader, pipelineCts);
+        var publishers = StartPublishers(run, channel.Reader, pipelineCts);
 
         try
         {
@@ -135,7 +137,7 @@ public sealed class FileIngestionPipeline
             // here as cancellation, but the publisher's fault is the real error and must win.
             channel.Writer.TryComplete();
             await pipelineCts.CancelAsync().ConfigureAwait(false);
-            var publisherError = await CaptureExceptionAsync(publisher).ConfigureAwait(false);
+            var publisherError = await ObservePublishersAsync(publishers).ConfigureAwait(false);
             if (publisherError is not null and not OperationCanceledException)
             {
                 ExceptionDispatchInfo.Throw(publisherError);
@@ -145,10 +147,25 @@ public sealed class FileIngestionPipeline
         }
 #pragma warning restore CA1031
 
-        await publisher.ConfigureAwait(false); // propagate a publisher fault on the happy path
+        var error = await ObservePublishersAsync(publishers).ConfigureAwait(false); // propagate a publisher fault
+        if (error is not null)
+        {
+            ExceptionDispatchInfo.Throw(error);
+        }
 
         await _checkpointStore.ClearAsync(run.SourceKey, cancellationToken).ConfigureAwait(false);
         return new IngestOutcome(fileId, run.Accepted, run.Rejected, run.Batches);
+    }
+
+    private Task[] StartPublishers(FileRun run, ChannelReader<IngestBatchMessage> reader, CancellationTokenSource pipelineCts)
+    {
+        var publishers = new Task[_options.PublisherConcurrency];
+        for (var i = 0; i < publishers.Length; i++)
+        {
+            publishers[i] = ConsumeAndPublishAsync(run, reader, pipelineCts);
+        }
+
+        return publishers;
     }
 
     private async Task ConsumeAndPublishAsync(
@@ -170,19 +187,41 @@ public sealed class FileIngestionPipeline
 #pragma warning restore CA1031
     }
 
-    private static async Task<Exception?> CaptureExceptionAsync(Task task)
+    // Awaits every publisher, returning the most meaningful fault: a real publish/checkpoint error wins
+    // over the cancellation it triggers in the other publishers; null if all succeeded.
+    private static async Task<Exception?> ObservePublishersAsync(Task[] publishers)
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await Task.WhenAll(publishers).ConfigureAwait(false);
             return null;
         }
-#pragma warning disable CA1031 // capturing any fault is this helper's purpose
-        catch (Exception ex)
+#pragma warning disable CA1031 // inspect the individual tasks below to pick the true cause
+        catch (Exception)
         {
-            return ex;
+            // fall through
         }
 #pragma warning restore CA1031
+
+        Exception? cancellation = null;
+        foreach (var task in publishers)
+        {
+            if (task.Exception?.InnerExceptions[0] is { } fault)
+            {
+                if (fault is not OperationCanceledException)
+                {
+                    return fault;
+                }
+
+                cancellation = fault;
+            }
+            else if (task.IsCanceled)
+            {
+                cancellation ??= new OperationCanceledException();
+            }
+        }
+
+        return cancellation;
     }
 
     private static async Task<string> ComputeFileIdAsync(IngestRequest request, CancellationToken cancellationToken)
@@ -203,11 +242,12 @@ public sealed class FileIngestionPipeline
 
         var provenance = new MessageProvenance(
             request.CorrelationId, fileId, request.FileName, request.ProfileId, request.LayoutVersion);
-        var batcher = new Batcher(
-            _options.MaxRecordsPerBatch, _options.MaxContentBytesPerBatch, provenance,
-            watermark is null ? 0 : watermark.BatchSeq + 1);
+        var firstBatchSeq = watermark is null ? 0 : watermark.BatchSeq + 1;
+        var batcher = new Batcher(_options.MaxRecordsPerBatch, _options.MaxContentBytesPerBatch, provenance, firstBatchSeq);
 
-        return new FileRun(request.SourceKey, watermark?.ByteOffset ?? 0, _reader.Stride, provenance, batcher);
+        return new FileRun(
+            request.SourceKey, watermark?.ByteOffset ?? 0, _reader.Stride, provenance, batcher,
+            new ConfirmedBatchTracker(firstBatchSeq));
     }
 
     private async ValueTask ProcessAsync(
@@ -277,22 +317,46 @@ public sealed class FileIngestionPipeline
 
         _metrics.BatchPublished();
         _heartbeat.Beat();
-        run.Batches++;
+        Interlocked.Increment(ref run.Batches); // publishers run concurrently
         // With publisher confirms, publish completing IS broker confirmation, so Published collapses into
         // Confirmed — the lineage reflects how the record actually moved.
         await EmitBatchLineageAsync(run, batch, LineageState.Confirmed, reasonCode: null, cancellationToken)
             .ConfigureAwait(false);
 
         // Resume position = one stride past the highest-offset record in the batch. LastByteOffset is the
-        // authoritative max (not Records[^1]), so this does not depend on batch insertion order. For the
-        // terminator-less final record this overshoots by the terminator length, which is immaterial: it
-        // is always the last batch and the watermark is cleared on completion (a crash in that window
-        // resumes past EOF, having already confirmed every record).
+        // authoritative max (not Records[^1]). The watermark may only advance across the contiguous confirmed
+        // prefix: a batch confirmed beyond an unconfirmed gap is held by the tracker until the gap fills, so
+        // a crash never resumes past an unconfirmed record.
         var confirmedOffset = batch.LastByteOffset + run.Stride;
-        await _checkpointStore.SaveAsync(
-            new Watermark(run.SourceKey, batch.Provenance.FileId, confirmedOffset, batch.LastRecordSeq, batch.BatchSeq),
-            cancellationToken)
-            .ConfigureAwait(false);
+        var advanced = run.Tracker.Confirm(new BatchPosition(batch.BatchSeq, confirmedOffset, batch.LastRecordSeq));
+        if (advanced is not null)
+        {
+            await SaveWatermarkAsync(run, advanced, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task SaveWatermarkAsync(FileRun run, BatchPosition position, CancellationToken cancellationToken)
+    {
+        // Serialise watermark writes across publishers and enforce monotonic advance: concurrent confirms
+        // can present advances out of order, and the watermark must never move backward.
+        await run.WatermarkGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (position.BatchSeq <= run.LastSavedBatchSeq)
+            {
+                return; // a newer watermark was already persisted
+            }
+
+            run.LastSavedBatchSeq = position.BatchSeq;
+            await _checkpointStore.SaveAsync(
+                new Watermark(
+                    run.SourceKey, run.Provenance.FileId, position.ByteOffset, position.LastRecordSeq, position.BatchSeq),
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            run.WatermarkGate.Release();
+        }
     }
 
     private async ValueTask EmitBatchLineageAsync(
@@ -306,17 +370,21 @@ public sealed class FileIngestionPipeline
         }
     }
 
-    // Per-file run state threaded through the single-threaded read loop: immutable resume/provenance
-    // context plus the running tallies. Replaces threading eight parameters through the read callback.
-    private sealed class FileRun
+    // Per-file run state. Immutable resume/provenance context plus running tallies. The reader mutates the
+    // batcher and Accepted/Rejected (single producer thread); concurrent publishers mutate Batches (via
+    // Interlocked) and advance the watermark through the tracker under WatermarkGate.
+    private sealed class FileRun : IDisposable
     {
-        public FileRun(string sourceKey, long resumeOffset, int stride, MessageProvenance provenance, Batcher batcher)
+        public FileRun(
+            string sourceKey, long resumeOffset, int stride, MessageProvenance provenance, Batcher batcher,
+            ConfirmedBatchTracker tracker)
         {
             SourceKey = sourceKey;
             ResumeOffset = resumeOffset;
             Stride = stride;
             Provenance = provenance;
             Batcher = batcher;
+            Tracker = tracker;
         }
 
         public string SourceKey { get; }
@@ -324,8 +392,16 @@ public sealed class FileIngestionPipeline
         public int Stride { get; }
         public MessageProvenance Provenance { get; }
         public Batcher Batcher { get; }
+        public ConfirmedBatchTracker Tracker { get; }
+
+        // Serialises watermark writes across publishers and enforces monotonic advance.
+        public SemaphoreSlim WatermarkGate { get; } = new(1, 1);
+        public long LastSavedBatchSeq { get; set; } = -1;
+
         public long Accepted;
         public long Rejected;
         public long Batches;
+
+        public void Dispose() => WatermarkGate.Dispose();
     }
 }

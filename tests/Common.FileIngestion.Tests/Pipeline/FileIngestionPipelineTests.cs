@@ -31,6 +31,7 @@ public sealed class FileIngestionPipelineTests
         public ChannelLineageEmitter Lineage { get; } = new(capacity: 1000); // large enough not to block small tests
 
         public int BatchChannelCapacity { get; set; } = 64; // large enough not to gate small tests
+        public int PublisherConcurrency { get; set; } = 1;  // deterministic by default; fan-out tests raise it
 
         public FileIngestionPipeline Build(int maxRecords = 2)
         {
@@ -46,7 +47,7 @@ public sealed class FileIngestionPipelineTests
                 new RecordLineage(Lineage, TimeProvider.System),
                 new IngestionTracing(instrumentation),
                 new Heartbeat(TimeProvider.System),
-                new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity));
+                new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity, PublisherConcurrency));
         }
     }
 
@@ -207,6 +208,43 @@ public sealed class FileIngestionPipelineTests
             () => harness.Build().IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
     }
 
+    private static string ManyRecords(int count) =>
+        string.Concat(Enumerable.Range(1, count).Select(i => $"DATA{i:D4}\n"));
+
+    [Fact]
+    public async Task Ingest_FanOut_PublishesEveryBatchOnce_AndCompletesCleanly()
+    {
+        var harness = new Harness { PublisherConcurrency = 4, BatchChannelCapacity = 4 };
+        var bytes = Bytes(ManyRecords(20)); // 20 records, maxRecords 1 -> 20 batches across 4 publishers
+
+        var outcome = await harness.Build(maxRecords: 1)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        Assert.Equal(20, outcome.RecordsAccepted);
+        Assert.Equal(20, outcome.BatchesPublished);
+        // Every batch seq 0..19 published exactly once, regardless of publisher order (no loss, no dup).
+        Assert.Equal(
+            Enumerable.Range(0, 20).Select(i => (long)i),
+            harness.Publisher.Batches.Select(b => b.BatchSeq).OrderBy(s => s));
+        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None)); // completed, cleared
+    }
+
+    [Fact]
+    public async Task Ingest_FanOut_PublishFault_NeverAdvancesWatermarkPastTheFailedBatch()
+    {
+        var harness = new Harness { PublisherConcurrency = 4, BatchChannelCapacity = 4 };
+        harness.Publisher.FailOnBatchSeq = 3; // batch 3 always faults, creating a gap
+        var bytes = Bytes(ManyRecords(20));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Build(maxRecords: 1).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
+
+        // Batches 4..19 may confirm out of order, but they sit beyond the gap at 3, so the contiguous
+        // watermark can never reach or pass 3. It is null or somewhere in 0..2 — never a skipped record.
+        var watermark = await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None);
+        Assert.True(watermark is null || watermark.BatchSeq < 3);
+    }
+
     [Fact]
     public async Task Ingest_ContentChangesBetweenPasses_FailsClosed()
     {
@@ -308,21 +346,43 @@ public sealed class FileIngestionPipelineTests
         public string Unprotect(FieldProtectionContext context, EncryptedFieldValue payload) => payload.Value.Ciphertext;
     }
 
+    // Thread-safe: under fan-out, PublishBatchAsync is called from N publisher threads concurrently.
     private sealed class CapturingPublisher : IMessagePublisher
     {
-        public List<IngestBatchMessage> Batches { get; } = [];
-        public List<RejectMessage> Rejects { get; } = [];
+        private readonly List<IngestBatchMessage> _batches = [];
+        private readonly List<RejectMessage> _rejects = [];
+
+        public IReadOnlyList<IngestBatchMessage> Batches
+        {
+            get { lock (_batches) { return _batches.ToArray(); } }
+        }
+
+        public IReadOnlyList<RejectMessage> Rejects
+        {
+            get { lock (_rejects) { return _rejects.ToArray(); } }
+        }
+
         public int FailOnBatchNumber { get; set; } = int.MaxValue; // 1-based publish attempt that faults
+        public long? FailOnBatchSeq { get; set; }                  // fail a specific batch (deterministic under fan-out)
         public bool FailOnReject { get; set; }
 
         public Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
         {
-            if (Batches.Count + 1 == FailOnBatchNumber)
+            if (batch.BatchSeq == FailOnBatchSeq)
             {
                 return Task.FromException(new InvalidOperationException("broker publish fault"));
             }
 
-            Batches.Add(batch);
+            lock (_batches)
+            {
+                if (_batches.Count + 1 == FailOnBatchNumber)
+                {
+                    return Task.FromException(new InvalidOperationException("broker publish fault"));
+                }
+
+                _batches.Add(batch);
+            }
+
             return Task.CompletedTask;
         }
 
@@ -333,7 +393,11 @@ public sealed class FileIngestionPipelineTests
                 return Task.FromException(new InvalidOperationException("broker reject fault"));
             }
 
-            Rejects.Add(reject);
+            lock (_rejects)
+            {
+                _rejects.Add(reject);
+            }
+
             return Task.CompletedTask;
         }
     }
