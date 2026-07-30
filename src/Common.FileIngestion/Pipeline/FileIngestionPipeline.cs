@@ -228,10 +228,10 @@ public sealed class FileIngestionPipeline
     private async ValueTask EmitBatchLineageAsync(
         FileRun run, IngestBatchMessage batch, LineageState state, string? reasonCode, CancellationToken cancellationToken)
     {
+        var batchRef = new BatchReference(batch.BatchSeq, batch.MessageId);
         foreach (var record in batch.Records)
         {
-            await _lineage.EmitAsync(
-                run.Provenance, record.Locator, state, batch.BatchSeq, batch.MessageId, reasonCode, cancellationToken)
+            await _lineage.EmitAsync(run.Provenance, record.Locator, state, batchRef, reasonCode, cancellationToken)
                 .ConfigureAwait(false);
         }
     }

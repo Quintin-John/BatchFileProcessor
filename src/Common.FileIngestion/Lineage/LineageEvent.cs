@@ -4,9 +4,9 @@ namespace Common.FileIngestion.Lineage;
 
 /// <summary>
 /// One structured per-record lifecycle event (design §8), stamped with the identity backbone
-/// (correlation/file/record, plus batch identity once known). Emitted at each <see cref="LineageState"/>
-/// transition to form the forensic trace of how a record moved. Telemetry, not the system of record —
-/// it never carries clear sensitive field data (§8.3): only stable reason codes.
+/// (correlation/file/record, plus the batch reference once known). Emitted at each
+/// <see cref="LineageState"/> transition to form the forensic trace of how a record moved. Telemetry,
+/// not the system of record — it never carries clear sensitive field data (§8.3): only stable reason codes.
 /// </summary>
 public sealed record LineageEvent
 {
@@ -25,11 +25,8 @@ public sealed record LineageEvent
     /// <summary>When the transition occurred (stamped by the emitter via an injected clock).</summary>
     public DateTimeOffset Timestamp { get; }
 
-    /// <summary>Batch sequence, once the record has been batched; otherwise null.</summary>
-    public long? BatchSeq { get; }
-
-    /// <summary>Batch message id, once the record has been batched; otherwise null.</summary>
-    public string? MessageId { get; }
+    /// <summary>The batch the record was placed into, once batched; otherwise null.</summary>
+    public BatchReference? Batch { get; }
 
     /// <summary>Stable reason code for a <see cref="LineageState.Rejected"/>/<see cref="LineageState.Failed"/> event; otherwise null. Never a raw field value.</summary>
     public string? ReasonCode { get; }
@@ -40,20 +37,17 @@ public sealed record LineageEvent
     /// <param name="locator">Record identity; required.</param>
     /// <param name="state">Lifecycle state; must be a defined value.</param>
     /// <param name="timestamp">Transition time.</param>
-    /// <param name="batchSeq">Batch sequence once known; non-negative if present.</param>
-    /// <param name="messageId">Batch message id once known; non-blank if present.</param>
+    /// <param name="batch">Batch reference once known; otherwise null.</param>
     /// <param name="reasonCode">Reason code for reject/fail; non-blank if present.</param>
-    /// <exception cref="ArgumentException">A required string is blank, an optional string is present but blank, or <paramref name="state"/> is undefined.</exception>
+    /// <exception cref="ArgumentException">A required string is blank, <paramref name="reasonCode"/> is present but blank, or <paramref name="state"/> is undefined.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="locator"/> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="batchSeq"/> is negative.</exception>
     public LineageEvent(
         string correlationId,
         string fileId,
         RecordLocator locator,
         LineageState state,
         DateTimeOffset timestamp,
-        long? batchSeq = null,
-        string? messageId = null,
+        BatchReference? batch = null,
         string? reasonCode = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
@@ -62,16 +56,6 @@ public sealed record LineageEvent
         if (!Enum.IsDefined(state))
         {
             throw new ArgumentException($"Undefined lineage state '{state}'.", nameof(state));
-        }
-
-        if (batchSeq is < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(batchSeq), batchSeq, "Batch sequence must be non-negative.");
-        }
-
-        if (messageId is not null && string.IsNullOrWhiteSpace(messageId))
-        {
-            throw new ArgumentException("Message id, when present, must be non-blank.", nameof(messageId));
         }
 
         if (reasonCode is not null && string.IsNullOrWhiteSpace(reasonCode))
@@ -84,8 +68,7 @@ public sealed record LineageEvent
         Locator = locator;
         State = state;
         Timestamp = timestamp;
-        BatchSeq = batchSeq;
-        MessageId = messageId;
+        Batch = batch;
         ReasonCode = reasonCode;
     }
 }

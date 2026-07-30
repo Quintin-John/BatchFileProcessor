@@ -29,8 +29,7 @@ public sealed class RecordLineage
     /// <param name="provenance">Run provenance (correlation + file identity); required.</param>
     /// <param name="locator">Record identity; required.</param>
     /// <param name="state">The transition.</param>
-    /// <param name="batchSeq">Batch sequence, once known; otherwise null.</param>
-    /// <param name="messageId">Batch message id, once known; otherwise null.</param>
+    /// <param name="batch">Batch reference, once known; otherwise null.</param>
     /// <param name="reasonCode">Reason code for reject/fail (never a raw value); otherwise null.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <exception cref="ArgumentNullException"><paramref name="provenance"/> or <paramref name="locator"/> is null.</exception>
@@ -38,16 +37,14 @@ public sealed class RecordLineage
         MessageProvenance provenance,
         RecordLocator locator,
         LineageState state,
-        long? batchSeq = null,
-        string? messageId = null,
+        BatchReference? batch = null,
         string? reasonCode = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(provenance);
 
         var lineageEvent = new LineageEvent(
-            provenance.CorrelationId, provenance.FileId, locator, state, _clock.GetUtcNow(),
-            batchSeq, messageId, reasonCode);
+            provenance.CorrelationId, provenance.FileId, locator, state, _clock.GetUtcNow(), batch, reasonCode);
         return _emitter.EmitAsync(lineageEvent, cancellationToken);
     }
 }

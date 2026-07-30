@@ -12,15 +12,15 @@ public sealed class LineageEventTests
     public void Constructor_SetsProperties()
     {
         var e = new LineageEvent("run-1", "FILE1", Locator(), LineageState.Confirmed, When,
-            batchSeq: 3, messageId: "FILE1-3", reasonCode: null);
+            batch: new BatchReference(3, "FILE1-3"));
 
         Assert.Equal("run-1", e.CorrelationId);
         Assert.Equal("FILE1", e.FileId);
         Assert.Equal(101, e.Locator.RecordSeq);
         Assert.Equal(LineageState.Confirmed, e.State);
         Assert.Equal(When, e.Timestamp);
-        Assert.Equal(3, e.BatchSeq);
-        Assert.Equal("FILE1-3", e.MessageId);
+        Assert.Equal(3, e.Batch!.BatchSeq);
+        Assert.Equal("FILE1-3", e.Batch.MessageId);
     }
 
     [Fact]
@@ -28,8 +28,7 @@ public sealed class LineageEventTests
     {
         var e = new LineageEvent("run-1", "FILE1", Locator(), LineageState.Consumed, When);
 
-        Assert.Null(e.BatchSeq);
-        Assert.Null(e.MessageId);
+        Assert.Null(e.Batch);
         Assert.Null(e.ReasonCode);
     }
 
@@ -56,16 +55,6 @@ public sealed class LineageEventTests
     public void Constructor_UndefinedState_Throws() =>
         Assert.Throws<ArgumentException>(
             () => new LineageEvent("run-1", "FILE1", Locator(), (LineageState)999, When));
-
-    [Fact]
-    public void Constructor_NegativeBatchSeq_Throws() =>
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new LineageEvent("run-1", "FILE1", Locator(), LineageState.Batched, When, batchSeq: -1));
-
-    [Fact]
-    public void Constructor_BlankMessageId_Throws() =>
-        Assert.Throws<ArgumentException>(
-            () => new LineageEvent("run-1", "FILE1", Locator(), LineageState.Batched, When, messageId: " "));
 
     [Fact]
     public void Constructor_BlankReasonCode_Throws() =>
