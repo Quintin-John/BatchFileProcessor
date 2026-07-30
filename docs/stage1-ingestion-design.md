@@ -593,11 +593,12 @@ Cross-cutting concerns are extracted into **focused, single-responsibility share
 | `*.Messaging.Contracts` | **generic** envelope + open name→value field bag + `EncryptedValue` + reject DTOs — **no G266-typed fields** (those stay in the versioned layout YAML, §5) | producer & all consumers bind the **same** format-agnostic contract; new file types add YAML, not code |
 | `*.Security.DataProtection` | `IFieldProtector`, AES-256-GCM envelope crypto, classification-policy loader, Key Vault/KMS client | producer encrypts / consumers decrypt — **must** share the exact scheme (§8.2/§8.3) |
 | `*.Observability` | OTel wiring (traces/metrics/logs), identity/correlation propagation, structured-log conventions | every service emits consistent, correlated telemetry |
-| `*.Messaging.MassTransit` | MassTransit conventions — retry/CB/encryption/naming defaults | uniform transport behaviour across producers/consumers |
-| `*.Configuration` | Options binding + Key Vault secret/config provider conventions | consistent zero-hardcoding config + secret access |
+| `*.Messaging.MassTransit` | MassTransit conventions — publisher, resilience (retry/CB/rate-limit), serialization bridge, bus registration | uniform transport behaviour across producers/consumers |
 | `*.FileIngestion.Core` *(candidate)* | the generic fixed-length/delimited engine + layout/profile model | **only** promoted to a shared library if sibling **deployables** appear; today it is this component's core — not a premature library |
 
-Dependency direction: `Contracts` ← `DataProtection` / `Observability` / `MassTransit` ← app. No cycles (§1.1-D).
+**Final count: 4 shared libraries** (Contracts, DataProtection, Observability, MassTransit). A `*.Configuration` library was **considered and rejected** — options binding + Key-Vault-secret access is a thin composition-root concern loaded per component from Helm values → env/appsettings → a Key Vault config provider, not shared behaviour. Making it a library risked exactly the `Common`/utils grab-bag §13 forbids. Each library already binds its own options directly from `IConfiguration`.
+
+Dependency direction: `Contracts` ← `DataProtection` / `Observability`\* / `MassTransit` ← app (\*Observability is independent of Contracts — see §1.2). No cycles (§1.1-D).
 
 **Enforced by the build, not by review (DRY/SOLID as gates):**
 - **Architecture tests** (NetArchTest / ArchUnitNET) fail the build on: a dependency-direction violation (any library referencing the app), a **cycle** between libraries, or a forbidden cross-reference. SOLID-D and acyclicity become CI gates.
