@@ -120,8 +120,9 @@ public sealed class SerializationTests
             ["memo"] = new ClearFieldValue(null),
             ["pan"] = new EncryptedFieldValue(Envelope()),
         };
-        var record = new IngestRecord(101, 121200, "TRAN", fields);
-        return new IngestBatchMessage("file-abc-1234", "run-xyz", "file-abc", "g266.dat", "g266", "4.8", 1234, new[] { record });
+        var record = new IngestRecord(new RecordLocator(101, 121200, "TRAN"), fields);
+        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        return new IngestBatchMessage("file-abc-1234", provenance, 1234, new[] { record });
     }
 
     [Fact]
@@ -133,15 +134,12 @@ public sealed class SerializationTests
         var result = JsonSerializer.Deserialize<IngestBatchMessage>(json, Options)!;
 
         Assert.Equal(original.MessageId, result.MessageId);
-        Assert.Equal(original.CorrelationId, result.CorrelationId);
-        Assert.Equal(original.FileId, result.FileId);
-        Assert.Equal(original.FileName, result.FileName);
-        Assert.Equal(original.Profile, result.Profile);
-        Assert.Equal(original.LayoutVersion, result.LayoutVersion);
+        Assert.Equal(original.Provenance, result.Provenance);
         Assert.Equal(original.BatchSeq, result.BatchSeq);
         Assert.Equal(original.Count, result.Count);
         Assert.Equal(original.FirstRecordSeq, result.FirstRecordSeq);
         Assert.Equal(original.LastRecordSeq, result.LastRecordSeq);
+        Assert.Equal(original.Records[0].Locator, result.Records[0].Locator);
 
         var originalFields = original.Records[0].Fields;
         var resultFields = result.Records[0].Fields;
@@ -157,8 +155,9 @@ public sealed class SerializationTests
     public void RoundTrip_RejectMessage_PreservesReasonsAndRawRecord()
     {
         var original = new RejectMessage(
-            "file-abc-101-reject", "run-xyz", "file-abc", "g266.dat", "g266", "4.8",
-            101, 121200, "TRAN",
+            "file-abc-101-reject",
+            new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8"),
+            new RecordLocator(101, 121200, "TRAN"),
             new ClearFieldValue("cmF3"),
             new[]
             {
@@ -170,7 +169,8 @@ public sealed class SerializationTests
         var result = JsonSerializer.Deserialize<RejectMessage>(json, Options)!;
 
         Assert.Equal(original.MessageId, result.MessageId);
-        Assert.Equal(original.RecordSeq, result.RecordSeq);
+        Assert.Equal(original.Provenance, result.Provenance);
+        Assert.Equal(original.Locator, result.Locator);
         Assert.Equal(original.RawRecord, result.RawRecord);
         Assert.Equal(original.Reasons.Count, result.Reasons.Count);
         Assert.Equal(original.Reasons[0], result.Reasons[0]);
@@ -180,15 +180,22 @@ public sealed class SerializationTests
     // ---- golden shape ----
 
     [Fact]
-    public void GoldenShape_UsesCamelCase_ClearScalars_And_NestedEncryptedObject()
+    public void GoldenShape_UsesCamelCase_NestedProvenanceAndLocator_ClearScalars_EncryptedObject()
     {
         var json = JsonSerializer.Serialize(SampleBatch(), Options);
 
-        // camelCase identity + derived fields present
+        // camelCase identity + derived fields present at the top level
         Assert.Contains("\"messageId\":\"file-abc-1234\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"layoutVersion\":\"4.8\"", json, StringComparison.Ordinal);
         Assert.Contains("\"count\":1", json, StringComparison.Ordinal);
         Assert.Contains("\"firstRecordSeq\":101", json, StringComparison.Ordinal);
+        // nested provenance
+        Assert.Contains("\"provenance\":{", json, StringComparison.Ordinal);
+        Assert.Contains("\"fileId\":\"file-abc\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"layoutVersion\":\"4.8\"", json, StringComparison.Ordinal);
+        // nested locator
+        Assert.Contains("\"locator\":{", json, StringComparison.Ordinal);
+        Assert.Contains("\"recordSeq\":101", json, StringComparison.Ordinal);
+        Assert.Contains("\"recordType\":\"TRAN\"", json, StringComparison.Ordinal);
         // clear scalar is bare; encrypted is a nested object
         Assert.Contains("\"amount\":221.73", json, StringComparison.Ordinal);
         Assert.Contains("\"active\":true", json, StringComparison.Ordinal);

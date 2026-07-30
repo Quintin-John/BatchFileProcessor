@@ -1,0 +1,13 @@
+ª
+ž/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/obj/Release/net8.0/Common.Messaging.Contracts.Tests.AssemblyInfo.csutf-8¨
+œ/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/obj/Release/net8.0/.NETCoreApp,Version=v8.0.AssemblyAttributes.csutf-8¬
+ /Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/obj/Release/net8.0/Common.Messaging.Contracts.Tests.GlobalUsings.g.csutf-8‡
+|/Users/quintin-johnsmith/.nuget/packages/microsoft.net.test.sdk/17.8.0/build/netcoreapp3.1/Microsoft.NET.Test.Sdk.Program.csutf-8y
+p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/SerializationTests.csutf-8x
+o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectReasonTests.csutf-8y
+p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectMessageTests.csutf-8x
+o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestRecordTests.csutf-8~
+u/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestBatchMessageTests.csutf-8x
+o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/HarnessSmokeTests.csutf-8v
+m/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/FieldValueTests.csutf-8z
+q/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/EncryptedValueTests.csutf-8

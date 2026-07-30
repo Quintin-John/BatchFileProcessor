@@ -1,0 +1,75 @@
+Ó
+p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/SerializationTests.cs Common.Messaging.Contracts.TestsT
+3Common.Messaging.Contracts.Tests.SerializationTestsWrite_ClearNull_EmitsJsonNullX
+3Common.Messaging.Contracts.Tests.SerializationTests!Write_ClearString_EmitsJsonStringT
+3Common.Messaging.Contracts.Tests.SerializationTestsWrite_ClearBool_EmitsJsonBoolY
+3Common.Messaging.Contracts.Tests.SerializationTests"Write_ClearDecimal_EmitsJsonNumberV
+3Common.Messaging.Contracts.Tests.SerializationTestsWrite_ClearLong_EmitsJsonNumberU
+3Common.Messaging.Contracts.Tests.SerializationTestsWrite_ClearInt_EmitsJsonNumberX
+3Common.Messaging.Contracts.Tests.SerializationTests!Write_ClearDouble_EmitsJsonNumberY
+3Common.Messaging.Contracts.Tests.SerializationTests"Write_ClearDateOnly_EmitsIsoString_
+3Common.Messaging.Contracts.Tests.SerializationTests(Write_ClearDateTimeOffset_EmitsIsoStringX
+3Common.Messaging.Contracts.Tests.SerializationTests!Write_ClearUnsupportedType_ThrowsX
+3Common.Messaging.Contracts.Tests.SerializationTests!Read_JsonString_YieldsClearStringY
+3Common.Messaging.Contracts.Tests.SerializationTests"Read_JsonNumber_YieldsClearDecimalT
+3Common.Messaging.Contracts.Tests.SerializationTestsRead_JsonBool_YieldsClearBoolT
+3Common.Messaging.Contracts.Tests.SerializationTestsRead_JsonNull_YieldsClearNullL
+3Common.Messaging.Contracts.Tests.SerializationTestsRead_JsonArray_ThrowsZ
+3Common.Messaging.Contracts.Tests.SerializationTests#Write_Encrypted_EmitsEnvelopeObject\
+3Common.Messaging.Contracts.Tests.SerializationTests%RoundTrip_Encrypted_PreservesEnvelopen
+3Common.Messaging.Contracts.Tests.SerializationTests7RoundTrip_IngestBatchMessage_PreservesEnvelopeAndFieldsk
+3Common.Messaging.Contracts.Tests.SerializationTests4RoundTrip_RejectMessage_PreservesReasonsAndRawRecordw
+3Common.Messaging.Contracts.Tests.SerializationTests@GoldenShape_UsesCamelCase_ClearScalars_And_NestedEncryptedObject¬
+o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectReasonTests.cs Common.Messaging.Contracts.Testsa
+2Common.Messaging.Contracts.Tests.RejectReasonTests+Constructor_WithAllArguments_SetsPropertieso
+2Common.Messaging.Contracts.Tests.RejectReasonTests9Constructor_WithOnlyRequiredArguments_LeavesOptionalsNullb
+2Common.Messaging.Contracts.Tests.RejectReasonTests,Constructor_WithBlankRequiredArgument_Throws[
+2Common.Messaging.Contracts.Tests.RejectReasonTests%Constructor_WithNegativeOffset_Throws^
+2Common.Messaging.Contracts.Tests.RejectReasonTests(Constructor_WithNonPositiveLength_ThrowsZ
+2Common.Messaging.Contracts.Tests.RejectReasonTests$Constructor_WithZeroOffset_IsAllowedF
+2Common.Messaging.Contracts.Tests.RejectReasonTestsEquality_ByValueÝ
+p/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectMessageTests.cs Common.Messaging.Contracts.Testsd
+3Common.Messaging.Contracts.Tests.RejectMessageTests-Constructor_WithValidArguments_SetsPropertiesX
+3Common.Messaging.Contracts.Tests.RejectMessageTests!RawRecord_AcceptsEncryptedContentS
+3Common.Messaging.Contracts.Tests.RejectMessageTestsReasons_AreDefensivelyCopied[
+3Common.Messaging.Contracts.Tests.RejectMessageTests$Constructor_WithBlankIdentity_Throws`
+3Common.Messaging.Contracts.Tests.RejectMessageTests)Constructor_WithOutOfRangePosition_Throws[
+3Common.Messaging.Contracts.Tests.RejectMessageTests$Constructor_WithNullRawRecord_ThrowsY
+3Common.Messaging.Contracts.Tests.RejectMessageTests"Constructor_WithNullReasons_ThrowsZ
+3Common.Messaging.Contracts.Tests.RejectMessageTests#Constructor_WithEmptyReasons_Throws_
+3Common.Messaging.Contracts.Tests.RejectMessageTests(Constructor_WithNullReasonElement_Throwsî
+o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestRecordTests.cs Common.Messaging.Contracts.Testsc
+2Common.Messaging.Contracts.Tests.IngestRecordTests-Constructor_WithValidArguments_SetsPropertiesm
+2Common.Messaging.Contracts.Tests.IngestRecordTests7Fields_AreDefensivelyCopied_SoCallerMutationDoesNotLeakS
+2Common.Messaging.Contracts.Tests.IngestRecordTestsConstructor_AllowsEmptyFields^
+2Common.Messaging.Contracts.Tests.IngestRecordTests(Constructor_WithRecordSeqBelowOne_Throws_
+2Common.Messaging.Contracts.Tests.IngestRecordTests)Constructor_WithNegativeByteOffset_Throws\
+2Common.Messaging.Contracts.Tests.IngestRecordTests&Constructor_WithBlankRecordType_ThrowsW
+2Common.Messaging.Contracts.Tests.IngestRecordTests!Constructor_WithNullFields_Throws[
+2Common.Messaging.Contracts.Tests.IngestRecordTests%Constructor_WithBlankFieldName_Throws[
+2Common.Messaging.Contracts.Tests.IngestRecordTests%Constructor_WithNullFieldValue_Throws–
+u/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestBatchMessageTests.cs Common.Messaging.Contracts.Testsi
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests-Constructor_WithValidArguments_SetsPropertiesV
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTestsCount_IsDerivedFromRecordsp
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests4FirstAndLastRecordSeq_AreMinAndMax_RegardlessOfOrderX
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTestsRecords_AreDefensivelyCopied`
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests$Constructor_WithBlankIdentity_Throwsc
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests'Constructor_WithNegativeBatchSeq_Throws^
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests"Constructor_WithNullRecords_Throws_
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests#Constructor_WithEmptyRecords_Throwsd
+8Common.Messaging.Contracts.Tests.IngestBatchMessageTests(Constructor_WithNullRecordElement_Throwsß
+o/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/HarnessSmokeTests.cs Common.Messaging.Contracts.TestsJ
+2Common.Messaging.Contracts.Tests.HarnessSmokeTestsTestHarness_Executes†
+m/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/FieldValueTests.cs Common.Messaging.Contracts.TestsT
+0Common.Messaging.Contracts.Tests.FieldValueTests ClearFieldValue_HoldsScalarValuef
+0Common.Messaging.Contracts.Tests.FieldValueTests2ClearFieldValue_AllowsNull_ForPresentButEmptyFieldU
+0Common.Messaging.Contracts.Tests.FieldValueTests!EncryptedFieldValue_HoldsEnvelope_
+0Common.Messaging.Contracts.Tests.FieldValueTests+EncryptedFieldValue_WithNullEnvelope_ThrowsJ
+0Common.Messaging.Contracts.Tests.FieldValueTestsCases_AreDistinctTypesT
+0Common.Messaging.Contracts.Tests.FieldValueTests ClearFieldValue_Equality_ByValue[
+0Common.Messaging.Contracts.Tests.FieldValueTests'EncryptedFieldValue_Equality_ByEnvelope¯
+q/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/EncryptedValueTests.cs Common.Messaging.Contracts.Testsh
+4Common.Messaging.Contracts.Tests.EncryptedValueTests0Constructor_WithValidArguments_SetsAllPropertiesl
+4Common.Messaging.Contracts.Tests.EncryptedValueTests4Constructor_WithNullEmptyOrWhitespaceArgument_Throws]
+4Common.Messaging.Contracts.Tests.EncryptedValueTests%Equality_WithIdenticalValues_AreEquala
+4Common.Messaging.Contracts.Tests.EncryptedValueTests)Equality_WhenAnyMemberDiffers_AreNotEqual

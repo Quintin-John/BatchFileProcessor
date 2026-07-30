@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json.schemastore.org/sarif-1.0.0",
+  "version": "1.0.0",
+  "runs": [
+    {
+      "tool": {
+        "name": "Microsoft (R) Visual C# Compiler",
+        "version": "4.11.0.0",
+        "fileVersion": "4.11.0-3.24554.2 (bc1c3011)",
+        "semanticVersion": "4.11.0",
+        "language": "en-US"
+      },
+      "results": [
+        {
+          "ruleId": "S107",
+          "level": "warning",
+          "message": "Constructor has 8 parameters, which is greater than the 7 authorized.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestBatchMessage.cs",
+                "region": {
+                  "startLine": 58,
+                  "startColumn": 30,
+                  "endLine": 66,
+                  "endColumn": 45
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        },
+        {
+          "ruleId": "S107",
+          "level": "warning",
+          "message": "Constructor has 11 parameters, which is greater than the 7 authorized.",
+          "locations": [
+            {
+              "resultFile": {
+                "uri": "file:///Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectMessage.cs",
+                "region": {
+                  "startLine": 65,
+                  "startColumn": 25,
+                  "endLine": 76,
+                  "endColumn": 45
+                }
+              }
+            }
+          ],
+          "properties": {
+            "warningLevel": 1
+          }
+        }
+      ],
+      "rules": {
+        "S107": {
+          "id": "S107",
+          "shortDescription": "Methods should not have too many parameters",
+          "fullDescription": "Methods with a long parameter list are difficult to use because maintainers must figure out the role of each parameter and keep track of their position.",
+          "defaultLevel": "warning",
+          "properties": {
+            "category": "Major Code Smell",
+            "isEnabledByDefault": false,
+            "tags": [
+              "C#",
+              "MainSourceScope",
+              "TestSourceScope",
+              "SonarWay"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

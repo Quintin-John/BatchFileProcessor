@@ -2,21 +2,15 @@ namespace Common.Messaging.Contracts.Tests;
 
 public sealed class RejectMessageTests
 {
+    private static MessageProvenance Provenance() => new("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+
+    private static RecordLocator Locator() => new(101, 121200, "TRAN");
+
     private static RejectReason Reason() => new("amount", "decimal", "NON_NUMERIC");
 
     private static RejectMessage Create(IReadOnlyList<RejectReason>? reasons = null) =>
-        new(
-            messageId: "file-abc-101-reject",
-            correlationId: "run-xyz",
-            fileId: "file-abc",
-            fileName: "g266.dat",
-            profile: "g266",
-            layoutVersion: "4.8",
-            recordSeq: 101,
-            byteOffset: 121200,
-            recordType: "TRAN",
-            rawRecord: new ClearFieldValue("cmF3LXJlY29yZA=="),
-            reasons: reasons ?? new[] { Reason() });
+        new("file-abc-101-reject", Provenance(), Locator(), new ClearFieldValue("cmF3LXJlY29yZA=="),
+            reasons ?? new[] { Reason() });
 
     [Fact]
     public void Constructor_WithValidArguments_SetsProperties()
@@ -24,14 +18,8 @@ public sealed class RejectMessageTests
         var message = Create();
 
         Assert.Equal("file-abc-101-reject", message.MessageId);
-        Assert.Equal("run-xyz", message.CorrelationId);
-        Assert.Equal("file-abc", message.FileId);
-        Assert.Equal("g266.dat", message.FileName);
-        Assert.Equal("g266", message.Profile);
-        Assert.Equal("4.8", message.LayoutVersion);
-        Assert.Equal(101, message.RecordSeq);
-        Assert.Equal(121200, message.ByteOffset);
-        Assert.Equal("TRAN", message.RecordType);
+        Assert.Equal(Provenance(), message.Provenance);
+        Assert.Equal(Locator(), message.Locator);
         Assert.Equal(new ClearFieldValue("cmF3LXJlY29yZA=="), message.RawRecord);
         Assert.Single(message.Reasons);
     }
@@ -42,8 +30,7 @@ public sealed class RejectMessageTests
         var encrypted = new EncryptedFieldValue(
             new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn"));
 
-        var message = new RejectMessage(
-            "m", "c", "f", "n", "p", "v", 1, 0, "TRAN", encrypted, new[] { Reason() });
+        var message = new RejectMessage("m", Provenance(), Locator(), encrypted, new[] { Reason() });
 
         Assert.IsType<EncryptedFieldValue>(message.RawRecord);
     }
@@ -60,57 +47,54 @@ public sealed class RejectMessageTests
     }
 
     [Theory]
-    [InlineData(null, "c", "f", "n", "p", "v", "TRAN")]
-    [InlineData("m", "", "f", "n", "p", "v", "TRAN")]
-    [InlineData("m", "c", "  ", "n", "p", "v", "TRAN")]
-    [InlineData("m", "c", "f", null, "p", "v", "TRAN")]
-    [InlineData("m", "c", "f", "n", "", "v", "TRAN")]
-    [InlineData("m", "c", "f", "n", "p", "  ", "TRAN")]
-    [InlineData("m", "c", "f", "n", "p", "v", null)]
-    public void Constructor_WithBlankIdentity_Throws(
-        string? messageId, string? correlationId, string? fileId, string? fileName,
-        string? profile, string? layoutVersion, string? recordType)
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Constructor_WithBlankMessageId_Throws(string? messageId)
     {
-        Assert.ThrowsAny<ArgumentException>(() => new RejectMessage(
-            messageId!, correlationId!, fileId!, fileName!, profile!, layoutVersion!,
-            1, 0, recordType!, new ClearFieldValue("x"), new[] { Reason() }));
+        Assert.ThrowsAny<ArgumentException>(() =>
+            new RejectMessage(messageId!, Provenance(), Locator(), new ClearFieldValue("x"), new[] { Reason() }));
     }
 
-    [Theory]
-    [InlineData(0L, 0L)]
-    [InlineData(1L, -1L)]
-    public void Constructor_WithOutOfRangePosition_Throws(long recordSeq, long byteOffset)
+    [Fact]
+    public void Constructor_WithNullProvenance_Throws()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new RejectMessage(
-            "m", "c", "f", "n", "p", "v", recordSeq, byteOffset, "TRAN",
-            new ClearFieldValue("x"), new[] { Reason() }));
+        Assert.Throws<ArgumentNullException>(() =>
+            new RejectMessage("m", null!, Locator(), new ClearFieldValue("x"), new[] { Reason() }));
+    }
+
+    [Fact]
+    public void Constructor_WithNullLocator_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new RejectMessage("m", Provenance(), null!, new ClearFieldValue("x"), new[] { Reason() }));
     }
 
     [Fact]
     public void Constructor_WithNullRawRecord_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new RejectMessage(
-            "m", "c", "f", "n", "p", "v", 1, 0, "TRAN", null!, new[] { Reason() }));
+        Assert.Throws<ArgumentNullException>(() =>
+            new RejectMessage("m", Provenance(), Locator(), null!, new[] { Reason() }));
     }
 
     [Fact]
     public void Constructor_WithNullReasons_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new RejectMessage(
-            "m", "c", "f", "n", "p", "v", 1, 0, "TRAN", new ClearFieldValue("x"), null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            new RejectMessage("m", Provenance(), Locator(), new ClearFieldValue("x"), null!));
     }
 
     [Fact]
     public void Constructor_WithEmptyReasons_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new RejectMessage(
-            "m", "c", "f", "n", "p", "v", 1, 0, "TRAN", new ClearFieldValue("x"), Array.Empty<RejectReason>()));
+        Assert.Throws<ArgumentException>(() =>
+            new RejectMessage("m", Provenance(), Locator(), new ClearFieldValue("x"), Array.Empty<RejectReason>()));
     }
 
     [Fact]
     public void Constructor_WithNullReasonElement_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new RejectMessage(
-            "m", "c", "f", "n", "p", "v", 1, 0, "TRAN", new ClearFieldValue("x"), new RejectReason[] { null! }));
+        Assert.Throws<ArgumentException>(() =>
+            new RejectMessage("m", Provenance(), Locator(), new ClearFieldValue("x"), new RejectReason[] { null! }));
     }
 }

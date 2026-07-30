@@ -1,0 +1,8 @@
+﻿/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/EncryptedValue.cs
+/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/FieldValue.cs
+/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestBatchMessage.cs
+/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestRecord.cs
+/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/MessagingJson.cs
+/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectMessage.cs
+/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectReason.cs
+/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/Serialization/FieldValueJsonConverter.cs

@@ -1,0 +1,1 @@
+R‚/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/Common.Messaging.Contracts.Tests.csprojòCSharp12

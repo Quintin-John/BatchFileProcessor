@@ -1,0 +1,148 @@
+{
+  "scannerProperties": [
+    {
+      "key": "sonar.scanner.app",
+      "value": "ScannerMSBuild"
+    },
+    {
+      "key": "sonar.scanner.appVersion",
+      "value": "11.2.1"
+    },
+    {
+      "key": "sonar.scanner.bootstrapStartTime",
+      "value": "1785375366000"
+    },
+    {
+      "key": "sonar.projectKey",
+      "value": "BatchProcessing"
+    },
+    {
+      "key": "sonar.working.directory",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/.sonar"
+    },
+    {
+      "key": "sonar.projectBaseDir",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266"
+    },
+    {
+      "key": "sonar.pullrequest.cache.basepath",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266"
+    },
+    {
+      "key": "sonar.sources",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.claude/settings.local.json"
+    },
+    {
+      "key": "sonar.tests",
+      "value": ""
+    },
+    {
+      "key": "sonar.modules",
+      "value": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD,FC077102-5A2D-4E19-8D1C-A40486D7DFAC"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.projectKey",
+      "value": "BatchProcessing:6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.projectName",
+      "value": "Common.Messaging.Contracts"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.projectBaseDir",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.working.directory",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/.sonar/mod0"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.sourceEncoding",
+      "value": "utf-8"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.tests",
+      "value": ""
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.sources",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/EncryptedValue.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/FieldValue.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestBatchMessage.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/IngestRecord.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/MessagingJson.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectMessage.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/RejectReason.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/Serialization/FieldValueJsonConverter.cs,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/obj/Common.Messaging.Contracts.csproj.nuget.dgspec.json,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/obj/project.assets.json,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/bin/Release/net8.0/Common.Messaging.Contracts.deps.json,/Users/quintin-johnsmith/Documents/Development/G266/src/Common.Messaging.Contracts/bin/Debug/net8.0/Common.Messaging.Contracts.deps.json"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.cs.analyzer.projectOutPaths",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/0"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.cs.roslyn.reportFilePaths",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/0/Issues.json"
+    },
+    {
+      "key": "6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD.sonar.cs.scanner.telemetry",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/0/Telemetry.json"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.projectKey",
+      "value": "BatchProcessing:FC077102-5A2D-4E19-8D1C-A40486D7DFAC"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.projectName",
+      "value": "Common.Messaging.Contracts.Tests"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.projectBaseDir",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.working.directory",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/.sonar/mod1"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.sourceEncoding",
+      "value": "utf-8"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.sources",
+      "value": ""
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.tests",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/obj/Common.Messaging.Contracts.Tests.csproj.nuget.dgspec.json,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/obj/project.assets.json,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/bin/Release/net8.0/Common.Messaging.Contracts.Tests.runtimeconfig.json,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/bin/Release/net8.0/Common.Messaging.Contracts.Tests.deps.json,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/bin/Debug/net8.0/Common.Messaging.Contracts.Tests.runtimeconfig.json,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/bin/Debug/net8.0/Common.Messaging.Contracts.Tests.deps.json,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/EncryptedValueTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/FieldValueTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/HarnessSmokeTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestBatchMessageTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/IngestRecordTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectMessageTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/RejectReasonTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/SerializationTests.cs,/Users/quintin-johnsmith/Documents/Development/G266/tests/Common.Messaging.Contracts.Tests/coverage.cobertura.xml"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.cs.analyzer.projectOutPaths",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/1"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.cs.roslyn.reportFilePaths",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/1/Issues.json"
+    },
+    {
+      "key": "FC077102-5A2D-4E19-8D1C-A40486D7DFAC.sonar.cs.scanner.telemetry",
+      "value": "/Users/quintin-johnsmith/Documents/Development/G266/.sonarqube/out/1/Telemetry.json"
+    },
+    {
+      "key": "sonar.token",
+      "value": "***"
+    },
+    {
+      "key": "sonar.host.url",
+      "value": "http://localhost:9000"
+    },
+    {
+      "key": "sonar.cs.opencover.reportsPaths",
+      "value": "**/coverage.opencover.xml"
+    },
+    {
+      "key": "sonar.coverage.exclusions",
+      "value": "tests/**"
+    },
+    {
+      "key": "sonar.exclusions",
+      "value": "**/coverage.opencover.xml"
+    },
+    {
+      "key": "sonar.visualstudio.enable",
+      "value": "false"
+    }
+  ]
+}

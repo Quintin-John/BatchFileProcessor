@@ -2,19 +2,14 @@ namespace Common.Messaging.Contracts.Tests;
 
 public sealed class IngestBatchMessageTests
 {
+    private static MessageProvenance Provenance() => new("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+
     private static IngestRecord Record(long seq) =>
-        new(seq, seq * 1200, "TRAN", new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(1m) });
+        new(new RecordLocator(seq, seq * 1200, "TRAN"),
+            new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(1m) });
 
     private static IngestBatchMessage Create(IReadOnlyList<IngestRecord>? records = null) =>
-        new(
-            messageId: "file-abc-1234",
-            correlationId: "run-xyz",
-            fileId: "file-abc",
-            fileName: "g266.dat",
-            profile: "g266",
-            layoutVersion: "4.8",
-            batchSeq: 1234,
-            records: records ?? new[] { Record(101), Record(102), Record(103) });
+        new("file-abc-1234", Provenance(), 1234, records ?? new[] { Record(101), Record(102), Record(103) });
 
     [Fact]
     public void Constructor_WithValidArguments_SetsProperties()
@@ -22,11 +17,7 @@ public sealed class IngestBatchMessageTests
         var message = Create();
 
         Assert.Equal("file-abc-1234", message.MessageId);
-        Assert.Equal("run-xyz", message.CorrelationId);
-        Assert.Equal("file-abc", message.FileId);
-        Assert.Equal("g266.dat", message.FileName);
-        Assert.Equal("g266", message.Profile);
-        Assert.Equal("4.8", message.LayoutVersion);
+        Assert.Equal(Provenance(), message.Provenance);
         Assert.Equal(1234, message.BatchSeq);
     }
 
@@ -60,44 +51,47 @@ public sealed class IngestBatchMessageTests
     }
 
     [Theory]
-    [InlineData(null, "c", "f", "n", "p", "v")]
-    [InlineData("m", "", "f", "n", "p", "v")]
-    [InlineData("m", "c", "  ", "n", "p", "v")]
-    [InlineData("m", "c", "f", null, "p", "v")]
-    [InlineData("m", "c", "f", "n", "", "v")]
-    [InlineData("m", "c", "f", "n", "p", "  ")]
-    public void Constructor_WithBlankIdentity_Throws(
-        string? messageId, string? correlationId, string? fileId, string? fileName, string? profile, string? layoutVersion)
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Constructor_WithBlankMessageId_Throws(string? messageId)
     {
-        Assert.ThrowsAny<ArgumentException>(() => new IngestBatchMessage(
-            messageId!, correlationId!, fileId!, fileName!, profile!, layoutVersion!, 0, new[] { Record(1) }));
+        Assert.ThrowsAny<ArgumentException>(() =>
+            new IngestBatchMessage(messageId!, Provenance(), 0, new[] { Record(1) }));
+    }
+
+    [Fact]
+    public void Constructor_WithNullProvenance_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new IngestBatchMessage("m", null!, 0, new[] { Record(1) }));
     }
 
     [Fact]
     public void Constructor_WithNegativeBatchSeq_Throws()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new IngestBatchMessage(
-            "m", "c", "f", "n", "p", "v", -1, new[] { Record(1) }));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new IngestBatchMessage("m", Provenance(), -1, new[] { Record(1) }));
     }
 
     [Fact]
     public void Constructor_WithNullRecords_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new IngestBatchMessage(
-            "m", "c", "f", "n", "p", "v", 0, null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            new IngestBatchMessage("m", Provenance(), 0, null!));
     }
 
     [Fact]
     public void Constructor_WithEmptyRecords_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new IngestBatchMessage(
-            "m", "c", "f", "n", "p", "v", 0, Array.Empty<IngestRecord>()));
+        Assert.Throws<ArgumentException>(() =>
+            new IngestBatchMessage("m", Provenance(), 0, Array.Empty<IngestRecord>()));
     }
 
     [Fact]
     public void Constructor_WithNullRecordElement_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new IngestBatchMessage(
-            "m", "c", "f", "n", "p", "v", 0, new IngestRecord[] { null! }));
+        Assert.Throws<ArgumentException>(() =>
+            new IngestBatchMessage("m", Provenance(), 0, new IngestRecord[] { null! }));
     }
 }

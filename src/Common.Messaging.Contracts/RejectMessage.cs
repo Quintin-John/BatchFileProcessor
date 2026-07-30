@@ -13,29 +13,11 @@ public sealed class RejectMessage
     /// <summary>Deterministic message identity used for dedupe.</summary>
     public string MessageId { get; }
 
-    /// <summary>Correlation identity for the run that produced this reject (the RunId).</summary>
-    public string CorrelationId { get; }
+    /// <summary>Source/run provenance for this reject.</summary>
+    public MessageProvenance Provenance { get; }
 
-    /// <summary>Content hash / identity of the source file.</summary>
-    public string FileId { get; }
-
-    /// <summary>Original source file name.</summary>
-    public string FileName { get; }
-
-    /// <summary>Profile that produced this reject.</summary>
-    public string Profile { get; }
-
-    /// <summary>Layout version in force when the record was rejected.</summary>
-    public string LayoutVersion { get; }
-
-    /// <summary>1-based sequence of the rejected record within its source file.</summary>
-    public long RecordSeq { get; }
-
-    /// <summary>Byte offset of the rejected record within its source file.</summary>
-    public long ByteOffset { get; }
-
-    /// <summary>Record-type discriminator of the rejected record.</summary>
-    public string RecordType { get; }
+    /// <summary>Where the rejected record sits in its source file.</summary>
+    public RecordLocator Locator { get; }
 
     /// <summary>
     /// The original record content for inspection/repair/replay: a <see cref="ClearFieldValue"/>
@@ -49,41 +31,22 @@ public sealed class RejectMessage
 
     /// <summary>Creates a validated reject message.</summary>
     /// <param name="messageId">Deterministic message id; required, non-blank.</param>
-    /// <param name="correlationId">Run correlation id; required, non-blank.</param>
-    /// <param name="fileId">Source file identity; required, non-blank.</param>
-    /// <param name="fileName">Source file name; required, non-blank.</param>
-    /// <param name="profile">Producing profile; required, non-blank.</param>
-    /// <param name="layoutVersion">Layout version; required, non-blank.</param>
-    /// <param name="recordSeq">1-based record sequence; must be at least 1.</param>
-    /// <param name="byteOffset">Byte offset in the source file; must be non-negative.</param>
-    /// <param name="recordType">Record-type discriminator; required, non-blank.</param>
+    /// <param name="provenance">Source/run provenance; required.</param>
+    /// <param name="locator">Where the rejected record sits in its source file; required.</param>
     /// <param name="rawRecord">Original record content (clear or encrypted); required.</param>
     /// <param name="reasons">Field-level failures; required, non-empty, no null elements. Copied defensively.</param>
-    /// <exception cref="ArgumentException">Any identity is blank, or <paramref name="reasons"/> is empty or contains a null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="recordSeq"/> is less than 1 or <paramref name="byteOffset"/> is negative.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="rawRecord"/> or <paramref name="reasons"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="messageId"/> is blank, or <paramref name="reasons"/> is empty or contains a null.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="provenance"/>, <paramref name="locator"/>, <paramref name="rawRecord"/>, or <paramref name="reasons"/> is null.</exception>
     public RejectMessage(
         string messageId,
-        string correlationId,
-        string fileId,
-        string fileName,
-        string profile,
-        string layoutVersion,
-        long recordSeq,
-        long byteOffset,
-        string recordType,
+        MessageProvenance provenance,
+        RecordLocator locator,
         FieldValue rawRecord,
         IReadOnlyList<RejectReason> reasons)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(profile);
-        ArgumentException.ThrowIfNullOrWhiteSpace(layoutVersion);
-        ArgumentOutOfRangeException.ThrowIfLessThan(recordSeq, 1);
-        ArgumentOutOfRangeException.ThrowIfNegative(byteOffset);
-        ArgumentException.ThrowIfNullOrWhiteSpace(recordType);
+        ArgumentNullException.ThrowIfNull(provenance);
+        ArgumentNullException.ThrowIfNull(locator);
         ArgumentNullException.ThrowIfNull(rawRecord);
         ArgumentNullException.ThrowIfNull(reasons);
 
@@ -104,14 +67,8 @@ public sealed class RejectMessage
         }
 
         MessageId = messageId;
-        CorrelationId = correlationId;
-        FileId = fileId;
-        FileName = fileName;
-        Profile = profile;
-        LayoutVersion = layoutVersion;
-        RecordSeq = recordSeq;
-        ByteOffset = byteOffset;
-        RecordType = recordType;
+        Provenance = provenance;
+        Locator = locator;
         RawRecord = rawRecord;
         Reasons = new ReadOnlyCollection<RejectReason>(copy);
     }
