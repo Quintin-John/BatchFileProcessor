@@ -10,7 +10,7 @@ namespace Common.FileIngestion.Pipeline;
 public sealed class ConfirmedBatchTracker
 {
     private readonly object _gate = new();
-    private readonly Dictionary<long, BatchPosition> _confirmedAhead = new();
+    private readonly Dictionary<long, BatchPosition> _confirmedAhead = [];
     private long _nextExpectedSeq;
 
     /// <summary>Creates a tracker expecting the first batch at <paramref name="firstBatchSeq"/>.</summary>
