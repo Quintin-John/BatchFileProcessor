@@ -153,8 +153,10 @@ public sealed class FileIngestionPipeline
         }
 
         var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, parseResult.RecordType);
-        await _rejectSink.RejectAsync(
-            run.Provenance, locator, new ClearFieldValue(parseResult.RawRecord!), parseResult.Reasons!, cancellationToken)
+        // Encrypt the raw record before it reaches the reject queue: a failed-parse line can still carry
+        // PAN/PII and must never travel in clear.
+        var rawRecord = _protector.ProtectRaw(run.Provenance.FileId, framed.RecordSeq, parseResult.RawRecord!);
+        await _rejectSink.RejectAsync(run.Provenance, locator, rawRecord, parseResult.Reasons!, cancellationToken)
             .ConfigureAwait(false);
         _metrics.RecordRejected(parseResult.RecordType);
         run.Rejected++;

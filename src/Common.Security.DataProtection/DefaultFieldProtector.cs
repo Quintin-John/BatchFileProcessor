@@ -1,6 +1,4 @@
-using System.Buffers.Binary;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Common.Messaging.Contracts;
 
@@ -50,7 +48,7 @@ public sealed class DefaultFieldProtector : IFieldProtector
         var plaintext = JsonSerializer.SerializeToUtf8Bytes(value, MessagingJson.Options);
         try
         {
-            var envelope = _crypto.Encrypt(plaintext, _keys.GetActiveKey(), Aad(context));
+            var envelope = _crypto.Encrypt(plaintext, _keys.GetActiveKey(), ProtectionAad.Build(context));
             return new EncryptedFieldValue(envelope);
         }
         finally
@@ -72,31 +70,8 @@ public sealed class DefaultFieldProtector : IFieldProtector
         }
 
         var key = _keys.ResolveKey(encrypted.Value.KeyId, encrypted.Value.KeyVersion);
-        var plaintext = _crypto.Decrypt(encrypted.Value, key, Aad(context));
+        var plaintext = _crypto.Decrypt(encrypted.Value, key, ProtectionAad.Build(context));
         return JsonSerializer.Deserialize<FieldValue>(plaintext, MessagingJson.Options)
             ?? throw new InvalidOperationException("Decrypted field value was null.");
-    }
-
-    private static byte[] Aad(FieldProtectionContext context)
-    {
-        // Length-prefixed encoding so distinct (fileId, recordSeq, field) triples can never
-        // collide to the same bytes. A plain delimiter would collide when a value contains it,
-        // weakening the anti-replay binding.
-        var fileId = Encoding.UTF8.GetBytes(context.FileId);
-        var field = Encoding.UTF8.GetBytes(context.Field);
-        var buffer = new byte[sizeof(int) + fileId.Length + sizeof(long) + sizeof(int) + field.Length];
-        var span = buffer.AsSpan();
-
-        BinaryPrimitives.WriteInt32LittleEndian(span, fileId.Length);
-        fileId.CopyTo(span[sizeof(int)..]);
-        var offset = sizeof(int) + fileId.Length;
-
-        BinaryPrimitives.WriteInt64LittleEndian(span[offset..], context.RecordSeq);
-        offset += sizeof(long);
-
-        BinaryPrimitives.WriteInt32LittleEndian(span[offset..], field.Length);
-        field.CopyTo(span[(offset + sizeof(int))..]);
-
-        return buffer;
     }
 }

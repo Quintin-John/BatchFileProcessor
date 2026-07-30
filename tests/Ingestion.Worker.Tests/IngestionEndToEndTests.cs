@@ -43,7 +43,7 @@ public sealed class IngestionEndToEndTests : IDisposable
         await mediator.Send(new IngestFile("e2e.dat", "e2e.dat", _file, "run-1", "g266", "4.8"));
 
         Assert.NotEmpty(_publisher.Batches);
-        Assert.Single(_publisher.Rejects);
+        Assert.IsType<EncryptedFieldValue>(Assert.Single(_publisher.Rejects).RawRecord);
         Assert.All(_publisher.Batches, b => Assert.StartsWith(b.Provenance.FileId, b.MessageId, StringComparison.Ordinal));
         Assert.Null(await _checkpoints.LoadAsync("e2e.dat", CancellationToken.None));
     }
@@ -51,7 +51,7 @@ public sealed class IngestionEndToEndTests : IDisposable
     private FileIngestionPipeline BuildPipeline() => new(
         new StreamRecordReader(8, terminatorLength: 1, Encoding.ASCII),
         new FakeParser(),
-        new RecordProtector(new PassThroughProtector()),
+        new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
         _publisher,
         new RejectSink(_publisher),
         _checkpoints,
@@ -81,7 +81,14 @@ public sealed class IngestionEndToEndTests : IDisposable
         public FieldValue Protect(FieldProtectionContext context, FieldValue value) => value;
 
         public FieldValue Unprotect(FieldProtectionContext context, FieldValue value) => value;
+    }
 
+    private sealed class StubPayloadProtector : IPayloadProtector
+    {
+        public EncryptedFieldValue Protect(FieldProtectionContext context, string payload) =>
+            new(new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn"));
+
+        public string Unprotect(FieldProtectionContext context, EncryptedFieldValue payload) => payload.Value.Ciphertext;
     }
 
     private sealed class CapturingPublisher : IMessagePublisher

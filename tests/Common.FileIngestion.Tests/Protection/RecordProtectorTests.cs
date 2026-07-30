@@ -6,6 +6,8 @@ namespace Common.FileIngestion.Tests.Protection;
 
 public sealed class RecordProtectorTests
 {
+    private static RecordProtector Protector() => new(new StubProtector(), new StubPayloadProtector());
+
     private static IngestRecord Record(params (string Name, FieldValue Value)[] fields)
     {
         var dict = new Dictionary<string, FieldValue>(StringComparer.Ordinal);
@@ -20,9 +22,7 @@ public sealed class RecordProtectorTests
     [Fact]
     public void Protect_EncryptsSensitiveFields_PassesOthers()
     {
-        var protector = new RecordProtector(new StubProtector());
-
-        var result = protector.Protect("file-abc", Record(
+        var result = Protector().Protect("file-abc", Record(
             ("pan", new ClearFieldValue("1234567890123456")),
             ("amount", new ClearFieldValue(221.73m))));
 
@@ -34,24 +34,41 @@ public sealed class RecordProtectorTests
     [Fact]
     public void Protect_UnclassifiedField_PropagatesFailClosed()
     {
-        var protector = new RecordProtector(new StubProtector());
-
         Assert.Throws<KeyNotFoundException>(
-            () => protector.Protect("file-abc", Record(("unclassified", new ClearFieldValue("x")))));
+            () => Protector().Protect("file-abc", Record(("unclassified", new ClearFieldValue("x")))));
     }
 
     [Fact]
-    public void Constructor_NullProtector_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new RecordProtector(null!));
+    public void ProtectRaw_EncryptsRawRecord()
+    {
+        var result = Protector().ProtectRaw("file-abc", 7, "HEAD...4111111111111111");
+
+        Assert.IsType<EncryptedFieldValue>(result);
+    }
+
+    [Fact]
+    public void ProtectRaw_BlankFileId_Throws() =>
+        Assert.ThrowsAny<ArgumentException>(() => Protector().ProtectRaw(" ", 1, "raw"));
+
+    [Fact]
+    public void ProtectRaw_NullRaw_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => Protector().ProtectRaw("f", 1, null!));
+
+    [Fact]
+    public void Constructor_NullArgument_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => new RecordProtector(null!, new StubPayloadProtector()));
+        Assert.Throws<ArgumentNullException>(() => new RecordProtector(new StubProtector(), null!));
+    }
 
     [Fact]
     public void Protect_NullRecord_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new RecordProtector(new StubProtector()).Protect("f", null!));
+        Assert.Throws<ArgumentNullException>(() => Protector().Protect("f", null!));
 
     [Fact]
     public void Protect_BlankFileId_Throws() =>
         Assert.ThrowsAny<ArgumentException>(
-            () => new RecordProtector(new StubProtector()).Protect(" ", Record(("amount", new ClearFieldValue(1m)))));
+            () => Protector().Protect(" ", Record(("amount", new ClearFieldValue(1m)))));
 
     // Encrypts "pan", passes "amount", rejects anything else (fail-closed classification).
     private sealed class StubProtector : IFieldProtector
@@ -64,6 +81,13 @@ public sealed class RecordProtectorTests
         };
 
         public FieldValue Unprotect(FieldProtectionContext context, FieldValue value) => value;
+    }
 
+    private sealed class StubPayloadProtector : IPayloadProtector
+    {
+        public EncryptedFieldValue Protect(FieldProtectionContext context, string payload) =>
+            new(new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn"));
+
+        public string Unprotect(FieldProtectionContext context, EncryptedFieldValue payload) => string.Empty;
     }
 }

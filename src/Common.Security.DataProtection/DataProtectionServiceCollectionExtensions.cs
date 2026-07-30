@@ -26,6 +26,7 @@ public static class DataProtectionServiceCollectionExtensions
         services.AddSingleton<IMasker, PanMasker>();
         services.AddSingleton<IFieldProtector, DefaultFieldProtector>();
         services.AddSingleton<IFieldMasker, DefaultFieldMasker>();
+        services.AddSingleton<IPayloadProtector, DefaultPayloadProtector>();
         return services;
     }
 

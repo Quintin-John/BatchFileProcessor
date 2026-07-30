@@ -30,7 +30,7 @@ public sealed class FileIngestionPipelineTests
         public FileIngestionPipeline Build(int maxRecords = 2) => new(
             new StreamRecordReader(RecordLength, terminatorLength: 1, Encoding.ASCII),
             new FakeParser(),
-            new RecordProtector(new PassThroughProtector()),
+            new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
             Publisher,
             new RejectSink(Publisher),
             Checkpoints,
@@ -61,6 +61,7 @@ public sealed class FileIngestionPipelineTests
 
         var reject = Assert.Single(harness.Publisher.Rejects);
         Assert.Equal($"{outcome.FileId}-3-reject", reject.MessageId);
+        Assert.IsType<EncryptedFieldValue>(reject.RawRecord); // raw record encrypted, never clear
 
         Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None));
     }
@@ -158,7 +159,14 @@ public sealed class FileIngestionPipelineTests
         public FieldValue Protect(FieldProtectionContext context, FieldValue value) => value;
 
         public FieldValue Unprotect(FieldProtectionContext context, FieldValue value) => value;
+    }
 
+    private sealed class StubPayloadProtector : IPayloadProtector
+    {
+        public EncryptedFieldValue Protect(FieldProtectionContext context, string payload) =>
+            new(new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn"));
+
+        public string Unprotect(FieldProtectionContext context, EncryptedFieldValue payload) => payload.Value.Ciphertext;
     }
 
     private sealed class CapturingPublisher : IMessagePublisher

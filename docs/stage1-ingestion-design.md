@@ -640,8 +640,8 @@ publisher port `IMessagePublisher` relocated to Contracts (DIP).
 - Azure Functions host (isolated worker, Blob/Event Grid trigger) — deferred by decision.
 - Real G266 **data-protection policy** classifying every field (security-owned) — the fail-closed
   policy rejects unclassified fields; the POC composition loads it from a configured path.
-- **Reject-payload encryption:** the reject raw record is currently carried clear (`ClearFieldValue`);
-  encrypt sensitive raw content before the reject queue.
+- ~~**Reject-payload encryption**~~ — **DONE.** The reject raw record is encrypted before the reject
+  queue via `IPayloadProtector` (unconditional AEAD, AAD-bound); never carried in clear.
 - **Shared checkpoint store** (Redis/Blob/DB) for cross-instance resume (§12/Q8) — file store today.
 - **EBCDIC / code-page** encodings: register `CodePagesEncodingProvider` when a layout needs a
   non–built-in single-byte encoding.
