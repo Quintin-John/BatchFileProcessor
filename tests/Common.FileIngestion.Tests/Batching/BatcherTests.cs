@@ -60,6 +60,23 @@ public sealed class BatcherTests
         Assert.Null(new Batcher(2, 1000, Provenance()).Flush());
     }
 
+    [Fact]
+    public void Add_WithFirstBatchSeq_ResumesNumbering()
+    {
+        var batcher = new Batcher(1, 1000, Provenance(), firstBatchSeq: 4);
+
+        var batch = batcher.Add(Record(1));
+
+        Assert.Equal(4, batch!.BatchSeq);
+        Assert.Equal("FILE1-4", batch.MessageId);
+    }
+
+    [Fact]
+    public void Constructor_NegativeFirstBatchSeq_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Batcher(1, 1000, Provenance(), firstBatchSeq: -1));
+    }
+
     [Theory]
     [InlineData(0, 1000)]
     [InlineData(2, 0)]

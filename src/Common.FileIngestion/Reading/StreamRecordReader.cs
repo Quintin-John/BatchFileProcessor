@@ -33,6 +33,12 @@ public sealed class StreamRecordReader
         _encoding = encoding;
     }
 
+    /// <summary>Record content length in bytes (excludes the terminator).</summary>
+    public int RecordLength => _recordLength;
+
+    /// <summary>Bytes consumed per record including the terminator (record + terminator length).</summary>
+    public int Stride => _recordLength + _terminatorLength;
+
     /// <summary>
     /// Reads <paramref name="stream"/> to completion, invoking <paramref name="onRecord"/> for each
     /// framed record, and returns the file's SHA-256 as an uppercase hex string (the FileId).

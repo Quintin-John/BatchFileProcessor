@@ -22,18 +22,22 @@ public sealed class Batcher
     /// <param name="maxRecords">Max records per batch; must be at least 1.</param>
     /// <param name="maxContentBytes">Max estimated content bytes per batch (set below the transport limit); at least 1.</param>
     /// <param name="provenance">Provenance stamped on every batch; required.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxRecords"/> or <paramref name="maxContentBytes"/> is less than 1.</exception>
+    /// <param name="firstBatchSeq">Sequence for the first sealed batch; on resume this continues past the
+    /// last confirmed batch so message ids never collide with already-published batches. Non-negative.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxRecords"/> or <paramref name="maxContentBytes"/> is less than 1, or <paramref name="firstBatchSeq"/> is negative.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="provenance"/> is null.</exception>
-    public Batcher(int maxRecords, int maxContentBytes, MessageProvenance provenance)
+    public Batcher(int maxRecords, int maxContentBytes, MessageProvenance provenance, long firstBatchSeq = 0)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxRecords, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxContentBytes, 1);
         ArgumentNullException.ThrowIfNull(provenance);
+        ArgumentOutOfRangeException.ThrowIfNegative(firstBatchSeq);
 
         _maxRecords = maxRecords;
         _maxContentBytes = maxContentBytes;
         _provenance = provenance;
         _pending = new List<IngestRecord>(maxRecords);
+        _batchSeq = firstBatchSeq;
     }
 
     /// <summary>Adds a record, returning a sealed batch if this add completed one; otherwise null.</summary>
