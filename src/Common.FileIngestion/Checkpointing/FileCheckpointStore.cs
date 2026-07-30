@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Common.FileIngestion.Checkpointing;
 
 /// <summary>
-/// File-based <see cref="ICheckpointStore"/>. Persists one watermark JSON file per file id in a
+/// File-based <see cref="ICheckpointStore"/>. Persists one watermark JSON file per source key in a
 /// configured durable directory, written atomically (temp file then rename) so a crash mid-write
 /// never leaves a corrupt watermark. Suitable for a mounted durable volume.
 /// </summary>
@@ -23,9 +23,9 @@ public sealed class FileCheckpointStore : ICheckpointStore
     }
 
     /// <inheritdoc />
-    public async Task<Watermark?> LoadAsync(string fileId, CancellationToken cancellationToken)
+    public async Task<Watermark?> LoadAsync(string sourceKey, CancellationToken cancellationToken)
     {
-        var path = PathFor(fileId);
+        var path = PathFor(sourceKey);
         if (!File.Exists(path))
         {
             return null;
@@ -40,7 +40,7 @@ public sealed class FileCheckpointStore : ICheckpointStore
     {
         ArgumentNullException.ThrowIfNull(watermark);
 
-        var path = PathFor(watermark.FileId);
+        var path = PathFor(watermark.SourceKey);
         var temp = path + ".tmp";
         var json = JsonSerializer.SerializeToUtf8Bytes(watermark);
 
@@ -49,9 +49,9 @@ public sealed class FileCheckpointStore : ICheckpointStore
     }
 
     /// <inheritdoc />
-    public Task ClearAsync(string fileId, CancellationToken cancellationToken)
+    public Task ClearAsync(string sourceKey, CancellationToken cancellationToken)
     {
-        var path = PathFor(fileId);
+        var path = PathFor(sourceKey);
         if (File.Exists(path))
         {
             File.Delete(path);
@@ -60,15 +60,15 @@ public sealed class FileCheckpointStore : ICheckpointStore
         return Task.CompletedTask;
     }
 
-    private string PathFor(string fileId)
+    private string PathFor(string sourceKey)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
 
-        if (fileId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        if (sourceKey.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
-            throw new ArgumentException("File id contains invalid path characters.", nameof(fileId));
+            throw new ArgumentException("Source key contains invalid path characters.", nameof(sourceKey));
         }
 
-        return Path.Combine(_directory, fileId + WatermarkExtension);
+        return Path.Combine(_directory, sourceKey + WatermarkExtension);
     }
 }
