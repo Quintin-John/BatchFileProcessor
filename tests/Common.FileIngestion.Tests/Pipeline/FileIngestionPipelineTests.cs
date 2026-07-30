@@ -78,12 +78,13 @@ public sealed class FileIngestionPipelineTests
     }
 
     [Fact]
-    public async Task Ingest_Resume_SkipsConfirmedPrefix_AndContinuesBatchSeq()
+    public async Task Ingest_Resume_MatchingFileId_SkipsConfirmedPrefix_AndContinuesBatchSeq()
     {
         var harness = new Harness();
-        // Prior run confirmed records 1-2 (offsets 0, 9); resume from offset 18, next batch seq 1.
-        await harness.Checkpoints.SaveAsync(new Watermark("g266.dat", 2 * Stride, 2, 0), CancellationToken.None);
         var bytes = Bytes(FileText);
+        var fileId = await FileIdHasher.ComputeAsync(new MemoryStream(bytes), CancellationToken.None);
+        // Prior run confirmed records 1-2 (offsets 0, 9) against THIS content; resume from offset 18, next seq 1.
+        await harness.Checkpoints.SaveAsync(new Watermark("g266.dat", fileId, 2 * Stride, 2, 0), CancellationToken.None);
 
         var outcome = await harness.Build().IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
 
@@ -94,6 +95,24 @@ public sealed class FileIngestionPipelineTests
         var batch = Assert.Single(harness.Publisher.Batches);
         Assert.Equal($"{outcome.FileId}-1", batch.MessageId);
         Assert.Equal(4, batch.Records[0].Locator.RecordSeq);
+    }
+
+    [Fact]
+    public async Task Ingest_Resume_StaleWatermarkForDifferentContent_IsIgnored_NoRecordsSkipped()
+    {
+        var harness = new Harness();
+        // A prior, DIFFERENT file reused the same name and left a watermark; its FileId cannot match.
+        await harness.Checkpoints.SaveAsync(
+            new Watermark("g266.dat", "STALE-HASH-FROM-A-DIFFERENT-FILE", 2 * Stride, 2, 0), CancellationToken.None);
+        var bytes = Bytes(FileText);
+
+        var outcome = await harness.Build().IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        // Stale watermark ignored → whole file processed, nothing silently skipped (BUG-1 guard).
+        Assert.Equal(3, outcome.RecordsAccepted);
+        Assert.Equal(1, outcome.RecordsRejected);
+        Assert.Equal(2, outcome.BatchesPublished);
+        Assert.Equal($"{outcome.FileId}-0", harness.Publisher.Batches[0].MessageId);
     }
 
     [Fact]

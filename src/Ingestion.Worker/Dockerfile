@@ -9,6 +9,8 @@ RUN dotnet restore src/Ingestion.Worker/Ingestion.Worker.csproj
 RUN dotnet publish src/Ingestion.Worker/Ingestion.Worker.csproj -c Release -o /app --no-restore
 
 # Runtime stage (no SDK; smaller, fewer CVEs)
+# NOTE: runs as the image default user (root). Reviewed and accepted for the POC — the worker runs in a
+# controlled/isolated container runtime. Non-root USER hardening is tracked as production backlog (Sonar S6471 accepted).
 FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .

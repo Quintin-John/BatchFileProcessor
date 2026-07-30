@@ -75,7 +75,13 @@ public sealed class FileIngestionPipeline
 
         var fileId = await ComputeFileIdAsync(request, cancellationToken).ConfigureAwait(false);
 
-        var watermark = await _checkpointStore.LoadAsync(request.SourceKey, cancellationToken).ConfigureAwait(false);
+        // Resume only when the stored watermark was recorded against THIS exact content. A file that
+        // reuses the name with different content (recurring daily batches) must start from zero, never
+        // inherit a stale offset — otherwise its leading records would be silently skipped.
+        var loaded = await _checkpointStore.LoadAsync(request.SourceKey, cancellationToken).ConfigureAwait(false);
+        var watermark = loaded is not null && string.Equals(loaded.FileId, fileId, StringComparison.Ordinal)
+            ? loaded
+            : null;
         var resumeOffset = watermark?.ByteOffset ?? 0;
         var firstBatchSeq = watermark is null ? 0 : watermark.BatchSeq + 1;
 
@@ -164,7 +170,8 @@ public sealed class FileIngestionPipeline
         var last = batch.Records[^1];
         var confirmedOffset = last.Locator.ByteOffset + stride;
         await _checkpointStore.SaveAsync(
-            new Watermark(sourceKey, confirmedOffset, last.Locator.RecordSeq, batch.BatchSeq), cancellationToken)
+            new Watermark(sourceKey, batch.Provenance.FileId, confirmedOffset, last.Locator.RecordSeq, batch.BatchSeq),
+            cancellationToken)
             .ConfigureAwait(false);
     }
 

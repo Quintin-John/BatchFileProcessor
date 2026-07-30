@@ -20,7 +20,7 @@ public sealed class FileCheckpointStoreTests : IDisposable
     public async Task SaveThenLoad_RoundTrips()
     {
         var store = Store();
-        var watermark = new Watermark("SRC1", 1200, 1, 0);
+        var watermark = new Watermark("SRC1", "F", 1200, 1, 0);
 
         await store.SaveAsync(watermark, CancellationToken.None);
         var loaded = await store.LoadAsync("SRC1", CancellationToken.None);
@@ -33,8 +33,8 @@ public sealed class FileCheckpointStoreTests : IDisposable
     {
         var store = Store();
 
-        await store.SaveAsync(new Watermark("SRC1", 100, 1, 0), CancellationToken.None);
-        await store.SaveAsync(new Watermark("SRC2", 200, 2, 1), CancellationToken.None);
+        await store.SaveAsync(new Watermark("SRC1", "F", 100, 1, 0), CancellationToken.None);
+        await store.SaveAsync(new Watermark("SRC2", "F", 200, 2, 1), CancellationToken.None);
 
         Assert.Equal(100, (await store.LoadAsync("SRC1", CancellationToken.None))!.ByteOffset);
         Assert.Equal(200, (await store.LoadAsync("SRC2", CancellationToken.None))!.ByteOffset);
@@ -51,8 +51,8 @@ public sealed class FileCheckpointStoreTests : IDisposable
     {
         var store = Store();
 
-        await store.SaveAsync(new Watermark("S", 100, 1, 0), CancellationToken.None);
-        await store.SaveAsync(new Watermark("S", 300, 3, 1), CancellationToken.None);
+        await store.SaveAsync(new Watermark("S", "F", 100, 1, 0), CancellationToken.None);
+        await store.SaveAsync(new Watermark("S", "F", 300, 3, 1), CancellationToken.None);
 
         Assert.Equal(300, (await store.LoadAsync("S", CancellationToken.None))!.ByteOffset);
     }
@@ -61,7 +61,7 @@ public sealed class FileCheckpointStoreTests : IDisposable
     public async Task Clear_RemovesWatermark()
     {
         var store = Store();
-        await store.SaveAsync(new Watermark("S", 100, 1, 0), CancellationToken.None);
+        await store.SaveAsync(new Watermark("S", "F", 100, 1, 0), CancellationToken.None);
 
         await store.ClearAsync("S", CancellationToken.None);
 
@@ -98,6 +98,6 @@ public sealed class FileCheckpointStoreTests : IDisposable
         var store = Store();
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => store.SaveAsync(new Watermark("bad/key", 0, 0, 0), CancellationToken.None));
+            () => store.SaveAsync(new Watermark("bad/key", "F", 0, 0, 0), CancellationToken.None));
     }
 }
