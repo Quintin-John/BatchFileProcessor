@@ -26,6 +26,24 @@ public sealed class LineageDrainServiceTests
     }
 
     [Fact]
+    public async Task StopAsync_FlushesBufferedEvents_NoneDropped()
+    {
+        var emitter = new ChannelLineageEmitter(capacity: 100);
+        var sink = new CapturingSink();
+        var service = new LineageDrainService(emitter, sink);
+
+        for (var i = 1; i <= 50; i++)
+        {
+            await emitter.EmitAsync(Event(i), CancellationToken.None);
+        }
+
+        await service.StartAsync(CancellationToken.None);
+        await service.StopAsync(CancellationToken.None); // completes the emitter and drains the buffer
+
+        Assert.Equal(50, sink.Count); // every buffered event exported before stop returned — never dropped (§6.1/§8)
+    }
+
+    [Fact]
     public void Constructor_NullArgument_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => new LineageDrainService(null!, new CapturingSink()));

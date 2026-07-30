@@ -38,6 +38,6 @@ public sealed class ChannelLineageEmitter : ILineageEmitter
         return _channel.Writer.WriteAsync(lineageEvent, cancellationToken);
     }
 
-    /// <summary>Signals that no more events will be emitted, so the drainer can finish.</summary>
-    public void Complete() => _channel.Writer.Complete();
+    /// <summary>Signals that no more events will be emitted, so the drainer can finish. Idempotent.</summary>
+    public void Complete() => _channel.Writer.TryComplete();
 }
