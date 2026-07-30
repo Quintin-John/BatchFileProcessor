@@ -122,7 +122,7 @@ public static class LayoutLoader
 
             try
             {
-                fields.Add(new FieldDefinition(field.Name, field.Start, field.Length, type));
+                fields.Add(new FieldDefinition(field.Name, field.Start, field.Length, type, field.Scale, field.Format));
             }
             catch (ArgumentException ex)
             {
@@ -177,6 +177,10 @@ public static class LayoutLoader
         public int Length { get; set; }
 
         public string? Type { get; set; }
+
+        public int Scale { get; set; }
+
+        public string? Format { get; set; }
     }
 #pragma warning restore S1144, S3459, CA1812
 }
