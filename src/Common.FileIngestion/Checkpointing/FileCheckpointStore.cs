@@ -4,12 +4,15 @@ namespace Common.FileIngestion.Checkpointing;
 
 /// <summary>
 /// File-based <see cref="ICheckpointStore"/>. Persists one watermark JSON file per source key in a
-/// configured durable directory, written atomically (temp file then rename) so a crash mid-write
-/// never leaves a corrupt watermark. Suitable for a mounted durable volume.
+/// configured durable directory. The temp file is flushed to disk (fsync) before an atomic rename, so
+/// neither a process crash nor a power loss can leave a torn or unflushed watermark at the final path.
+/// (Directory-entry durability after the rename is filesystem-dependent and not portably exposed by
+/// .NET; on a journaled volume the rename is itself durable.) Suitable for a mounted durable volume.
 /// </summary>
 public sealed class FileCheckpointStore : ICheckpointStore
 {
     private const string WatermarkExtension = ".watermark.json";
+    private const string TempExtension = ".tmp";
     private readonly string _directory;
 
     /// <summary>Creates a store rooted at a durable directory (created if missing).</summary>
@@ -41,10 +44,18 @@ public sealed class FileCheckpointStore : ICheckpointStore
         ArgumentNullException.ThrowIfNull(watermark);
 
         var path = PathFor(watermark.SourceKey);
-        var temp = path + ".tmp";
+        var temp = path + TempExtension;
         var json = JsonSerializer.SerializeToUtf8Bytes(watermark);
 
-        await File.WriteAllBytesAsync(temp, json, cancellationToken).ConfigureAwait(false);
+        // Write then fsync the temp file so its bytes are durably on disk before the rename; rename
+        // atomicity alone does not guarantee the content survived a power loss.
+        var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None);
+        await using (stream.ConfigureAwait(false))
+        {
+            await stream.WriteAsync(json, cancellationToken).ConfigureAwait(false);
+            stream.Flush(flushToDisk: true);
+        }
+
         File.Move(temp, path, overwrite: true);
     }
 
