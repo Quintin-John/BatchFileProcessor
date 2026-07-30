@@ -1,6 +1,7 @@
 using System.Text;
 using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
+using Common.FileIngestion.Lineage;
 using Common.FileIngestion.Parsing;
 using Common.FileIngestion.Pipeline;
 using Common.FileIngestion.Protection;
@@ -26,6 +27,7 @@ public sealed class FileIngestionPipelineTests
     {
         public CapturingPublisher Publisher { get; } = new();
         public InMemoryCheckpointStore Checkpoints { get; } = new();
+        public ChannelLineageEmitter Lineage { get; } = new(capacity: 1000); // large enough not to block small tests
 
         public FileIngestionPipeline Build(int maxRecords = 2) => new(
             new StreamRecordReader(RecordLength, terminatorLength: 1, Encoding.ASCII),
@@ -35,6 +37,7 @@ public sealed class FileIngestionPipelineTests
             new RejectSink(Publisher),
             Checkpoints,
             new IngestionMetrics(new ObservabilityInstrumentation("test-pipeline")),
+            new RecordLineage(Lineage, TimeProvider.System),
             new Heartbeat(TimeProvider.System),
             new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000));
     }
@@ -191,6 +194,34 @@ public sealed class FileIngestionPipelineTests
         await Assert.ThrowsAsync<InvalidDataException>(
             () => harness.Build().IngestAsync(Request(Open), CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Ingest_EmitsLineage_ForEveryRecordTransition()
+    {
+        var harness = new Harness();
+        var bytes = Bytes(FileText);
+
+        await harness.Build(maxRecords: 2).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+        harness.Lineage.Complete();
+
+        var events = new List<LineageEvent>();
+        await foreach (var e in harness.Lineage.Reader.ReadAllAsync())
+        {
+            events.Add(e);
+        }
+
+        // An accepted record moves consumed -> accepted -> batched -> confirmed.
+        List<LineageState> accepted = [LineageState.Consumed, LineageState.Accepted, LineageState.Batched, LineageState.Confirmed];
+        Assert.Equal(accepted, States(events, recordSeq: 1));
+
+        // A rejected record moves consumed -> rejected, carrying the reason code (never a value).
+        List<LineageState> rejected = [LineageState.Consumed, LineageState.Rejected];
+        Assert.Equal(rejected, States(events, recordSeq: 3));
+        Assert.Equal("CODE", events.Single(e => e.Locator.RecordSeq == 3 && e.State == LineageState.Rejected).ReasonCode);
+    }
+
+    private static List<LineageState> States(IEnumerable<LineageEvent> events, long recordSeq) =>
+        events.Where(e => e.Locator.RecordSeq == recordSeq).Select(e => e.State).ToList();
 
     [Fact]
     public async Task Ingest_NullRequest_Throws()

@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Common.FileIngestion.Batching;
 using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
+using Common.FileIngestion.Lineage;
 using Common.FileIngestion.Parsing;
 using Common.FileIngestion.Protection;
 using Common.FileIngestion.Reading;
@@ -21,6 +22,8 @@ namespace Common.FileIngestion.Pipeline;
 /// </summary>
 public sealed class FileIngestionPipeline
 {
+    private const string PublishFailedReasonCode = "PUBLISH_FAILED";
+
     private readonly StreamRecordReader _reader;
     private readonly IRecordParser _parser;
     private readonly RecordProtector _protector;
@@ -28,6 +31,7 @@ public sealed class FileIngestionPipeline
     private readonly RejectSink _rejectSink;
     private readonly ICheckpointStore _checkpointStore;
     private readonly IngestionMetrics _metrics;
+    private readonly RecordLineage _lineage;
     private readonly Heartbeat _heartbeat;
     private readonly IngestionOptions _options;
 
@@ -45,6 +49,7 @@ public sealed class FileIngestionPipeline
         RejectSink rejectSink,
         ICheckpointStore checkpointStore,
         IngestionMetrics metrics,
+        RecordLineage lineage,
         Heartbeat heartbeat,
         IngestionOptions options)
     {
@@ -55,6 +60,7 @@ public sealed class FileIngestionPipeline
         ArgumentNullException.ThrowIfNull(rejectSink);
         ArgumentNullException.ThrowIfNull(checkpointStore);
         ArgumentNullException.ThrowIfNull(metrics);
+        ArgumentNullException.ThrowIfNull(lineage);
         ArgumentNullException.ThrowIfNull(heartbeat);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -65,6 +71,7 @@ public sealed class FileIngestionPipeline
         _rejectSink = rejectSink;
         _checkpointStore = checkpointStore;
         _metrics = metrics;
+        _lineage = lineage;
         _heartbeat = heartbeat;
         _options = options;
     }
@@ -137,11 +144,17 @@ public sealed class FileIngestionPipeline
         }
 
         var parseResult = _parser.Parse(framed.RecordSeq, framed.ByteOffset, framed.Content);
+        var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, parseResult.RecordType);
+        await _lineage.EmitAsync(run.Provenance, locator, LineageState.Consumed, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
         if (parseResult.IsSuccess)
         {
             var protectedRecord = _protector.Protect(run.Provenance.FileId, parseResult.Record!);
             _metrics.RecordParsed(protectedRecord.Locator.RecordType);
             run.Accepted++;
+            await _lineage.EmitAsync(run.Provenance, locator, LineageState.Accepted, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
 
             var sealedBatch = run.Batcher.Add(protectedRecord);
             if (sealedBatch is not null)
@@ -152,7 +165,6 @@ public sealed class FileIngestionPipeline
             return;
         }
 
-        var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, parseResult.RecordType);
         // Encrypt the raw record before it reaches the reject queue: a failed-parse line can still carry
         // PAN/PII and must never travel in clear.
         var rawRecord = _protector.ProtectRaw(run.Provenance.FileId, framed.RecordSeq, parseResult.RawRecord!);
@@ -160,14 +172,36 @@ public sealed class FileIngestionPipeline
             .ConfigureAwait(false);
         _metrics.RecordRejected(parseResult.RecordType);
         run.Rejected++;
+        await _lineage.EmitAsync(
+            run.Provenance, locator, LineageState.Rejected, reasonCode: parseResult.Reasons![0].Code,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     private async Task PublishBatchAsync(FileRun run, IngestBatchMessage batch, CancellationToken cancellationToken)
     {
-        await _publisher.PublishBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+        await EmitBatchLineageAsync(run, batch, LineageState.Batched, reasonCode: null, cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await _publisher.PublishBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // record terminal lineage for the batch's records, then rethrow (fail-closed)
+        catch (Exception)
+        {
+            await EmitBatchLineageAsync(run, batch, LineageState.Failed, PublishFailedReasonCode, cancellationToken)
+                .ConfigureAwait(false);
+            throw;
+        }
+#pragma warning restore CA1031
+
         _metrics.BatchPublished();
         _heartbeat.Beat();
         run.Batches++;
+        // With publisher confirms, publish completing IS broker confirmation, so Published collapses into
+        // Confirmed — the lineage reflects how the record actually moved.
+        await EmitBatchLineageAsync(run, batch, LineageState.Confirmed, reasonCode: null, cancellationToken)
+            .ConfigureAwait(false);
 
         // Resume position = one stride past the highest-offset record in the batch. LastByteOffset is the
         // authoritative max (not Records[^1]), so this does not depend on batch insertion order. For the
@@ -179,6 +213,17 @@ public sealed class FileIngestionPipeline
             new Watermark(run.SourceKey, batch.Provenance.FileId, confirmedOffset, batch.LastRecordSeq, batch.BatchSeq),
             cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private async ValueTask EmitBatchLineageAsync(
+        FileRun run, IngestBatchMessage batch, LineageState state, string? reasonCode, CancellationToken cancellationToken)
+    {
+        foreach (var record in batch.Records)
+        {
+            await _lineage.EmitAsync(
+                run.Provenance, record.Locator, state, batch.BatchSeq, batch.MessageId, reasonCode, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     // Per-file run state threaded through the single-threaded read loop: immutable resume/provenance

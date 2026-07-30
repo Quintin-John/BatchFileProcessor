@@ -1,6 +1,7 @@
 using System.Text;
 using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
+using Common.FileIngestion.Lineage;
 using Common.FileIngestion.Parsing;
 using Common.FileIngestion.Pipeline;
 using Common.FileIngestion.Protection;
@@ -56,6 +57,7 @@ public sealed class IngestionEndToEndTests : IDisposable
         new RejectSink(_publisher),
         _checkpoints,
         new IngestionMetrics(new ObservabilityInstrumentation("e2e")),
+        new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System),
         new Heartbeat(TimeProvider.System),
         new IngestionOptions(2, 100_000));
 

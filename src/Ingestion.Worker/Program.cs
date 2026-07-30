@@ -2,6 +2,7 @@ using System.Text;
 using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Layouts;
+using Common.FileIngestion.Lineage;
 using Common.FileIngestion.Parsing;
 using Common.FileIngestion.Pipeline;
 using Common.FileIngestion.Protection;
@@ -41,6 +42,14 @@ services.AddSingleton<IRecordParser>(new FixedLengthRecordParser(layout));
 services.AddSingleton(new StreamRecordReader(layout.RecordLength, ingestion.GetValue<int>("TerminatorLength"), encoding));
 services.AddObservability(builder.Configuration.GetSection("Observability")); // binds name/version, registers OTel export
 services.AddSingleton<IngestionMetrics>();
+
+// Per-record lineage (§8): bounded channel emitter, drained off the hot path to a structured-log sink.
+services.AddSingleton(new ChannelLineageEmitter(ingestion.GetValue<int>("LineageChannelCapacity")));
+services.AddSingleton<ILineageEmitter>(sp => sp.GetRequiredService<ChannelLineageEmitter>());
+services.AddSingleton<RecordLineage>();
+services.AddSingleton<ILineageSink, StructuredLogLineageSink>();
+services.AddHostedService<LineageDrainService>();
+
 services.AddSingleton<Heartbeat>();
 services.AddSingleton(new IngestionOptions(
     ingestion.GetValue<int>("MaxRecordsPerBatch"), ingestion.GetValue<int>("MaxContentBytesPerBatch")));
