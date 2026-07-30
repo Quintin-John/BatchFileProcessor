@@ -8,7 +8,7 @@ public sealed class RejectSinkTests
     private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
 
     private static RejectReason[] Reasons() =>
-        new[] { new RejectReason("amount", "decimal", "NON_NUMERIC", "decimal", "12A4") };
+        [new RejectReason("amount", "decimal", "NON_NUMERIC", "decimal", "12A4")];
 
     [Fact]
     public async Task RejectAsync_BuildsDeterministicMessage_AndPublishes()

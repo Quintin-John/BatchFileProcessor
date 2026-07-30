@@ -143,7 +143,7 @@ public sealed class FileIngestionPipelineTests
             if (content.StartsWith("REJ", StringComparison.Ordinal))
             {
                 return RecordParseResult.Rejected("REJ", content,
-                    new[] { new RejectReason("v", "rule", "CODE", null, content) });
+                    [new RejectReason("v", "rule", "CODE", null, content)]);
             }
 
             var ingest = new IngestRecord(

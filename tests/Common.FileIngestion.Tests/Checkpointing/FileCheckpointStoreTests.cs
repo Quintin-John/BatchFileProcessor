@@ -71,7 +71,11 @@ public sealed class FileCheckpointStoreTests : IDisposable
     [Fact]
     public async Task Clear_Missing_IsNoOp()
     {
-        await Store().ClearAsync("missing", CancellationToken.None);
+        var store = Store();
+
+        await store.ClearAsync("missing", CancellationToken.None); // does not throw
+
+        Assert.Null(await store.LoadAsync("missing", CancellationToken.None));
     }
 
     [Fact]

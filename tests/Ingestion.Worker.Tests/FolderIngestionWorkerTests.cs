@@ -30,11 +30,7 @@ public sealed class FolderIngestionWorkerTests
         var source = new FakeFileSource();
         var worker = new FolderIngestionWorker(source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
 
-        var files = new List<ClaimedFile>
-        {
-            new("ok.dat", "p/ok.dat"),
-            new("boom.dat", "p/boom.dat"),
-        };
+        List<ClaimedFile> files = [new("ok.dat", "p/ok.dat"), new("boom.dat", "p/boom.dat")];
 
         await worker.ProcessAsync(files, CancellationToken.None);
 
@@ -70,10 +66,10 @@ public sealed class FolderIngestionWorkerTests
         var worker = new FolderIngestionWorker(
             new FakeFileSource(), mediator, gate, Options(), NullLogger<FolderIngestionWorker>.Instance);
 
-        await worker.ProcessAsync(new List<ClaimedFile> { new("ok.dat", "p/ok.dat") }, CancellationToken.None);
+        await worker.ProcessAsync([new ClaimedFile("ok.dat", "p/ok.dat")], CancellationToken.None);
         Assert.Equal(HealthStatus.Healthy, gate.Status);
 
-        await worker.ProcessAsync(new List<ClaimedFile> { new("boom.dat", "p/boom.dat") }, CancellationToken.None);
+        await worker.ProcessAsync([new ClaimedFile("boom.dat", "p/boom.dat")], CancellationToken.None);
         Assert.Equal(HealthStatus.Degraded, gate.Status);
     }
 
