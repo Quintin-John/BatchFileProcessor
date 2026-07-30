@@ -106,6 +106,19 @@ public sealed class StreamRecordReaderTests
     }
 
     [Fact]
+    public void Constructor_SingleByteEncoding_Accepted()
+    {
+        _ = new StreamRecordReader(4, 1, Encoding.Latin1); // does not throw
+    }
+
+    [Fact]
+    public void Constructor_MultiByteEncoding_Throws()
+    {
+        // UTF-8 would decode N bytes into a differently-sized string, misaligning fixed-width fields.
+        Assert.Throws<ArgumentException>(() => new StreamRecordReader(4, 1, Encoding.UTF8));
+    }
+
+    [Fact]
     public async Task ReadAsync_NullArguments_Throw()
     {
         var reader = new StreamRecordReader(4, 1, Encoding.ASCII);

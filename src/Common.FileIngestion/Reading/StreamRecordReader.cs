@@ -27,6 +27,13 @@ public sealed class StreamRecordReader
         ArgumentOutOfRangeException.ThrowIfLessThan(recordLength, 1);
         ArgumentOutOfRangeException.ThrowIfNegative(terminatorLength);
         ArgumentNullException.ThrowIfNull(encoding);
+        if (!encoding.IsSingleByte)
+        {
+            throw new ArgumentException(
+                "A single-byte encoding is required so a record's byte length equals its character length; " +
+                "a multi-byte encoding would misalign fixed-width fields.",
+                nameof(encoding));
+        }
 
         _recordLength = recordLength;
         _terminatorLength = terminatorLength;
@@ -108,7 +115,9 @@ public sealed class StreamRecordReader
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(scratch);
+            // Zero on return: the scratch buffer held cleartext record bytes (PAN/PII) and goes back to a
+            // shared pool that any other component can rent.
+            ArrayPool<byte>.Shared.Return(scratch, clearArray: true);
             await pipe.CompleteAsync().ConfigureAwait(false);
         }
 

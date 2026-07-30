@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Common.Messaging.Contracts;
@@ -55,8 +56,16 @@ public sealed class DefaultFieldProtector : IFieldProtector
         }
 
         var plaintext = JsonSerializer.SerializeToUtf8Bytes(value, MessagingJson.Options);
-        var envelope = _crypto.Encrypt(plaintext, _keys.GetActiveKey(), Aad(context));
-        return new EncryptedFieldValue(envelope);
+        try
+        {
+            var envelope = _crypto.Encrypt(plaintext, _keys.GetActiveKey(), Aad(context));
+            return new EncryptedFieldValue(envelope);
+        }
+        finally
+        {
+            // Zero the transient cleartext so a decrypted field value never lingers on the heap.
+            CryptographicOperations.ZeroMemory(plaintext);
+        }
     }
 
     /// <inheritdoc />
