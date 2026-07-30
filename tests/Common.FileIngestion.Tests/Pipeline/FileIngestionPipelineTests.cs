@@ -249,6 +249,32 @@ public sealed class FileIngestionPipelineTests
     }
 
     [Fact]
+    public async Task Ingest_FanOut_ResumesAfterFault_AllBatchesEventuallyPublished_NoLoss()
+    {
+        var harness = new Harness { PublisherConcurrency = 4, BatchChannelCapacity = 8, PublisherConfirmWindow = 8 };
+        var bytes = Bytes(ManyRecords(20));
+
+        // Run 1: batch 10 faults, creating a gap; the run fails and the watermark stops before batch 10.
+        harness.Publisher.FailOnBatchSeq = 10;
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Build(maxRecords: 1).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
+        var afterFault = await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None);
+        Assert.True(afterFault is null || afterFault.BatchSeq < 10);
+
+        // Run 2: broker recovered; resume from the watermark and finish.
+        harness.Publisher.FailOnBatchSeq = null;
+        var outcome = await harness.Build(maxRecords: 1)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None)); // completed, cleared
+        // Every batch 0..19 is published across the two runs (no loss). Distinct absorbs the at-least-once
+        // replay of the unconfirmed window — the safety net the resume design relies on.
+        Assert.Equal(
+            Enumerable.Range(0, 20).Select(i => (long)i),
+            harness.Publisher.Batches.Select(b => b.BatchSeq).Distinct().OrderBy(s => s));
+    }
+
+    [Fact]
     public async Task Ingest_ConfirmWindow_CapsBatchesInFlightToWindowSize()
     {
         const int window = 3;
