@@ -16,6 +16,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
             .AddMassTransitTestHarness(cfg =>
             {
                 cfg.AddConsumer<BatchConsumer>();
+                cfg.AddConsumer<RejectConsumer>();
                 cfg.UsingInMemory((context, bus) =>
                 {
                     bus.ConfigureJsonSerializerOptions(options =>
@@ -64,6 +65,36 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
             () => publisher.PublishBatchAsync(null!, CancellationToken.None));
     }
 
+    private static RejectMessage SampleReject()
+    {
+        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        var reasons = new[] { new RejectReason("amount", "decimal", "NON_NUMERIC", "decimal", "12A4") };
+        return new RejectMessage(
+            "file-abc-101-reject", provenance, new RecordLocator(101, 121200, "TRAN"),
+            new ClearFieldValue("cmF3"), reasons);
+    }
+
+    [Fact]
+    public async Task PublishRejectAsync_PublishesAndIsConsumed()
+    {
+        var publisher = new MassTransitPublisher(_harness.Bus);
+
+        await publisher.PublishRejectAsync(SampleReject(), CancellationToken.None);
+
+        Assert.True(await _harness.Published.Any<RejectMessage>());
+        var consumer = _harness.GetConsumerHarness<RejectConsumer>();
+        Assert.True(await consumer.Consumed.Any<RejectMessage>());
+    }
+
+    [Fact]
+    public async Task PublishRejectAsync_NullReject_Throws()
+    {
+        var publisher = new MassTransitPublisher(_harness.Bus);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => publisher.PublishRejectAsync(null!, CancellationToken.None));
+    }
+
     [Fact]
     public void Constructor_NullEndpoint_Throws()
     {
@@ -75,4 +106,10 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
 public sealed class BatchConsumer : IConsumer<IngestBatchMessage>
 {
     public Task Consume(ConsumeContext<IngestBatchMessage> context) => Task.CompletedTask;
+}
+
+/// <summary>Test consumer used to prove a published reject round-trips and is consumed.</summary>
+public sealed class RejectConsumer : IConsumer<RejectMessage>
+{
+    public Task Consume(ConsumeContext<RejectMessage> context) => Task.CompletedTask;
 }

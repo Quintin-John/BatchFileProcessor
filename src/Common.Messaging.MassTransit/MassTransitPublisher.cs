@@ -34,4 +34,15 @@ public sealed class MassTransitPublisher : IMessagePublisher
             context => context.Headers.Set(CorrelationIdHeader, batch.Provenance.CorrelationId),
             cancellationToken);
     }
+
+    /// <inheritdoc />
+    public Task PublishRejectAsync(RejectMessage reject, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reject);
+
+        return _publishEndpoint.Publish(
+            reject,
+            context => context.Headers.Set(CorrelationIdHeader, reject.Provenance.CorrelationId),
+            cancellationToken);
+    }
 }

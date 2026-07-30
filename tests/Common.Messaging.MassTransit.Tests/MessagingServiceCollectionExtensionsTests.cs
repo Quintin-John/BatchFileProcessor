@@ -1,5 +1,6 @@
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
+using Common.Messaging.Contracts;
 
 namespace Common.Messaging.MassTransit.Tests;
 

@@ -1,4 +1,5 @@
 using MassTransit;
+using Common.Messaging.Contracts;
 using Common.Messaging.MassTransit;
 
 namespace Microsoft.Extensions.DependencyInjection;
