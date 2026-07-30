@@ -64,21 +64,21 @@ public sealed class MessagingOptionsTests
             RetryLimit = 3,
             RetryInitialInterval = TimeSpan.FromSeconds(2),
             RetryIntervalIncrement = TimeSpan.FromSeconds(3),
-            UseJitter = false,
             CircuitBreakerTripThreshold = 20,
             CircuitBreakerActiveThreshold = 5,
             CircuitBreakerResetInterval = TimeSpan.FromMinutes(2),
             RateLimit = 100,
+            RateLimitInterval = TimeSpan.FromSeconds(5),
         };
 
         Assert.Equal(3, options.RetryLimit);
         Assert.Equal(TimeSpan.FromSeconds(2), options.RetryInitialInterval);
         Assert.Equal(TimeSpan.FromSeconds(3), options.RetryIntervalIncrement);
-        Assert.False(options.UseJitter);
         Assert.Equal(20, options.CircuitBreakerTripThreshold);
         Assert.Equal(5, options.CircuitBreakerActiveThreshold);
         Assert.Equal(TimeSpan.FromMinutes(2), options.CircuitBreakerResetInterval);
         Assert.Equal(100, options.RateLimit);
+        Assert.Equal(TimeSpan.FromSeconds(5), options.RateLimitInterval);
     }
 
     [Fact]

@@ -6,6 +6,9 @@ namespace Common.Messaging.MassTransit;
 /// </summary>
 public sealed class MessagingResilienceOptions
 {
+    /// <summary>Upper bound for <see cref="CircuitBreakerTripThreshold"/>, expressed as a percentage.</summary>
+    private const int MaxTripThresholdPercent = 100;
+
     /// <summary>Number of retry attempts before a message faults.</summary>
     public int RetryLimit { get; set; } = 5;
 
@@ -14,9 +17,6 @@ public sealed class MessagingResilienceOptions
 
     /// <summary>Amount each retry interval grows by.</summary>
     public TimeSpan RetryIntervalIncrement { get; set; } = TimeSpan.FromSeconds(2);
-
-    /// <summary>Whether to add jitter to retry intervals.</summary>
-    public bool UseJitter { get; set; } = true;
 
     /// <summary>Failure percentage (0..100) at which the circuit breaker trips.</summary>
     public int CircuitBreakerTripThreshold { get; set; } = 15;
@@ -27,8 +27,11 @@ public sealed class MessagingResilienceOptions
     /// <summary>How long the breaker stays open before probing again.</summary>
     public TimeSpan CircuitBreakerResetInterval { get; set; } = TimeSpan.FromMinutes(1);
 
-    /// <summary>Maximum messages per interval, or 0 to disable rate limiting.</summary>
+    /// <summary>Maximum messages per <see cref="RateLimitInterval"/>, or 0 to disable rate limiting.</summary>
     public int RateLimit { get; set; }
+
+    /// <summary>Window over which <see cref="RateLimit"/> applies.</summary>
+    public TimeSpan RateLimitInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>Validates the options. Fail-closed on invalid configuration.</summary>
     /// <exception cref="ArgumentOutOfRangeException">A numeric or interval value is out of range.</exception>
@@ -39,8 +42,9 @@ public sealed class MessagingResilienceOptions
         ArgumentOutOfRangeException.ThrowIfNegative(RetryIntervalIncrement.Ticks);
         ArgumentOutOfRangeException.ThrowIfNegative(CircuitBreakerActiveThreshold);
         ArgumentOutOfRangeException.ThrowIfNegative(CircuitBreakerTripThreshold);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(CircuitBreakerTripThreshold, 100);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(CircuitBreakerTripThreshold, MaxTripThresholdPercent);
         ArgumentOutOfRangeException.ThrowIfNegative(CircuitBreakerResetInterval.Ticks);
         ArgumentOutOfRangeException.ThrowIfNegative(RateLimit);
+        ArgumentOutOfRangeException.ThrowIfNegative(RateLimitInterval.Ticks);
     }
 }
