@@ -30,6 +30,8 @@ public sealed class FileIngestionPipelineTests
         public InMemoryCheckpointStore Checkpoints { get; } = new();
         public ChannelLineageEmitter Lineage { get; } = new(capacity: 1000); // large enough not to block small tests
 
+        public int BatchChannelCapacity { get; set; } = 64; // large enough not to gate small tests
+
         public FileIngestionPipeline Build(int maxRecords = 2)
         {
             var instrumentation = new ObservabilityInstrumentation("test-pipeline");
@@ -44,7 +46,7 @@ public sealed class FileIngestionPipelineTests
                 new RecordLineage(Lineage, TimeProvider.System),
                 new IngestionTracing(instrumentation),
                 new Heartbeat(TimeProvider.System),
-                new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000));
+                new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity));
         }
     }
 
@@ -72,6 +74,23 @@ public sealed class FileIngestionPipelineTests
         Assert.Equal($"{outcome.FileId}-3-reject", reject.MessageId);
         Assert.IsType<EncryptedFieldValue>(reject.RawRecord); // raw record encrypted, never clear
 
+        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Ingest_WithTinyChannelCapacity_BackpressuresButCompletesCorrectly()
+    {
+        // Capacity 1 forces the reader to wait on the publisher for almost every batch; the bounded
+        // channel must neither lose a batch nor deadlock (GS1 backpressure).
+        var harness = new Harness { BatchChannelCapacity = 1 };
+        var bytes = Bytes(FileText);
+
+        var outcome = await harness.Build(maxRecords: 1)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        Assert.Equal(3, outcome.RecordsAccepted);
+        Assert.Equal(1, outcome.RecordsRejected);
+        Assert.Equal(3, outcome.BatchesPublished); // maxRecords 1 -> one batch per accepted record
         Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None));
     }
 

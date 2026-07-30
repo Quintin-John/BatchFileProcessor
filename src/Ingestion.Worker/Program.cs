@@ -53,7 +53,8 @@ services.AddHostedService<LineageDrainService>();
 
 services.AddSingleton<Heartbeat>();
 services.AddSingleton(new IngestionOptions(
-    ingestion.GetValue<int>("MaxRecordsPerBatch"), ingestion.GetValue<int>("MaxContentBytesPerBatch")));
+    ingestion.GetValue<int>("MaxRecordsPerBatch"), ingestion.GetValue<int>("MaxContentBytesPerBatch"),
+    ingestion.GetValue<int>("BatchChannelCapacity")));
 services.AddSingleton<RecordProtector>();
 services.AddSingleton<RejectSink>();
 services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(Required(ingestion, "CheckpointDirectory")));

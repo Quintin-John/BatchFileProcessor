@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
+using System.Threading.Channels;
 using Common.FileIngestion.Batching;
 using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
@@ -95,25 +97,92 @@ public sealed class FileIngestionPipeline
         // Run span covers the whole file; batch spans nest under it and carry traceparent into headers.
         using var fileSpan = _tracing.StartFileActivity(run.Provenance);
 
-        var readPassFileId = await _reader.ReadAsync(
-            request.OpenStream(),
-            (framed, ct) => ProcessAsync(run, framed, ct),
-            cancellationToken).ConfigureAwait(false);
-
-        if (!string.Equals(readPassFileId, fileId, StringComparison.Ordinal))
+        // Decouple read/map from publishing: sealed batches flow through a bounded channel to a publisher
+        // task. The bound caps in-flight memory regardless of file size (§3.1) and backpressures the reader.
+        var channel = Channel.CreateBounded<IngestBatchMessage>(new BoundedChannelOptions(_options.BatchChannelCapacity)
         {
-            throw new InvalidDataException($"Source '{request.SourceKey}' changed during processing (hash mismatch).");
-        }
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = true,
+        });
+        using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var publisher = ConsumeAndPublishAsync(run, channel.Reader, pipelineCts);
 
-        var finalBatch = run.Batcher.Flush();
-        if (finalBatch is not null)
+        try
         {
-            await PublishBatchAsync(run, finalBatch, cancellationToken).ConfigureAwait(false);
+            var readPassFileId = await _reader.ReadAsync(
+                request.OpenStream(),
+                (framed, ct) => ProcessAsync(run, framed, channel.Writer, ct),
+                pipelineCts.Token).ConfigureAwait(false);
+
+            if (!string.Equals(readPassFileId, fileId, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException($"Source '{request.SourceKey}' changed during processing (hash mismatch).");
+            }
+
+            var finalBatch = run.Batcher.Flush();
+            if (finalBatch is not null)
+            {
+                await channel.Writer.WriteAsync(finalBatch, pipelineCts.Token).ConfigureAwait(false);
+            }
+
+            channel.Writer.Complete();
         }
+#pragma warning disable CA1031 // coordinate producer/publisher shutdown, then surface the true cause below
+        catch (Exception)
+        {
+            // A publisher fault cancels the producer so it cannot deadlock on a full channel; that surfaces
+            // here as cancellation, but the publisher's fault is the real error and must win.
+            channel.Writer.TryComplete();
+            pipelineCts.Cancel();
+            var publisherError = await CaptureExceptionAsync(publisher).ConfigureAwait(false);
+            if (publisherError is not null and not OperationCanceledException)
+            {
+                ExceptionDispatchInfo.Throw(publisherError);
+            }
+
+            throw;
+        }
+#pragma warning restore CA1031
+
+        await publisher.ConfigureAwait(false); // propagate a publisher fault on the happy path
 
         await _checkpointStore.ClearAsync(run.SourceKey, cancellationToken).ConfigureAwait(false);
-
         return new IngestOutcome(fileId, run.Accepted, run.Rejected, run.Batches);
+    }
+
+    private async Task ConsumeAndPublishAsync(
+        FileRun run, ChannelReader<IngestBatchMessage> reader, CancellationTokenSource pipelineCts)
+    {
+        try
+        {
+            await foreach (var batch in reader.ReadAllAsync(pipelineCts.Token).ConfigureAwait(false))
+            {
+                await PublishBatchAsync(run, batch, pipelineCts.Token).ConfigureAwait(false);
+            }
+        }
+#pragma warning disable CA1031 // any publisher fault must unblock the producer, then propagate
+        catch (Exception)
+        {
+            pipelineCts.Cancel(); // unblock the producer so a full channel can't deadlock the run
+            throw;
+        }
+#pragma warning restore CA1031
+    }
+
+    private static async Task<Exception?> CaptureExceptionAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+            return null;
+        }
+#pragma warning disable CA1031 // capturing any fault is this helper's purpose
+        catch (Exception ex)
+        {
+            return ex;
+        }
+#pragma warning restore CA1031
     }
 
     private static async Task<string> ComputeFileIdAsync(IngestRequest request, CancellationToken cancellationToken)
@@ -141,7 +210,8 @@ public sealed class FileIngestionPipeline
         return new FileRun(request.SourceKey, watermark?.ByteOffset ?? 0, _reader.Stride, provenance, batcher);
     }
 
-    private async ValueTask ProcessAsync(FileRun run, FramedRecord framed, CancellationToken cancellationToken)
+    private async ValueTask ProcessAsync(
+        FileRun run, FramedRecord framed, ChannelWriter<IngestBatchMessage> writer, CancellationToken cancellationToken)
     {
         _metrics.BytesRead(run.Stride);
 
@@ -166,7 +236,7 @@ public sealed class FileIngestionPipeline
             var sealedBatch = run.Batcher.Add(protectedRecord);
             if (sealedBatch is not null)
             {
-                await PublishBatchAsync(run, sealedBatch, cancellationToken).ConfigureAwait(false);
+                await writer.WriteAsync(sealedBatch, cancellationToken).ConfigureAwait(false); // backpressure
             }
 
             return;
