@@ -15,6 +15,10 @@ coverage*.json
 coverage*.xml
 *.trx
 
+# SonarQube scanner working output
+.sonarqube/
+sonar-project.properties
+
 # IDE
 .vs/
 .idea/
