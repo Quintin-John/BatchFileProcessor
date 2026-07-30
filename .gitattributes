@@ -1,0 +1,11 @@
+# Normalize line endings on commit; check out native.
+* text=auto
+
+# Tooling-managed files that Visual Studio writes CRLF.
+*.sln text eol=crlf
+
+# C# sources use LF.
+*.cs text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf

@@ -7,6 +7,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6FD848B6-E7B
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.Contracts", "src\Common.Messaging.Contracts\Common.Messaging.Contracts.csproj", "{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{93DE55B5-161C-4A97-B921-2A27DAE602B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.Contracts.Tests", "tests\Common.Messaging.Contracts.Tests\Common.Messaging.Contracts.Tests.csproj", "{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,8 +24,13 @@ Global
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
+		{FC077102-5A2D-4E19-8D1C-A40486D7DFAC} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
 	EndGlobalSection
 EndGlobal

@@ -1,0 +1,4 @@
+# Test-project analyzer overrides. Scoped to tests/ only; production code keeps the full ruleset.
+[*.cs]
+# Underscores are the idiomatic test-naming convention (Method_Scenario_Expectation).
+dotnet_diagnostic.CA1707.severity = none

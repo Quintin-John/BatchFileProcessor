@@ -10,6 +10,9 @@ artifacts/
 [Tt]est[Rr]esults/
 coverage/
 *.coverage
+*.cobertura.xml
+coverage*.json
+coverage*.xml
 *.trx
 
 # IDE
