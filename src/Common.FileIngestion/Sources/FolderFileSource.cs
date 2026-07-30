@@ -79,6 +79,21 @@ public sealed class FolderFileSource : IFileSource
     private static void MoveTo(ClaimedFile file, string targetDirectory)
     {
         ArgumentNullException.ThrowIfNull(file);
-        File.Move(file.ProcessingPath, Path.Combine(targetDirectory, file.Name), overwrite: true);
+        // Never overwrite: a same-name file already in done/failed is a prior original and must be
+        // preserved for audit. Disambiguate so both are kept rather than clobbering the earlier one.
+        File.Move(file.ProcessingPath, CollisionFreePath(targetDirectory, file.Name));
+    }
+
+    private static string CollisionFreePath(string directory, string name)
+    {
+        var candidate = Path.Combine(directory, name);
+        var suffix = 0;
+        while (File.Exists(candidate))
+        {
+            suffix++;
+            candidate = Path.Combine(directory, $"{name}.{suffix}");
+        }
+
+        return candidate;
     }
 }

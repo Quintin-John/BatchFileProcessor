@@ -97,6 +97,22 @@ public sealed class FolderFileSourceTests : IDisposable
     }
 
     [Fact]
+    public void Complete_SameNameArchiveExists_PreservesBothOriginals()
+    {
+        // Recurring daily file: the same name completes twice; the earlier archive must not be clobbered.
+        var source = Source();
+
+        DropIncoming("f.dat", "day1");
+        source.Complete(source.Claim().Single());
+
+        DropIncoming("f.dat", "day2");
+        source.Complete(source.Claim().Single());
+
+        Assert.Equal("day1", File.ReadAllText(Path.Combine(Done, "f.dat")));
+        Assert.Equal("day2", File.ReadAllText(Path.Combine(Done, "f.dat.1")));
+    }
+
+    [Fact]
     public void Fail_MovesProcessingToFailed()
     {
         var source = Source();
