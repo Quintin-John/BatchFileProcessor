@@ -46,7 +46,7 @@ services.AddSingleton<RecordProtector>();
 services.AddSingleton<RejectSink>();
 services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(Required(ingestion, "CheckpointDirectory")));
 services.AddSingleton<FileIngestionPipeline>();
-services.AddSingleton<IFileSource>(new FolderFileSource(Required(ingestion, "RootDirectory")));
+services.AddSingleton<IFileSource>(_ => new FolderFileSource(Required(ingestion, "RootDirectory")));
 services.AddSingleton(new WorkerOptions(
     Required(ingestion, "ProfileId"), layout.Version, TimeSpan.FromSeconds(ingestion.GetValue<int>("PollIntervalSeconds"))));
 

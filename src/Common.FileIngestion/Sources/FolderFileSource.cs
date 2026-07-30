@@ -8,21 +8,29 @@ namespace Common.FileIngestion.Sources;
 /// <c>processing</c> after a crash are re-offered by <see cref="RecoverOrphans"/> and resumed from
 /// their watermark.
 /// </summary>
-public sealed class FolderFileSource : IFileSource
+public sealed class FolderFileSource : IFileSource, IDisposable
 {
     private const string IncomingDir = "incoming";
     private const string ProcessingDir = "processing";
     private const string DoneDir = "done";
     private const string FailedDir = "failed";
+    private const string LockFileName = ".ingestion.lock";
 
     private readonly string _incoming;
     private readonly string _processing;
     private readonly string _done;
     private readonly string _failed;
+    private readonly FileStream _ownershipLock;
 
-    /// <summary>Creates the source, creating the four subdirectories if missing.</summary>
+    /// <summary>
+    /// Creates the source, creating the four subdirectories if missing and taking exclusive ownership
+    /// of the root. Orphan recovery re-offers files sitting in <c>processing</c>, which is only safe if
+    /// exactly one instance owns the root — so a second instance on the same root fails closed here
+    /// rather than stealing a file the first is actively processing.
+    /// </summary>
     /// <param name="rootDirectory">Root directory; required, non-blank.</param>
     /// <exception cref="ArgumentException"><paramref name="rootDirectory"/> is blank.</exception>
+    /// <exception cref="InvalidOperationException">Another instance already owns the root.</exception>
     public FolderFileSource(string rootDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
@@ -36,6 +44,8 @@ public sealed class FolderFileSource : IFileSource
         Directory.CreateDirectory(_processing);
         Directory.CreateDirectory(_done);
         Directory.CreateDirectory(_failed);
+
+        _ownershipLock = AcquireOwnership(rootDirectory);
     }
 
     /// <inheritdoc />
@@ -69,6 +79,25 @@ public sealed class FolderFileSource : IFileSource
 
     /// <inheritdoc />
     public void Fail(ClaimedFile file) => MoveTo(file, _failed);
+
+    /// <summary>Releases exclusive ownership of the root.</summary>
+    public void Dispose() => _ownershipLock.Dispose();
+
+    private static FileStream AcquireOwnership(string rootDirectory)
+    {
+        var lockPath = Path.Combine(rootDirectory, LockFileName);
+        try
+        {
+            // Exclusive handle held for this source's lifetime; a second instance's open fails while held.
+            return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidOperationException(
+                $"Another ingestion instance already owns '{rootDirectory}'; the folder source is single-instance.",
+                ex);
+        }
+    }
 
     private static List<ClaimedFile> Enumerate(string directory) =>
         Directory.EnumerateFiles(directory)

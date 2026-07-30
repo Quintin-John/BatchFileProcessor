@@ -11,13 +11,16 @@ public sealed class FolderFileSourceTests : IDisposable
     private string Done => Path.Combine(_root, "done");
     private string Failed => Path.Combine(_root, "failed");
 
-    private FolderFileSource Source() => new(_root);
+    private FolderFileSource? _tracked;
+
+    private FolderFileSource Source() => _tracked = new FolderFileSource(_root);
 
     private void DropIncoming(string name, string content = "x") =>
         File.WriteAllText(Path.Combine(Incoming, name), content);
 
     public void Dispose()
     {
+        _tracked?.Dispose(); // release the ownership lock before removing the root
         if (Directory.Exists(_root))
         {
             Directory.Delete(_root, recursive: true);
@@ -129,6 +132,23 @@ public sealed class FolderFileSourceTests : IDisposable
     public void Constructor_BlankRoot_Throws()
     {
         Assert.ThrowsAny<ArgumentException>(() => new FolderFileSource("  "));
+    }
+
+    [Fact]
+    public void Constructor_SecondInstanceOnSameRoot_FailsClosed()
+    {
+        _ = Source(); // first instance owns the root (released by Dispose)
+
+        Assert.Throws<InvalidOperationException>(() => new FolderFileSource(_root));
+    }
+
+    [Fact]
+    public void Constructor_AfterDispose_OwnershipReleased_AllowsNewInstance()
+    {
+        var first = new FolderFileSource(_root);
+        first.Dispose();
+
+        using var second = new FolderFileSource(_root); // lock released, does not throw
     }
 
     [Fact]
