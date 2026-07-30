@@ -23,12 +23,13 @@ public sealed class ConfirmedBatchTracker
     }
 
     /// <summary>
-    /// Records a confirmed batch and returns the new watermark position if the contiguous confirmed
-    /// prefix advanced; otherwise null (this batch is confirmed but sits beyond an unconfirmed gap).
+    /// Records a confirmed batch and reports how far the contiguous confirmed prefix advanced: the new
+    /// watermark position and how many batches became contiguous (0 when this batch sits beyond an
+    /// unconfirmed gap). The count lets the caller release exactly that many confirm-window slots.
     /// </summary>
     /// <param name="position">The confirmed batch's position; required.</param>
     /// <exception cref="ArgumentNullException"><paramref name="position"/> is null.</exception>
-    public BatchPosition? Confirm(BatchPosition position)
+    public ConfirmResult Confirm(BatchPosition position)
     {
         ArgumentNullException.ThrowIfNull(position);
 
@@ -36,19 +37,26 @@ public sealed class ConfirmedBatchTracker
         {
             if (position.BatchSeq < _nextExpectedSeq)
             {
-                return null; // already advanced past this batch (each batch confirms once)
+                return default; // already advanced past this batch (each batch confirms once)
             }
 
             _confirmedAhead[position.BatchSeq] = position;
 
             BatchPosition? advanced = null;
+            var count = 0;
             while (_confirmedAhead.Remove(_nextExpectedSeq, out var next))
             {
                 advanced = next;
                 _nextExpectedSeq++;
+                count++;
             }
 
-            return advanced;
+            return new ConfirmResult(advanced, count);
         }
     }
 }
+
+/// <summary>Result of a <see cref="ConfirmedBatchTracker.Confirm"/>: how far the prefix advanced.</summary>
+/// <param name="AdvancedTo">New watermark position, or null if the prefix did not advance.</param>
+/// <param name="AdvancedCount">Number of batches that became contiguous (0 if held).</param>
+public readonly record struct ConfirmResult(BatchPosition? AdvancedTo, int AdvancedCount);

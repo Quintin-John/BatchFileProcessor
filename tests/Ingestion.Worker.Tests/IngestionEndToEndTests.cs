@@ -63,7 +63,7 @@ public sealed class IngestionEndToEndTests : IDisposable
             new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System),
             new IngestionTracing(instrumentation),
             new Heartbeat(TimeProvider.System),
-            new IngestionOptions(2, 100_000, 64, 1));
+            new IngestionOptions(2, 100_000, 64, 1, 64));
     }
 
     private sealed class FakeParser : IRecordParser

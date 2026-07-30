@@ -125,6 +125,7 @@ public sealed class FileIngestionPipeline
             var finalBatch = run.Batcher.Flush();
             if (finalBatch is not null)
             {
+                await run.Window.WaitAsync(pipelineCts.Token).ConfigureAwait(false); // confirm-window slot
                 await channel.Writer.WriteAsync(finalBatch, pipelineCts.Token).ConfigureAwait(false);
             }
 
@@ -247,7 +248,7 @@ public sealed class FileIngestionPipeline
 
         return new FileRun(
             request.SourceKey, watermark?.ByteOffset ?? 0, _reader.Stride, provenance, batcher,
-            new ConfirmedBatchTracker(firstBatchSeq));
+            new ConfirmedBatchTracker(firstBatchSeq), _options.PublisherConfirmWindow);
     }
 
     private async ValueTask ProcessAsync(
@@ -276,6 +277,7 @@ public sealed class FileIngestionPipeline
             var sealedBatch = run.Batcher.Add(protectedRecord);
             if (sealedBatch is not null)
             {
+                await run.Window.WaitAsync(cancellationToken).ConfigureAwait(false); // confirm-window slot (§3.1)
                 await writer.WriteAsync(sealedBatch, cancellationToken).ConfigureAwait(false); // backpressure
             }
 
@@ -328,10 +330,15 @@ public sealed class FileIngestionPipeline
         // prefix: a batch confirmed beyond an unconfirmed gap is held by the tracker until the gap fills, so
         // a crash never resumes past an unconfirmed record.
         var confirmedOffset = batch.LastByteOffset + run.Stride;
-        var advanced = run.Tracker.Confirm(new BatchPosition(batch.BatchSeq, confirmedOffset, batch.LastRecordSeq));
-        if (advanced is not null)
+        var result = run.Tracker.Confirm(new BatchPosition(batch.BatchSeq, confirmedOffset, batch.LastRecordSeq));
+        if (result.AdvancedTo is not null)
         {
-            await SaveWatermarkAsync(run, advanced, cancellationToken).ConfigureAwait(false);
+            await SaveWatermarkAsync(run, result.AdvancedTo, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (result.AdvancedCount > 0)
+        {
+            run.Window.Release(result.AdvancedCount); // free the confirm-window slots that became contiguous
         }
     }
 
@@ -377,7 +384,7 @@ public sealed class FileIngestionPipeline
     {
         public FileRun(
             string sourceKey, long resumeOffset, int stride, MessageProvenance provenance, Batcher batcher,
-            ConfirmedBatchTracker tracker)
+            ConfirmedBatchTracker tracker, int confirmWindow)
         {
             SourceKey = sourceKey;
             ResumeOffset = resumeOffset;
@@ -385,6 +392,7 @@ public sealed class FileIngestionPipeline
             Provenance = provenance;
             Batcher = batcher;
             Tracker = tracker;
+            Window = new SemaphoreSlim(confirmWindow, confirmWindow);
         }
 
         public string SourceKey { get; }
@@ -398,10 +406,18 @@ public sealed class FileIngestionPipeline
         public SemaphoreSlim WatermarkGate { get; } = new(1, 1);
         public long LastSavedBatchSeq { get; set; } = -1;
 
+        // Outstanding-confirms window: a slot per created batch, released when it joins the contiguous
+        // confirmed prefix — bounding batches-in-flight (and the tracker's held set) to the window size.
+        public SemaphoreSlim Window { get; }
+
         public long Accepted;
         public long Rejected;
         public long Batches;
 
-        public void Dispose() => WatermarkGate.Dispose();
+        public void Dispose()
+        {
+            WatermarkGate.Dispose();
+            Window.Dispose();
+        }
     }
 }

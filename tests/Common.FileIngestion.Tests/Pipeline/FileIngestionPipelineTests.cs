@@ -32,6 +32,7 @@ public sealed class FileIngestionPipelineTests
 
         public int BatchChannelCapacity { get; set; } = 64; // large enough not to gate small tests
         public int PublisherConcurrency { get; set; } = 1;  // deterministic by default; fan-out tests raise it
+        public int PublisherConfirmWindow { get; set; } = 64; // large enough not to gate; window test lowers it
 
         public FileIngestionPipeline Build(int maxRecords = 2)
         {
@@ -47,7 +48,9 @@ public sealed class FileIngestionPipelineTests
                 new RecordLineage(Lineage, TimeProvider.System),
                 new IngestionTracing(instrumentation),
                 new Heartbeat(TimeProvider.System),
-                new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity, PublisherConcurrency));
+                new IngestionOptions(
+                    maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity, PublisherConcurrency,
+                    PublisherConfirmWindow));
         }
     }
 
@@ -246,6 +249,41 @@ public sealed class FileIngestionPipelineTests
     }
 
     [Fact]
+    public async Task Ingest_ConfirmWindow_CapsBatchesInFlightToWindowSize()
+    {
+        const int window = 3;
+        var harness = new Harness
+        {
+            PublisherConfirmWindow = window,
+            BatchChannelCapacity = 100, // large, so the window (not the channel) is the binding constraint
+            PublisherConcurrency = 8,   // >= window, so every windowed batch can be picked up
+        };
+        harness.Publisher.Gated = true; // hold confirms so the contiguous prefix never advances
+        var bytes = Bytes(ManyRecords(20));
+
+        var runTask = harness.Build(maxRecords: 1)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        // With confirms held, no window slot is ever released, so the producer can create at most `window`
+        // batches — bounded regardless of the 20-record file. At most `window` publishes therefore start.
+        await WaitUntil(() => harness.Publisher.PublishCallCount >= window);
+        await Task.Delay(100);
+        Assert.Equal(window, harness.Publisher.PublishCallCount);
+
+        harness.Publisher.ReleaseGate();
+        var outcome = await runTask;
+        Assert.Equal(20, outcome.BatchesPublished); // once slots free, the rest flow through
+    }
+
+    private static async Task WaitUntil(Func<bool> condition)
+    {
+        for (var i = 0; i < 300 && !condition(); i++)
+        {
+            await Task.Delay(10);
+        }
+    }
+
+    [Fact]
     public async Task Ingest_ContentChangesBetweenPasses_FailsClosed()
     {
         var harness = new Harness();
@@ -351,6 +389,8 @@ public sealed class FileIngestionPipelineTests
     {
         private readonly List<IngestBatchMessage> _batches = [];
         private readonly List<RejectMessage> _rejects = [];
+        private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _publishCalls;
 
         public IReadOnlyList<IngestBatchMessage> Batches
         {
@@ -365,25 +405,34 @@ public sealed class FileIngestionPipelineTests
         public int FailOnBatchNumber { get; set; } = int.MaxValue; // 1-based publish attempt that faults
         public long? FailOnBatchSeq { get; set; }                  // fail a specific batch (deterministic under fan-out)
         public bool FailOnReject { get; set; }
+        public bool Gated { get; set; }                            // hold every confirm until ReleaseGate
+        public int PublishCallCount => Volatile.Read(ref _publishCalls);
 
-        public Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
+        public void ReleaseGate() => _gate.TrySetResult();
+
+        public async Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
         {
+            Interlocked.Increment(ref _publishCalls);
+
             if (batch.BatchSeq == FailOnBatchSeq)
             {
-                return Task.FromException(new InvalidOperationException("broker publish fault"));
+                throw new InvalidOperationException("broker publish fault");
+            }
+
+            if (Gated)
+            {
+                await _gate.Task.WaitAsync(cancellationToken).ConfigureAwait(false); // hold confirm until released
             }
 
             lock (_batches)
             {
                 if (_batches.Count + 1 == FailOnBatchNumber)
                 {
-                    return Task.FromException(new InvalidOperationException("broker publish fault"));
+                    throw new InvalidOperationException("broker publish fault");
                 }
 
                 _batches.Add(batch);
             }
-
-            return Task.CompletedTask;
         }
 
         public Task PublishRejectAsync(RejectMessage reject, CancellationToken cancellationToken)
