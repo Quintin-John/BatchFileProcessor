@@ -33,4 +33,11 @@
     <ProjectReference Include="..\..\src\Common.FileIngestion\Common.FileIngestion.csproj" />
   </ItemGroup>
 
+  <!-- Real G266 V4.8 layout, so tests prove the generic loader accepts the actual spec. -->
+  <ItemGroup>
+    <Content Include="..\..\docs\layouts\g266-v4.8.yaml" Link="Layouts\g266-v4.8.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
