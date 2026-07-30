@@ -58,12 +58,29 @@ public sealed class AesGcmCryptoProvider : ICryptoProvider
                 $"Algorithm mismatch: envelope is '{value.Algorithm}', provider is '{Algorithm}'.");
         }
 
-        var nonce = Convert.FromBase64String(value.Nonce);
-        var ciphertext = Convert.FromBase64String(value.Ciphertext);
-        var tag = Convert.FromBase64String(value.Tag);
-        var plaintext = new byte[ciphertext.Length];
+        byte[] nonce;
+        byte[] ciphertext;
+        byte[] tag;
+        try
+        {
+            nonce = Convert.FromBase64String(value.Nonce);
+            ciphertext = Convert.FromBase64String(value.Ciphertext);
+            tag = Convert.FromBase64String(value.Tag);
+        }
+        catch (FormatException ex)
+        {
+            throw new CryptographicException("Encrypted value contains invalid base64.", ex);
+        }
 
-        using var aes = new AesGcm(key.Material, tag.Length);
+        // Nonce and tag sizes are pinned crypto parameters — never taken from the (untrusted)
+        // envelope, so a shortened tag cannot downgrade authentication strength.
+        if (nonce.Length != NonceLength || tag.Length != TagLength)
+        {
+            throw new CryptographicException("Encrypted value has an invalid nonce or tag length.");
+        }
+
+        var plaintext = new byte[ciphertext.Length];
+        using var aes = new AesGcm(key.Material, TagLength);
         aes.Decrypt(nonce, ciphertext, tag, plaintext, associatedData);
 
         return plaintext;

@@ -42,7 +42,7 @@ public static class MessagingJson
             // in an ISO date offset literal rather than +.
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
-        options.Converters.Add(new FieldValueJsonConverter());
+        RegisterConverters(options);
         options.MakeReadOnly(populateMissingResolver: true);
         return options;
     }

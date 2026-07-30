@@ -14,6 +14,9 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class ObservabilityServiceCollectionExtensions
 {
+    /// <summary>OpenTelemetry resource attribute key for the deployment environment.</summary>
+    private const string DeploymentEnvironmentAttribute = "deployment.environment";
+
     /// <summary>Registers observability from validated <paramref name="options"/>.</summary>
     /// <param name="services">The service collection.</param>
     /// <param name="options">Observability options; validated before use.</param>
@@ -32,7 +35,7 @@ public static class ObservabilityServiceCollectionExtensions
                 .AddService(serviceName: options.ServiceName, serviceVersion: options.ServiceVersion)
                 .AddAttributes(new[]
                 {
-                    new KeyValuePair<string, object>("deployment.environment", options.Environment),
+                    new KeyValuePair<string, object>(DeploymentEnvironmentAttribute, options.Environment),
                 }))
             .WithTracing(tracing => tracing
                 .AddSource(options.ServiceName)

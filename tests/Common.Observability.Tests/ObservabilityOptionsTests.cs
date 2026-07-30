@@ -21,6 +21,14 @@ public sealed class ObservabilityOptionsTests
         Assert.ThrowsAny<ArgumentException>(options.Validate);
     }
 
+    [Fact]
+    public void Validate_BlankEnvironment_Throws()
+    {
+        var options = new ObservabilityOptions { ServiceName = "svc", Environment = "" };
+
+        Assert.ThrowsAny<ArgumentException>(options.Validate);
+    }
+
     [Theory]
     [InlineData(-0.1)]
     [InlineData(1.1)]

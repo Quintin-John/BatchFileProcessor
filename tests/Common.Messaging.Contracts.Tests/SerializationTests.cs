@@ -44,8 +44,8 @@ public sealed class SerializationTests
         Assert.Equal("42", Serialize(new ClearFieldValue(42)));
 
     [Fact]
-    public void Write_ClearDouble_EmitsJsonNumber() =>
-        Assert.Equal("1.5", Serialize(new ClearFieldValue(1.5d)));
+    public void Write_ClearDouble_Throws() => // double can overflow decimal on read; unsupported by design
+        Assert.Throws<JsonException>(() => Serialize(new ClearFieldValue(1.5d)));
 
     [Fact]
     public void Write_ClearDateOnly_EmitsIsoString() =>

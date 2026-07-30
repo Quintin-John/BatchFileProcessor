@@ -46,5 +46,11 @@ public sealed class MessagingResilienceOptions
         ArgumentOutOfRangeException.ThrowIfNegative(CircuitBreakerResetInterval.Ticks);
         ArgumentOutOfRangeException.ThrowIfNegative(RateLimit);
         ArgumentOutOfRangeException.ThrowIfNegative(RateLimitInterval.Ticks);
+
+        // Coupled invariant: a rate limit is meaningless without a positive window.
+        if (RateLimit > 0)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(RateLimitInterval.Ticks);
+        }
     }
 }

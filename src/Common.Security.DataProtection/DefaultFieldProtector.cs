@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -97,8 +98,28 @@ public sealed class DefaultFieldProtector : IFieldProtector
         return masker.Mask(clear);
     }
 
-    private static byte[] Aad(FieldProtectionContext context) =>
-        Encoding.UTF8.GetBytes($"{context.FileId}:{context.RecordSeq}:{context.Field}");
+    private static byte[] Aad(FieldProtectionContext context)
+    {
+        // Length-prefixed encoding so distinct (fileId, recordSeq, field) triples can never
+        // collide to the same bytes. A plain delimiter would collide when a value contains it,
+        // weakening the anti-replay binding.
+        var fileId = Encoding.UTF8.GetBytes(context.FileId);
+        var field = Encoding.UTF8.GetBytes(context.Field);
+        var buffer = new byte[sizeof(int) + fileId.Length + sizeof(long) + sizeof(int) + field.Length];
+        var span = buffer.AsSpan();
+
+        BinaryPrimitives.WriteInt32LittleEndian(span, fileId.Length);
+        fileId.CopyTo(span[sizeof(int)..]);
+        var offset = sizeof(int) + fileId.Length;
+
+        BinaryPrimitives.WriteInt64LittleEndian(span[offset..], context.RecordSeq);
+        offset += sizeof(long);
+
+        BinaryPrimitives.WriteInt32LittleEndian(span[offset..], field.Length);
+        field.CopyTo(span[(offset + sizeof(int))..]);
+
+        return buffer;
+    }
 
     private static string ClearString(FieldValue value) => value switch
     {

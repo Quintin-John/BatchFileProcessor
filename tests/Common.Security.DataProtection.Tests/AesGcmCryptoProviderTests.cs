@@ -132,6 +132,40 @@ public sealed class AesGcmCryptoProviderTests
         Assert.Throws<ArgumentNullException>(() => Provider.Decrypt(null!, Key(), Aad()));
     }
 
+    [Fact]
+    public void Decrypt_WithWrongTagLength_Throws()
+    {
+        var key = Key();
+        var envelope = Provider.Encrypt(Plain(), key, Aad());
+        // A 12-byte tag is a valid GCM size but not this provider's pinned 16 — must be rejected.
+        var tampered = new EncryptedValue(envelope.Algorithm, envelope.KeyId, envelope.KeyVersion,
+            envelope.Nonce, envelope.Ciphertext, Convert.ToBase64String(new byte[12]));
+
+        Assert.Throws<CryptographicException>(() => Provider.Decrypt(tampered, key, Aad()));
+    }
+
+    [Fact]
+    public void Decrypt_WithWrongNonceLength_Throws()
+    {
+        var key = Key();
+        var envelope = Provider.Encrypt(Plain(), key, Aad());
+        var tampered = new EncryptedValue(envelope.Algorithm, envelope.KeyId, envelope.KeyVersion,
+            Convert.ToBase64String(new byte[8]), envelope.Ciphertext, envelope.Tag);
+
+        Assert.Throws<CryptographicException>(() => Provider.Decrypt(tampered, key, Aad()));
+    }
+
+    [Fact]
+    public void Decrypt_WithNonBase64Field_Throws()
+    {
+        var key = Key();
+        var envelope = Provider.Encrypt(Plain(), key, Aad());
+        var tampered = new EncryptedValue(envelope.Algorithm, envelope.KeyId, envelope.KeyVersion,
+            "not base64!!!", envelope.Ciphertext, envelope.Tag);
+
+        Assert.Throws<CryptographicException>(() => Provider.Decrypt(tampered, key, Aad()));
+    }
+
     private static EncryptedValue WithFlippedCiphertext(EncryptedValue envelope)
     {
         var ct = Convert.FromBase64String(envelope.Ciphertext);

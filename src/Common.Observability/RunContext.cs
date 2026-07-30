@@ -29,7 +29,7 @@ public sealed record RunContext
     /// <summary>Starts a fresh run whose correlation id equals its run id.</summary>
     public static RunContext NewRun()
     {
-        var id = Guid.NewGuid().ToString("N");
+        var id = NewId();
         return new RunContext(id, id);
     }
 
@@ -39,6 +39,8 @@ public sealed record RunContext
     public static RunContext ContinuedFrom(string correlationId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
-        return new RunContext(Guid.NewGuid().ToString("N"), correlationId);
+        return new RunContext(NewId(), correlationId);
     }
+
+    private static string NewId() => Guid.NewGuid().ToString("N");
 }

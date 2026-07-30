@@ -108,4 +108,11 @@ public sealed class MessagingOptionsTests
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new MessagingResilienceOptions { RateLimit = -1 }.Validate());
     }
+
+    [Fact]
+    public void Resilience_Validate_RateLimitWithoutPositiveInterval_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new MessagingResilienceOptions { RateLimit = 100, RateLimitInterval = TimeSpan.Zero }.Validate());
+    }
 }

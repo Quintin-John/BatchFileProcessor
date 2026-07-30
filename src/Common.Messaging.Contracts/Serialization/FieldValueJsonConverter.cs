@@ -71,6 +71,10 @@ internal sealed class FieldValueJsonConverter : JsonConverter<FieldValue>
             case bool b:
                 writer.WriteBooleanValue(b);
                 break;
+            // Numbers are written as decimal-representable values only; on read they
+            // re-materialize as `decimal` (the JSON scalar is the contract, not the CLR type).
+            // `double` is deliberately unsupported — it can serialize but overflow `GetDecimal`
+            // on read, and financial values must use `decimal`.
             case decimal m:
                 writer.WriteNumberValue(m);
                 break;
@@ -79,9 +83,6 @@ internal sealed class FieldValueJsonConverter : JsonConverter<FieldValue>
                 break;
             case int i:
                 writer.WriteNumberValue(i);
-                break;
-            case double d:
-                writer.WriteNumberValue(d);
                 break;
             case DateOnly date:
                 writer.WriteStringValue(date.ToString("O", CultureInfo.InvariantCulture));

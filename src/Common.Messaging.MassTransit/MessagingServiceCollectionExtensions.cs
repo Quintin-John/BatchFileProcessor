@@ -37,6 +37,10 @@ public static class MessagingServiceCollectionExtensions
         {
             configure?.Invoke(bus);
 
+            // Consistent endpoint naming across services (kebab-case, optional configured prefix).
+            bus.SetEndpointNameFormatter(
+                new KebabCaseEndpointNameFormatter(transport.EndpointPrefix ?? string.Empty, includeNamespace: false));
+
             bus.AddConfigureEndpointsCallback((_, _, endpoint) => MessagingResilience.Apply(endpoint, resilience));
 
             switch (transport.Transport)
