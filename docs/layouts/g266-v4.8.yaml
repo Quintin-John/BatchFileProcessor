@@ -177,12 +177,12 @@ recordTypes:
       - { name: FILLER,                       start: 479,  length: 722, type: filler }
 
   ftr:                       # File Trailer Record
-    match: "TRAI"            # observed in sample
+    match: "TRAI"            # confirmed
     fields:
-      - { name: W136-ECT-TLR-IDN-CDE, start: 1,  length: 4,    type: string }
+      - { name: W136-ECT-TLR-IDN-CDE, start: 1,  length: 4,    type: string }  # "TRAI"
       - { name: FILLER,               start: 5,  length: 5,    type: filler }
-      - { name: W136-ECT-TLR-PTG-NBR, start: 10, length: 17,   type: string }
+      - { name: W136-ECT-TLR-PTG-NBR, start: 10, length: 17,   type: decimal } # count of PER (TRAN) records
       - { name: FILLER,               start: 27, length: 5,    type: filler }
-      - { name: W136-ECT-TLR-ATH-NBR, start: 32, length: 17,   type: string }
-      - { name: W136-ECT-TLR-LST-CDE, start: 49, length: 4,    type: string }
+      - { name: W136-ECT-TLR-ATH-NBR, start: 32, length: 17,   type: decimal } # count of AER (AUTH) records
+      - { name: W136-ECT-TLR-LST-CDE, start: 49, length: 4,    type: string }  # "LAST"
       - { name: FILLER,               start: 53, length: 1148, type: filler }
