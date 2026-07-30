@@ -49,17 +49,22 @@ public sealed class IngestionEndToEndTests : IDisposable
         Assert.Null(await _checkpoints.LoadAsync("e2e.dat", CancellationToken.None));
     }
 
-    private FileIngestionPipeline BuildPipeline() => new(
-        new StreamRecordReader(8, terminatorLength: 1, Encoding.ASCII),
-        new FakeParser(),
-        new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
-        _publisher,
-        new RejectSink(_publisher),
-        _checkpoints,
-        new IngestionMetrics(new ObservabilityInstrumentation("e2e")),
-        new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System),
-        new Heartbeat(TimeProvider.System),
-        new IngestionOptions(2, 100_000));
+    private FileIngestionPipeline BuildPipeline()
+    {
+        var instrumentation = new ObservabilityInstrumentation("e2e");
+        return new FileIngestionPipeline(
+            new StreamRecordReader(8, terminatorLength: 1, Encoding.ASCII),
+            new FakeParser(),
+            new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
+            _publisher,
+            new RejectSink(_publisher),
+            _checkpoints,
+            new IngestionMetrics(instrumentation),
+            new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System),
+            new IngestionTracing(instrumentation),
+            new Heartbeat(TimeProvider.System),
+            new IngestionOptions(2, 100_000));
+    }
 
     private sealed class FakeParser : IRecordParser
     {

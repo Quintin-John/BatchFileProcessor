@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
@@ -29,17 +30,22 @@ public sealed class FileIngestionPipelineTests
         public InMemoryCheckpointStore Checkpoints { get; } = new();
         public ChannelLineageEmitter Lineage { get; } = new(capacity: 1000); // large enough not to block small tests
 
-        public FileIngestionPipeline Build(int maxRecords = 2) => new(
-            new StreamRecordReader(RecordLength, terminatorLength: 1, Encoding.ASCII),
-            new FakeParser(),
-            new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
-            Publisher,
-            new RejectSink(Publisher),
-            Checkpoints,
-            new IngestionMetrics(new ObservabilityInstrumentation("test-pipeline")),
-            new RecordLineage(Lineage, TimeProvider.System),
-            new Heartbeat(TimeProvider.System),
-            new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000));
+        public FileIngestionPipeline Build(int maxRecords = 2)
+        {
+            var instrumentation = new ObservabilityInstrumentation("test-pipeline");
+            return new FileIngestionPipeline(
+                new StreamRecordReader(RecordLength, terminatorLength: 1, Encoding.ASCII),
+                new FakeParser(),
+                new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
+                Publisher,
+                new RejectSink(Publisher),
+                Checkpoints,
+                new IngestionMetrics(instrumentation),
+                new RecordLineage(Lineage, TimeProvider.System),
+                new IngestionTracing(instrumentation),
+                new Heartbeat(TimeProvider.System),
+                new IngestionOptions(maxRecords, maxContentBytesPerBatch: 100_000));
+        }
     }
 
     private static IngestRequest Request(Func<Stream> openStream) =>
@@ -222,6 +228,26 @@ public sealed class FileIngestionPipelineTests
 
     private static List<LineageState> States(IEnumerable<LineageEvent> events, long recordSeq) =>
         events.Where(e => e.Locator.RecordSeq == recordSeq).Select(e => e.State).ToList();
+
+    [Fact]
+    public async Task Ingest_CreatesRunAndBatchSpans()
+    {
+        var operations = new List<string>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "test-pipeline",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStopped = activity => operations.Add(activity.OperationName),
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var bytes = Bytes(FileText);
+        await new Harness().Build(maxRecords: 2)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        Assert.Contains("ingest.file", operations);
+        Assert.Contains("ingest.batch", operations);
+    }
 
     [Fact]
     public async Task Ingest_NullRequest_Throws()

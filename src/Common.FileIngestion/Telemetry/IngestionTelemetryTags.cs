@@ -17,4 +17,10 @@ public static class IngestionTelemetryTags
 
     /// <summary>Record type (layout discriminator match), e.g. TRAN/AUTH.</summary>
     public const string RecordType = "record.type";
+
+    /// <summary>Batch sequence within the file.</summary>
+    public const string BatchSeq = "batch.seq";
+
+    /// <summary>Batch message id.</summary>
+    public const string MessageId = "messaging.message_id";
 }

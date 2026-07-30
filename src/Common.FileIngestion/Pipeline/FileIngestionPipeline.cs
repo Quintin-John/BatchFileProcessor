@@ -32,6 +32,7 @@ public sealed class FileIngestionPipeline
     private readonly ICheckpointStore _checkpointStore;
     private readonly IngestionMetrics _metrics;
     private readonly RecordLineage _lineage;
+    private readonly IngestionTracing _tracing;
     private readonly Heartbeat _heartbeat;
     private readonly IngestionOptions _options;
 
@@ -50,6 +51,7 @@ public sealed class FileIngestionPipeline
         ICheckpointStore checkpointStore,
         IngestionMetrics metrics,
         RecordLineage lineage,
+        IngestionTracing tracing,
         Heartbeat heartbeat,
         IngestionOptions options)
     {
@@ -61,6 +63,7 @@ public sealed class FileIngestionPipeline
         ArgumentNullException.ThrowIfNull(checkpointStore);
         ArgumentNullException.ThrowIfNull(metrics);
         ArgumentNullException.ThrowIfNull(lineage);
+        ArgumentNullException.ThrowIfNull(tracing);
         ArgumentNullException.ThrowIfNull(heartbeat);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -72,6 +75,7 @@ public sealed class FileIngestionPipeline
         _checkpointStore = checkpointStore;
         _metrics = metrics;
         _lineage = lineage;
+        _tracing = tracing;
         _heartbeat = heartbeat;
         _options = options;
     }
@@ -87,6 +91,9 @@ public sealed class FileIngestionPipeline
 
         var fileId = await ComputeFileIdAsync(request, cancellationToken).ConfigureAwait(false);
         var run = await BeginRunAsync(request, fileId, cancellationToken).ConfigureAwait(false);
+
+        // Run span covers the whole file; batch spans nest under it and carry traceparent into headers.
+        using var fileSpan = _tracing.StartFileActivity(run.Provenance);
 
         var readPassFileId = await _reader.ReadAsync(
             request.OpenStream(),
@@ -179,6 +186,9 @@ public sealed class FileIngestionPipeline
 
     private async Task PublishBatchAsync(FileRun run, IngestBatchMessage batch, CancellationToken cancellationToken)
     {
+        // Batch span active during publish → the transport injects traceparent into the message headers.
+        using var batchSpan = _tracing.StartBatchActivity(batch);
+
         await EmitBatchLineageAsync(run, batch, LineageState.Batched, reasonCode: null, cancellationToken)
             .ConfigureAwait(false);
 

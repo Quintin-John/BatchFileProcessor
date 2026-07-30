@@ -42,6 +42,7 @@ services.AddSingleton<IRecordParser>(new FixedLengthRecordParser(layout));
 services.AddSingleton(new StreamRecordReader(layout.RecordLength, ingestion.GetValue<int>("TerminatorLength"), encoding));
 services.AddObservability(builder.Configuration.GetSection("Observability")); // binds name/version, registers OTel export
 services.AddSingleton<IngestionMetrics>();
+services.AddSingleton<IngestionTracing>();
 
 // Per-record lineage (§8): bounded channel emitter, drained off the hot path to a structured-log sink.
 services.AddSingleton(new ChannelLineageEmitter(ingestion.GetValue<int>("LineageChannelCapacity")));
