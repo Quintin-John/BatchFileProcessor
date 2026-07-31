@@ -2,19 +2,18 @@
 
   <!-- Nullable / ImplicitUsings / analyzers inherited from Directory.Build.props (DRY). -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <UserSecretsId>ingestion-worker</UserSecretsId>
     <RootNamespace>Ingestion.Worker</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MassTransit" Version="8.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="YamlDotNet" Version="16.2.1" />
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="YamlDotNet" />
     <!-- Pin patched System.Text.Json: Microsoft.Extensions.Hosting 8.0.0 pulls 8.0.0 transitively,
          which carries GHSA-hh2w-p6rv-4g7w / GHSA-8g4q-xg66-9fp4 (High). 8.0.5 resolves both. -->
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <!-- ASP.NET Core for the K8s liveness/readiness HTTP probe endpoints. -->

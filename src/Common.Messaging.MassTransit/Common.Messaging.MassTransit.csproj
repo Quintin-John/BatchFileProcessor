@@ -2,7 +2,6 @@
 
   <!-- Shared build/quality settings come from Directory.Build.props (solution root). -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
 
     <!-- Public library: ship XML docs; keep the public surface deliberate. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -10,8 +9,8 @@
 
   <ItemGroup>
     <!-- MassTransit v8 (OSS/Apache line); v9 moved to a commercial license. -->
-    <PackageReference Include="MassTransit" Version="8.3.0" />
-    <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.0" />
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="MassTransit.RabbitMQ" />
   </ItemGroup>
 
   <ItemGroup>

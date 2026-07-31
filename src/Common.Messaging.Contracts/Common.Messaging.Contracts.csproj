@@ -2,7 +2,6 @@
 
   <!-- Shared build/quality settings come from Directory.Build.props (solution root). -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
 
     <!-- Public contract library: ship XML docs; keep the public surface deliberate. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
