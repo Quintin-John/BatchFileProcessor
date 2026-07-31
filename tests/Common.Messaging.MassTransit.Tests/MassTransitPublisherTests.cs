@@ -9,6 +9,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
 {
     private const string BatchDestination = "batches";
     private const string RejectDestination = "rejects";
+    private const string GuidCorrelation = "3f2504e04f8941d39a0c0305e82c3301"; // valid GUID (N format)
 
     private ServiceProvider _provider = null!;
     private ITestHarness _harness = null!;
@@ -41,9 +42,11 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
 
     public async Task DisposeAsync() => await _provider.DisposeAsync();
 
-    private static IngestBatchMessage SampleBatch()
+    private static IngestBatchMessage SampleBatch() => BatchWithCorrelation("run-xyz");
+
+    private static IngestBatchMessage BatchWithCorrelation(string correlationId)
     {
-        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        var provenance = new MessageProvenance(correlationId, "file-abc", "g266.dat", "g266", "4.8");
         var record = new IngestRecord(
             new RecordLocator(101, 121200, "TRAN"),
             new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(221.73m) });
@@ -79,6 +82,58 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
 
         Assert.True(await _harness.Sent.Any<RejectMessage>());
         Assert.True(await _harness.GetConsumerHarness<RejectConsumer>().Consumed.Any<RejectMessage>());
+    }
+
+    [Fact]
+    public async Task PublishBatchAsync_StampsDeterministicEnvelopeMessageId()
+    {
+        var publisher = new MassTransitPublisher(_harness.Bus);
+        var batch = SampleBatch();
+
+        await publisher.PublishBatchAsync(batch, BatchDestination, CancellationToken.None);
+
+        Assert.True(await _harness.Sent.Any<IngestBatchMessage>());
+        var sent = _harness.Sent.Select<IngestBatchMessage>().First();
+        Assert.Equal(DeterministicGuid.From(batch.MessageId), sent.Context.MessageId);
+    }
+
+    [Fact]
+    public async Task PublishBatchAsync_GuidCorrelation_SetsNativeEnvelopeCorrelationId_AndHeader()
+    {
+        var publisher = new MassTransitPublisher(_harness.Bus);
+
+        await publisher.PublishBatchAsync(BatchWithCorrelation(GuidCorrelation), BatchDestination, CancellationToken.None);
+
+        Assert.True(await _harness.Sent.Any<IngestBatchMessage>());
+        var sent = _harness.Sent.Select<IngestBatchMessage>().First();
+        Assert.Equal(Guid.Parse(GuidCorrelation), sent.Context.CorrelationId);
+        Assert.Equal(GuidCorrelation, sent.Context.Headers.Get<string>(MassTransitPublisher.CorrelationIdHeader));
+    }
+
+    [Fact]
+    public async Task PublishBatchAsync_NonGuidCorrelation_LeavesNativeCorrelationIdUnset_ButHeaderCarriesIt()
+    {
+        var publisher = new MassTransitPublisher(_harness.Bus);
+
+        await publisher.PublishBatchAsync(BatchWithCorrelation("run-xyz"), BatchDestination, CancellationToken.None);
+
+        Assert.True(await _harness.Sent.Any<IngestBatchMessage>());
+        var sent = _harness.Sent.Select<IngestBatchMessage>().First();
+        Assert.Null(sent.Context.CorrelationId);
+        Assert.Equal("run-xyz", sent.Context.Headers.Get<string>(MassTransitPublisher.CorrelationIdHeader));
+    }
+
+    [Fact]
+    public async Task PublishRejectAsync_StampsDeterministicEnvelopeMessageId()
+    {
+        var publisher = new MassTransitPublisher(_harness.Bus);
+        var reject = SampleReject();
+
+        await publisher.PublishRejectAsync(reject, RejectDestination, CancellationToken.None);
+
+        Assert.True(await _harness.Sent.Any<RejectMessage>());
+        var sent = _harness.Sent.Select<RejectMessage>().First();
+        Assert.Equal(DeterministicGuid.From(reject.MessageId), sent.Context.MessageId);
     }
 
     [Fact]
