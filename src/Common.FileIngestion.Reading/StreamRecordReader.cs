@@ -65,7 +65,7 @@ public sealed class StreamRecordReader
         ArgumentNullException.ThrowIfNull(onRecord);
 
         var stride = _recordLength + _terminatorLength;
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var hash = FileContentHash.CreateIncremental();
         var scratch = ArrayPool<byte>.Shared.Rent(stride);
         var pipe = PipeReader.Create(stream);
         long recordSeq = 1;
@@ -122,7 +122,7 @@ public sealed class StreamRecordReader
             await pipe.CompleteAsync().ConfigureAwait(false);
         }
 
-        return Convert.ToHexString(hash.GetHashAndReset());
+        return FileContentHash.Format(hash.GetHashAndReset());
     }
 
     // Copies the (record[+terminator]) slice into scratch, hashes all its bytes, and decodes the
