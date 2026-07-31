@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 // Composition root — wiring only (excluded from coverage). Fails fast on missing configuration.
 var builder = WebApplication.CreateBuilder(args);
@@ -61,7 +62,8 @@ services.AddSingleton<RecordProtector>();
 services.AddSingleton<RejectSink>();
 services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(Required(ingestion, "CheckpointDirectory")));
 services.AddSingleton<FileIngestionPipeline>();
-services.AddSingleton<IFileSource>(_ => new FolderFileSource(Required(ingestion, "RootDirectory")));
+services.AddSingleton<IFileSource>(sp => new FolderFileSource(
+    Required(ingestion, "RootDirectory"), sp.GetRequiredService<ILogger<FolderFileSource>>()));
 services.AddSingleton(new WorkerOptions(
     Required(ingestion, "ProfileId"), layout.Version, TimeSpan.FromSeconds(ingestion.GetValue<int>("PollIntervalSeconds"))));
 

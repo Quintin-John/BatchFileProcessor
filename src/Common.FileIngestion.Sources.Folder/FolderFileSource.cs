@@ -1,4 +1,6 @@
 using Common.FileIngestion.Abstractions;
+using Microsoft.Extensions.Logging;
+
 namespace Common.FileIngestion.Sources;
 
 /// <summary>
@@ -9,7 +11,7 @@ namespace Common.FileIngestion.Sources;
 /// <c>processing</c> after a crash are re-offered by <see cref="RecoverOrphans"/> and resumed from
 /// their watermark.
 /// </summary>
-public sealed class FolderFileSource : IFileSource, IDisposable
+public sealed partial class FolderFileSource : IFileSource, IDisposable
 {
     private const string IncomingDir = "incoming";
     private const string ProcessingDir = "processing";
@@ -22,6 +24,7 @@ public sealed class FolderFileSource : IFileSource, IDisposable
     private readonly string _done;
     private readonly string _failed;
     private readonly FileStream _ownershipLock;
+    private readonly ILogger<FolderFileSource> _logger;
 
     /// <summary>
     /// Creates the source, creating the four subdirectories if missing and taking exclusive ownership
@@ -30,11 +33,15 @@ public sealed class FolderFileSource : IFileSource, IDisposable
     /// rather than stealing a file the first is actively processing.
     /// </summary>
     /// <param name="rootDirectory">Root directory; required, non-blank.</param>
+    /// <param name="logger">Logger for skipped-claim diagnostics; required.</param>
     /// <exception cref="ArgumentException"><paramref name="rootDirectory"/> is blank.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="logger"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Another instance already owns the root.</exception>
-    public FolderFileSource(string rootDirectory)
+    public FolderFileSource(string rootDirectory, ILogger<FolderFileSource> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
+        ArgumentNullException.ThrowIfNull(logger);
+        _logger = logger;
 
         _incoming = Path.Combine(rootDirectory, IncomingDir);
         _processing = Path.Combine(rootDirectory, ProcessingDir);
@@ -64,9 +71,23 @@ public sealed class FolderFileSource : IFileSource, IDisposable
             {
                 File.Move(path, destination); // atomic claim; throws if already claimed
             }
-            catch (IOException)
+            catch (IOException ex)
             {
-                continue; // lost the race to another poller/instance — skip
+                // A same-name file already in processing (an orphan not yet cleared) is expected in the
+                // recurring-file model — leave the arrival for a later poll. Any other IOException (disk
+                // full, cross-volume move, a producer still holding the source) is unexpected and must be
+                // visible rather than silently swallowed. Either way, skip this file so one bad arrival
+                // never stalls the batch.
+                if (File.Exists(destination))
+                {
+                    LogClaimCollision(name);
+                }
+                else
+                {
+                    LogClaimFailed(ex, name);
+                }
+
+                continue;
             }
 
             claimed.Add(new ClaimedFile(name, destination));
@@ -83,6 +104,14 @@ public sealed class FolderFileSource : IFileSource, IDisposable
 
     /// <summary>Releases exclusive ownership of the root.</summary>
     public void Dispose() => _ownershipLock.Dispose();
+
+    [LoggerMessage(EventId = 1, Level = LogLevel.Debug,
+        Message = "Skipped claiming {File}: a same-name file is already in processing; leaving it for a later poll.")]
+    private partial void LogClaimCollision(string file);
+
+    [LoggerMessage(EventId = 2, Level = LogLevel.Warning,
+        Message = "Could not claim {File}; skipping it this poll.")]
+    private partial void LogClaimFailed(Exception exception, string file);
 
     private static FileStream AcquireOwnership(string rootDirectory)
     {

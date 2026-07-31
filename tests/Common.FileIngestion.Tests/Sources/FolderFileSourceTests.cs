@@ -1,4 +1,6 @@
 using Common.FileIngestion.Sources;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Common.FileIngestion.Tests.Sources;
 
@@ -13,7 +15,9 @@ public sealed class FolderFileSourceTests : IDisposable
 
     private FolderFileSource? _tracked;
 
-    private FolderFileSource Source() => _tracked = new FolderFileSource(_root);
+    private FolderFileSource Source() => _tracked = new FolderFileSource(_root, NullLogger<FolderFileSource>.Instance);
+
+    private FolderFileSource SourceWith(ILogger<FolderFileSource> logger) => _tracked = new FolderFileSource(_root, logger);
 
     private void DropIncoming(string name, string content = "x") =>
         File.WriteAllText(Path.Combine(Incoming, name), content);
@@ -131,7 +135,7 @@ public sealed class FolderFileSourceTests : IDisposable
     [Fact]
     public void Constructor_BlankRoot_Throws()
     {
-        Assert.ThrowsAny<ArgumentException>(() => new FolderFileSource("  "));
+        Assert.ThrowsAny<ArgumentException>(() => new FolderFileSource("  ", NullLogger<FolderFileSource>.Instance));
     }
 
     [Fact]
@@ -139,16 +143,16 @@ public sealed class FolderFileSourceTests : IDisposable
     {
         _ = Source(); // first instance owns the root (released by Dispose)
 
-        Assert.Throws<InvalidOperationException>(() => new FolderFileSource(_root));
+        Assert.Throws<InvalidOperationException>(() => new FolderFileSource(_root, NullLogger<FolderFileSource>.Instance));
     }
 
     [Fact]
     public void Constructor_AfterDispose_OwnershipReleased_AllowsNewInstance()
     {
-        var first = new FolderFileSource(_root);
+        var first = new FolderFileSource(_root, NullLogger<FolderFileSource>.Instance);
         first.Dispose();
 
-        using var second = new FolderFileSource(_root); // lock released, ownership re-acquired
+        using var second = new FolderFileSource(_root, NullLogger<FolderFileSource>.Instance); // lock released, ownership re-acquired
 
         Assert.Empty(second.Claim()); // usable: a fresh instance can operate on the root
     }
@@ -157,5 +161,65 @@ public sealed class FolderFileSourceTests : IDisposable
     public void Complete_NullFile_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => Source().Complete(null!));
+    }
+
+    [Fact]
+    public void Constructor_NullLogger_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => new FolderFileSource(_root, null!));
+    }
+
+    [Fact]
+    public void Claim_SameNameAlreadyInProcessing_LogsAtDebug_NotSilent()
+    {
+        var logger = new CapturingLogger<FolderFileSource>();
+        var source = SourceWith(logger);
+        DropIncoming("dup.dat");
+        File.WriteAllText(Path.Combine(Processing, "dup.dat"), "orphan"); // expected same-name collision
+
+        var claimed = source.Claim();
+
+        Assert.Empty(claimed);
+        Assert.Contains(logger.Entries,
+            e => e.Level == LogLevel.Debug && e.Message.Contains("dup.dat", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Claim_UnexpectedMoveFailure_LogsWarning_NotSilent()
+    {
+        var logger = new CapturingLogger<FolderFileSource>();
+        var source = SourceWith(logger);
+        DropIncoming("weird.dat");
+        // A directory where the claimed file would land makes File.Move fail with an IOException that is
+        // not a same-name file collision (File.Exists(destination) is false) — the unexpected-fault path.
+        Directory.CreateDirectory(Path.Combine(Processing, "weird.dat"));
+
+        var claimed = source.Claim();
+
+        Assert.Empty(claimed);
+        Assert.Contains(logger.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains("weird.dat", StringComparison.Ordinal));
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }
