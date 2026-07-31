@@ -6,7 +6,7 @@ namespace Ingestion.Worker.Tests;
 
 public sealed class LayoutProtectionPolicyTests
 {
-    private static Layout Layout() => new("1.0", 10, "ascii", 1, 2, new[]
+    private static Layout Layout() => new("1.0", 10, "ascii", 0, 1, 2, new[]
     {
         new RecordDefinition("r", "M", new[]
         {
@@ -44,7 +44,7 @@ public sealed class LayoutProtectionPolicyTests
     {
         // The same name may legitimately recur across record types as long as it classifies identically
         // (e.g. a shared FILLER). Collapsing consistent duplicates is safe and must not throw.
-        var layout = new Layout("1.0", 10, "ascii", 1, 2, new[]
+        var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
         {
             new RecordDefinition("a", "AA", new[]
             {
@@ -68,7 +68,7 @@ public sealed class LayoutProtectionPolicyTests
     {
         // 'dup' is encrypted in one record type and clear in another. Collapsing it would silently
         // declassify the encrypted side, so construction must fail closed.
-        var layout = new Layout("1.0", 10, "ascii", 1, 2, new[]
+        var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
         {
             new RecordDefinition("a", "AA", new[]
             {

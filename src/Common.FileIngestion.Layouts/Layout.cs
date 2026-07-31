@@ -20,6 +20,9 @@ public sealed class Layout
     /// <summary>Character encoding name (single-byte).</summary>
     public string Encoding { get; }
 
+    /// <summary>Record terminator length in bytes (0 = fixed-width with no terminator, 1 = LF, 2 = CRLF).</summary>
+    public int TerminatorLength { get; }
+
     /// <summary>1-based start of the record-type discriminator.</summary>
     public int DiscriminatorStart { get; }
 
@@ -36,6 +39,7 @@ public sealed class Layout
     /// <param name="version">Version identifier; required, non-blank.</param>
     /// <param name="recordLength">Fixed record length; must be at least 1.</param>
     /// <param name="encoding">Encoding name; required, non-blank.</param>
+    /// <param name="terminatorLength">Record terminator length in bytes; must be non-negative (0 = none).</param>
     /// <param name="discriminatorStart">1-based discriminator start; must fit within the record.</param>
     /// <param name="discriminatorLength">Discriminator length; must fit within the record.</param>
     /// <param name="recordTypes">Record types; required, non-empty, unique matches, each field set tiling the record with no gaps.</param>
@@ -46,6 +50,7 @@ public sealed class Layout
         string version,
         int recordLength,
         string encoding,
+        int terminatorLength,
         int discriminatorStart,
         int discriminatorLength,
         IReadOnlyList<RecordDefinition> recordTypes)
@@ -53,6 +58,7 @@ public sealed class Layout
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         ArgumentOutOfRangeException.ThrowIfLessThan(recordLength, 1);
         ArgumentException.ThrowIfNullOrWhiteSpace(encoding);
+        ArgumentOutOfRangeException.ThrowIfNegative(terminatorLength);
         ArgumentOutOfRangeException.ThrowIfLessThan(discriminatorStart, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(discriminatorLength, 1);
         ArgumentNullException.ThrowIfNull(recordTypes);
@@ -83,6 +89,7 @@ public sealed class Layout
         Version = version;
         RecordLength = recordLength;
         Encoding = encoding;
+        TerminatorLength = terminatorLength;
         DiscriminatorStart = discriminatorStart;
         DiscriminatorLength = discriminatorLength;
         RecordTypes = new ReadOnlyCollection<RecordDefinition>(new List<RecordDefinition>(recordTypes));

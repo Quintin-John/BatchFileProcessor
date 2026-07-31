@@ -38,10 +38,10 @@ var encoding = Encoding.GetEncoding(layout.Encoding);
 services.AddDataProtection(policy);
 services.AddInMemoryKeyProvider();
 
-// Ingestion collaborators (record length, encoding, and layout version are derived from the layout).
+// Ingestion collaborators (record length, terminator, encoding, and layout version are derived from the layout).
 services.AddSingleton(TimeProvider.System);
 services.AddSingleton<IRecordParser>(new FixedLengthRecordParser(layout));
-services.AddSingleton(new StreamRecordReader(layout.RecordLength, ingestion.GetValue<int>("TerminatorLength"), encoding));
+services.AddSingleton(new StreamRecordReader(layout.RecordLength, layout.TerminatorLength, encoding));
 services.AddObservability(builder.Configuration.GetSection("Observability")); // binds name/version, registers OTel export
 services.AddSingleton<IngestionMetrics>();
 services.AddSingleton<IngestionTracing>();

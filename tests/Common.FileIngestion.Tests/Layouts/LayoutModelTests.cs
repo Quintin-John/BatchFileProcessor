@@ -10,7 +10,7 @@ public sealed class LayoutModelTests
         new(name, match, fields);
 
     private static Layout ValidLayout() =>
-        new("1.0", 10, "ascii", 1, 2, new[]
+        new("1.0", 10, "ascii", 0, 1, 2, new[]
         {
             Record("head", "HD", Field(1, 2), Field(3, 8)),
             Record("detail", "DT", Field(1, 2), Field(3, 8)),
@@ -111,27 +111,42 @@ public sealed class LayoutModelTests
     public void Layout_RecordLengthBelowOne_Throws()
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new Layout("1.0", 0, "ascii", 1, 2, new[] { Record("r", "M", Field(1, 1)) }));
+            () => new Layout("1.0", 0, "ascii", 0, 1, 2, new[] { Record("r", "M", Field(1, 1)) }));
     }
 
     [Fact]
     public void Layout_DiscriminatorExceedsRecord_Throws()
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new Layout("1.0", 10, "ascii", 9, 5, new[] { Record("r", "M", Field(1, 10)) }));
+            () => new Layout("1.0", 10, "ascii", 0, 9, 5, new[] { Record("r", "M", Field(1, 10)) }));
+    }
+
+    [Fact]
+    public void Layout_StoresTerminatorLength()
+    {
+        var layout = new Layout("1.0", 10, "ascii", 2, 1, 2, new[] { Record("r", "M", Field(1, 10)) });
+
+        Assert.Equal(2, layout.TerminatorLength);
+    }
+
+    [Fact]
+    public void Layout_NegativeTerminator_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new Layout("1.0", 10, "ascii", -1, 1, 2, new[] { Record("r", "M", Field(1, 10)) }));
     }
 
     [Fact]
     public void Layout_EmptyRecordTypes_Throws()
     {
         Assert.Throws<ArgumentException>(
-            () => new Layout("1.0", 10, "ascii", 1, 2, Array.Empty<RecordDefinition>()));
+            () => new Layout("1.0", 10, "ascii", 0, 1, 2, Array.Empty<RecordDefinition>()));
     }
 
     [Fact]
     public void Layout_DuplicateMatch_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new Layout("1.0", 4, "ascii", 1, 2, new[]
+        Assert.Throws<ArgumentException>(() => new Layout("1.0", 4, "ascii", 0, 1, 2, new[]
         {
             Record("a", "M", Field(1, 4)),
             Record("b", "M", Field(1, 4)),
@@ -142,7 +157,7 @@ public sealed class LayoutModelTests
     public void Layout_FieldsWithGapOrOverlap_Throws()
     {
         // Fields 1-2 then 4-10 leaves a gap at position 3.
-        Assert.Throws<ArgumentException>(() => new Layout("1.0", 10, "ascii", 1, 2, new[]
+        Assert.Throws<ArgumentException>(() => new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
         {
             Record("r", "M", Field(1, 2), new FieldDefinition("f", 4, 7)),
         }));
@@ -152,7 +167,7 @@ public sealed class LayoutModelTests
     public void Layout_FieldsDoNotCoverRecord_Throws()
     {
         // Fields cover only 1-9 of a 10-byte record.
-        Assert.Throws<ArgumentException>(() => new Layout("1.0", 10, "ascii", 1, 2, new[]
+        Assert.Throws<ArgumentException>(() => new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
         {
             Record("r", "M", Field(1, 2), Field(3, 7)),
         }));
@@ -164,8 +179,8 @@ public sealed class LayoutModelTests
     public void Layout_BlankVersionOrEncoding_Throws(string blank)
     {
         Assert.ThrowsAny<ArgumentException>(
-            () => new Layout(blank, 4, "ascii", 1, 2, new[] { Record("r", "M", Field(1, 4)) }));
+            () => new Layout(blank, 4, "ascii", 0, 1, 2, new[] { Record("r", "M", Field(1, 4)) }));
         Assert.ThrowsAny<ArgumentException>(
-            () => new Layout("1.0", 4, blank, 1, 2, new[] { Record("r", "M", Field(1, 4)) }));
+            () => new Layout("1.0", 4, blank, 0, 1, 2, new[] { Record("r", "M", Field(1, 4)) }));
     }
 }

@@ -24,6 +24,7 @@ public sealed class LayoutLoaderTests
 
         Assert.Equal("1.0", layout.Version);
         Assert.Equal(10, layout.RecordLength);
+        Assert.Equal(0, layout.TerminatorLength); // absent in the YAML -> no terminator
         Assert.Equal(1, layout.DiscriminatorStart);
         Assert.Equal(2, layout.DiscriminatorLength);
 
@@ -34,6 +35,24 @@ public sealed class LayoutLoaderTests
         Assert.False(head.Fields[0].Required);
         Assert.True(head.Fields[1].Encrypt);     // encrypt/required read from the layout
         Assert.True(head.Fields[1].Required);
+    }
+
+    [Fact]
+    public void Load_ParsesTerminator_WhenPresent()
+    {
+        const string yaml = """
+            version: "1.0"
+            recordLength: 10
+            encoding: ascii
+            terminator: 2
+            discriminator: { start: 1, length: 2 }
+            recordTypes:
+              r:
+                match: "M"
+                fields: [ { name: f, start: 1, length: 10 } ]
+            """;
+
+        Assert.Equal(2, LayoutLoader.Load(yaml).TerminatorLength);
     }
 
     [Fact]
@@ -170,6 +189,7 @@ public sealed class LayoutLoaderTests
 
         Assert.Equal("4.8", layout.Version);
         Assert.Equal(1200, layout.RecordLength);
+        Assert.Equal(1, layout.TerminatorLength); // framing now sourced from the layout, not appsettings
         Assert.Equal(4, layout.RecordTypes.Count);
         Assert.Equal("per", layout.ResolveByDiscriminator("TRAN")!.Name);
         Assert.Equal("aer", layout.ResolveByDiscriminator("AUTH")!.Name);

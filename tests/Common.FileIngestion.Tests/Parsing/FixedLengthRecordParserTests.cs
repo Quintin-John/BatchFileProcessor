@@ -8,7 +8,7 @@ namespace Common.FileIngestion.Tests.Parsing;
 public sealed class FixedLengthRecordParserTests
 {
     // Two record types, each tiling a 10-char record. 'acct' is encrypted + required.
-    private static Layout Layout() => new("1.0", 10, "ascii", 1, 2, new[]
+    private static Layout Layout() => new("1.0", 10, "ascii", 0, 1, 2, new[]
     {
         new RecordDefinition("hd", "HD", new[]
         {

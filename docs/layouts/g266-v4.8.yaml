@@ -16,6 +16,7 @@
 version: "4.8"
 recordLength: 1200
 encoding: ascii
+terminator: 1          # bytes per record terminator (1 = LF); part of the framing spec, like recordLength/encoding
 discriminator: { start: 1, length: 4 }
 
 recordTypes:

@@ -61,6 +61,7 @@ public static class LayoutLoader
                 dto.Version ?? string.Empty,
                 dto.RecordLength,
                 dto.Encoding ?? string.Empty,
+                dto.Terminator,
                 dto.Discriminator.Start,
                 dto.Discriminator.Length,
                 recordTypes);
@@ -132,6 +133,9 @@ public static class LayoutLoader
         public int RecordLength { get; set; }
 
         public string? Encoding { get; set; }
+
+        // Absent in the YAML means 0 — a fixed-width layout with no record terminator.
+        public int Terminator { get; set; }
 
         public DiscriminatorDto? Discriminator { get; set; }
 
