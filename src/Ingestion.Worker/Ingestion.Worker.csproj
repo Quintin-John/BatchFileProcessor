@@ -14,6 +14,7 @@
     <!-- Pin patched System.Text.Json: Microsoft.Extensions.Hosting 8.0.0 pulls 8.0.0 transitively,
          which carries GHSA-hh2w-p6rv-4g7w / GHSA-8g4q-xg66-9fp4 (High). 8.0.5 resolves both. -->
     <PackageReference Include="System.Text.Json" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <!-- ASP.NET Core for the K8s liveness/readiness HTTP probe endpoints. -->
@@ -36,6 +37,7 @@
     <ProjectReference Include="..\Common.FileIngestion.Reading\Common.FileIngestion.Reading.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Sources.Folder\Common.FileIngestion.Sources.Folder.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Checkpointing\Common.FileIngestion.Checkpointing.csproj" />
+    <ProjectReference Include="..\Common.FileIngestion.Checkpointing.Redis\Common.FileIngestion.Checkpointing.Redis.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Parsing\Common.FileIngestion.Parsing.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Telemetry\Common.FileIngestion.Telemetry.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Protection\Common.FileIngestion.Protection.csproj" />

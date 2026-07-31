@@ -1,6 +1,7 @@
 using Common.FileIngestion.Abstractions;
 using System.Text;
 using Common.FileIngestion.Checkpointing;
+using Common.FileIngestion.Checkpointing.Redis;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Layouts;
 using Common.FileIngestion.Lineage;
@@ -23,6 +24,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
 
 // Composition root — wiring only (excluded from coverage). Fails fast on missing configuration.
 var builder = WebApplication.CreateBuilder(args);
@@ -60,7 +62,16 @@ services.AddSingleton(new IngestionOptions(
     RequiredConfig.Integer(ingestion, "PublisherConfirmWindow")));
 services.AddSingleton<RecordProtector>();
 services.AddSingleton(sp => ActivatorUtilities.CreateInstance<RejectSink>(sp, RequiredConfig.Text(messaging, "RejectDestination")));
-services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(RequiredConfig.Text(ingestion, "CheckpointDirectory")));
+// Checkpoint store selected by config, fail-closed. File = same-volume resume; Redis = cross-instance.
+ICheckpointStore checkpointStore = RequiredConfig.Enum<CheckpointProvider>(ingestion, "CheckpointProvider") switch
+{
+    CheckpointProvider.File => new FileCheckpointStore(RequiredConfig.Text(ingestion, "CheckpointDirectory")),
+    CheckpointProvider.Redis => new RedisCheckpointStore(
+        await ConnectionMultiplexer.ConnectAsync(RequiredConfig.Text(ingestion, "RedisConnectionString")),
+        RequiredConfig.Text(ingestion, "CheckpointKeyPrefix")),
+    _ => throw new InvalidOperationException("Unsupported checkpoint provider."),
+};
+services.AddSingleton(checkpointStore);
 services.AddSingleton(sp => ActivatorUtilities.CreateInstance<FileIngestionPipeline>(sp, RequiredConfig.Text(messaging, "Destination")));
 var root = RequiredConfig.Text(ingestion, "RootDirectory");
 var completionGuard = new StableSizeCompletionGuard(

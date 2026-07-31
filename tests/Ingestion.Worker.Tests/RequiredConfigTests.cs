@@ -58,6 +58,18 @@ public sealed class RequiredConfigTests
         Assert.Throws<InvalidOperationException>(() => RequiredConfig.Enum<MessagingTransport>(Section(("K", "99")), "K"));
 
     [Fact]
+    public void Enum_CheckpointProvider_Parses_CaseInsensitive()
+    {
+        Assert.Equal(CheckpointProvider.File, RequiredConfig.Enum<CheckpointProvider>(Section(("K", "File")), "K"));
+        Assert.Equal(CheckpointProvider.Redis, RequiredConfig.Enum<CheckpointProvider>(Section(("K", "redis")), "K"));
+    }
+
+    [Fact]
+    public void Enum_CheckpointProvider_UnknownProvider_Throws() =>
+        Assert.Throws<InvalidOperationException>(
+            () => RequiredConfig.Enum<CheckpointProvider>(Section(("K", "cosmos")), "K"));
+
+    [Fact]
     public void NullSection_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => RequiredConfig.Text(null!, "K"));
