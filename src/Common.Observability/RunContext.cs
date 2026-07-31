@@ -1,9 +1,9 @@
 namespace Common.Observability;
 
 /// <summary>
-/// Identity for one run: a unique <see cref="RunId"/> and the <see cref="CorrelationId"/> that
-/// ties this run's telemetry to any upstream work. For a fresh run the two are equal; a run
-/// continued from an upstream trace keeps the upstream correlation id.
+/// Identity for one run: a unique <see cref="RunId"/> and the <see cref="CorrelationId"/> that ties this
+/// run's telemetry together. Runs are always started fresh via <see cref="NewRun"/>, so the two are equal —
+/// there is no upstream correlation channel for a dropped file to continue.
 /// </summary>
 public sealed record RunContext
 {
@@ -31,15 +31,6 @@ public sealed record RunContext
     {
         var id = NewId();
         return new RunContext(id, id);
-    }
-
-    /// <summary>Starts a new run that continues an upstream correlation id.</summary>
-    /// <param name="correlationId">The upstream correlation id to keep; required, non-blank.</param>
-    /// <exception cref="ArgumentException"><paramref name="correlationId"/> is null, empty, or whitespace.</exception>
-    public static RunContext ContinuedFrom(string correlationId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
-        return new RunContext(NewId(), correlationId);
     }
 
     private static string NewId() => Guid.NewGuid().ToString("N");

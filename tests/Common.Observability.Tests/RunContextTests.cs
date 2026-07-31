@@ -17,25 +17,6 @@ public sealed class RunContextTests
         Assert.NotEqual(RunContext.NewRun().RunId, RunContext.NewRun().RunId);
     }
 
-    [Fact]
-    public void ContinuedFrom_KeepsCorrelation_ButNewRunId()
-    {
-        var run = RunContext.ContinuedFrom("upstream-corr");
-
-        Assert.Equal("upstream-corr", run.CorrelationId);
-        Assert.NotEqual("upstream-corr", run.RunId);
-        Assert.False(string.IsNullOrWhiteSpace(run.RunId));
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("  ")]
-    public void ContinuedFrom_BlankCorrelation_Throws(string? correlationId)
-    {
-        Assert.ThrowsAny<ArgumentException>(() => RunContext.ContinuedFrom(correlationId!));
-    }
-
     [Theory]
     [InlineData(null, "c")]
     [InlineData("", "c")]
