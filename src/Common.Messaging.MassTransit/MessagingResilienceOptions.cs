@@ -10,28 +10,28 @@ public sealed class MessagingResilienceOptions
     private const int MaxTripThresholdPercent = 100;
 
     /// <summary>Number of retry attempts before a message faults.</summary>
-    public int RetryLimit { get; set; } = 5;
+    public int RetryLimit { get; init; } = 5;
 
     /// <summary>Initial retry interval.</summary>
-    public TimeSpan RetryInitialInterval { get; set; } = TimeSpan.FromSeconds(1);
+    public TimeSpan RetryInitialInterval { get; init; } = TimeSpan.FromSeconds(1);
 
     /// <summary>Amount each retry interval grows by.</summary>
-    public TimeSpan RetryIntervalIncrement { get; set; } = TimeSpan.FromSeconds(2);
+    public TimeSpan RetryIntervalIncrement { get; init; } = TimeSpan.FromSeconds(2);
 
     /// <summary>Failure percentage (0..100) at which the circuit breaker trips.</summary>
-    public int CircuitBreakerTripThreshold { get; set; } = 15;
+    public int CircuitBreakerTripThreshold { get; init; } = 15;
 
     /// <summary>Minimum number of messages in the tracking window before the breaker can trip.</summary>
-    public int CircuitBreakerActiveThreshold { get; set; } = 10;
+    public int CircuitBreakerActiveThreshold { get; init; } = 10;
 
     /// <summary>How long the breaker stays open before probing again.</summary>
-    public TimeSpan CircuitBreakerResetInterval { get; set; } = TimeSpan.FromMinutes(1);
+    public TimeSpan CircuitBreakerResetInterval { get; init; } = TimeSpan.FromMinutes(1);
 
     /// <summary>Maximum messages per <see cref="RateLimitInterval"/>, or 0 to disable rate limiting.</summary>
-    public int RateLimit { get; set; }
+    public int RateLimit { get; init; }
 
     /// <summary>Window over which <see cref="RateLimit"/> applies.</summary>
-    public TimeSpan RateLimitInterval { get; set; } = TimeSpan.FromSeconds(1);
+    public TimeSpan RateLimitInterval { get; init; } = TimeSpan.FromSeconds(1);
 
     /// <summary>Validates the options. Fail-closed on invalid configuration.</summary>
     /// <exception cref="ArgumentOutOfRangeException">A numeric or interval value is out of range.</exception>

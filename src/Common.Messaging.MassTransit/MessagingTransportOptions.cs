@@ -15,13 +15,13 @@ public enum MessagingTransport
 public sealed class MessagingTransportOptions
 {
     /// <summary>Which transport to use.</summary>
-    public MessagingTransport Transport { get; set; }
+    public MessagingTransport Transport { get; init; }
 
-    /// <summary>Connection string / URI for the transport (AMQP URI for RabbitMQ, SB connection string for ASB).</summary>
-    public string ConnectionString { get; set; } = string.Empty;
+    /// <summary>Connection string / URI for the transport (AMQP URI for RabbitMQ).</summary>
+    public string ConnectionString { get; init; } = string.Empty;
 
     /// <summary>Optional prefix applied to endpoint names for consistent naming across services.</summary>
-    public string? EndpointPrefix { get; set; }
+    public string? EndpointPrefix { get; init; }
 
     /// <summary>Validates the options. Fail-closed on invalid configuration.</summary>
     /// <exception cref="InvalidOperationException"><see cref="Transport"/> is not a defined value.</exception>

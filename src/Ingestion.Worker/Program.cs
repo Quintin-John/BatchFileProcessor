@@ -78,8 +78,8 @@ services.AddHealthChecks()
     .AddCheck<ReadinessHealthCheck>("readiness", tags: readyTags);
 
 // Bus publishes batches/rejects to the broker; mediator dispatches IngestFile in-process.
-var resilience = new MessagingResilienceOptions();
-messaging.GetSection("Resilience").Bind(resilience); // retry/circuit-breaker policy is config, not hardcoded
+// retry/circuit-breaker policy is config, not hardcoded; Get<T> binds into the immutable options.
+var resilience = messaging.GetSection("Resilience").Get<MessagingResilienceOptions>() ?? new MessagingResilienceOptions();
 services.AddMessaging(
     new MessagingTransportOptions
     {
