@@ -1,10 +1,11 @@
-# BatchProcessing — fixed-width batch file ingestion
+# BatchFileProcessor
 
-A .NET 8 worker service that ingests large, sequential **fixed-width batch files** (financial
-transactions) and publishes each record to upstream systems as confirmed messages. Parsing and field
-mapping are **entirely layout-driven** — swap the layout YAML and you have a new format, with zero code
-changes. The engine is a generic **raw slicer**: it slices each field's bytes and ships them with their
-field name; it does not interpret values (types, scale, sign, dates are the consumer's concern).
+A .NET 8 worker service that ingests large, sequential **fixed-width batch files** and publishes their
+records to upstream systems as confirmed messages. Parsing and field mapping are **entirely layout-driven**
+— swap the layout YAML and you have a new fixed-width format, with zero code changes. The engine is a
+generic **raw slicer**: it slices each field's bytes and ships them with their field name; it does not
+interpret values (types, scale, sign, dates are the consumer's concern), so it is domain-agnostic. An
+example layout is included at [`docs/layouts/g266-v4.8.yaml`](docs/layouts/g266-v4.8.yaml).
 
 ## What it guarantees
 
@@ -19,12 +20,15 @@ field name; it does not interpret values (types, scale, sign, dates are the cons
   carries the same id and brokers / consumers can deduplicate it. Delivery is *at-least-once*; combined with
   an idempotent consumer this is **effectively-once**.
 - **Field-level protection from the layout.** Fields flagged `encrypt: true` are encrypted (AES-256-GCM,
-  self-describing envelope) before publish and redacted from logs.
-- **Per-profile isolation.** One worker + pipeline is built per profile and run concurrently, so files in
-  different folders never contend for performance.
-- **Fail-closed everywhere.** Missing config, an unknown format/transport, a structural fault, or an
-  exhausted publish retry stops the affected file (quarantined to `failed/`, watermark preserved for a clean
-  re-drive) rather than proceeding on ambiguous state.
+  self-describing envelope) before publish; a rejected record's raw content is encrypted too, so a marked
+  field never travels in clear.
+- **Per-profile isolation.** One worker + pipeline is built per profile and run concurrently, so a backlog
+  or a slow file in one folder does not stall another's processing. (The broker connection, checkpoint
+  store, and host resources are shared.)
+- **Fail-closed.** Missing config or an unknown format/transport fails fast at **startup** — the host will
+  not run on ambiguous config. At **runtime**, a structural fault or an exhausted publish retry quarantines
+  the affected file to `failed/` with its watermark preserved for a clean re-drive, never proceeding on
+  ambiguous state.
 
 > Completeness reconciliation (e.g. trailer control totals) and duplicate suppression are **downstream**
 > responsibilities: the trailer record is published like any other with its raw counts, and every message
@@ -39,11 +43,11 @@ flowchart LR
     C --> D[Stream framer<br/>fixed-width records]
     D --> E[Raw slicer<br/>layout-driven]
     E -->|valid| F[Field protection<br/>encrypt per layout]
-    E -->|invalid| G[Reject sink<br/>reject queue]
+    E -->|invalid| G[Reject sink<br/>reject queue, confirmed]
     F --> H[Batcher] --> I[Bounded channel<br/>N publishers]
     I --> J[Confirmed publish<br/>advance watermark]
     J --> K[done/ archive]
-    G --> J
+    G --> K
 ```
 
 Memory is O(1) in file size (records stream through a bounded buffer), so multi-gigabyte files are handled
@@ -110,15 +114,20 @@ the profile folders, and the layout path at local directories for a local run.
 
 ## Quality gates & conventions
 
-- **Central Package Management** — versions in `Directory.Packages.props`; shared build/analyzer/quality
-  settings in `Directory.Build.props` (nullable, implicit usings, warnings-as-errors, NuGet audit).
-- **Coverage** — 90% line coverage per test project (Coverlet), enforced on `dotnet test`.
-- **Static analysis** — SonarQube quality gate: zero new issues (any severity) on changed code.
-- **Testing model** — committed / CI tests are **mocked unit tests** only (they carry the coverage gate).
+- **Central Package Management** — versions in `Directory.Packages.props`; shared settings in
+  `Directory.Build.props`: `net8.0`, nullable + implicit usings, `TreatWarningsAsErrors`, .NET analyzers
+  (`latest-recommended`), NuGet audit (direct + transitive), deterministic builds — a violation fails
+  `dotnet build`.
+- **Coverage** — 90% line coverage per test project (Coverlet threshold), enforced on `dotnet test`.
+- **Static analysis** — developed against a SonarQube gate (zero new issues on changed code), run locally.
+  **No CI pipeline is committed in this repo**; the build- and coverage-gates above run via `dotnet build`
+  and `dotnet test`.
+- **Testing model** — committed tests are **mocked unit tests** only (they carry the coverage gate).
   Integration tests run locally against **real** infrastructure and are **never committed**.
-- **Test data is never committed** — sample production-shaped files stay local.
+- **Test data is never committed** — sample production-shaped files stay local (see `.gitignore`).
 
 ## Design reference
 
-See [`docs/stage1-ingestion-design.md`](docs/stage1-ingestion-design.md) for the full design rationale
-(ordering guarantees, resume/idempotency, health model, and the raw-slicer / layout-driven-protection model).
+See [`docs/stage1-ingestion-design.md`](docs/stage1-ingestion-design.md) for the full design rationale —
+boundary and non-negotiables, the generic ingestion model and variability seams, memory/scale invariants,
+delivery guarantees and resilience, security/field protection, component decomposition, and test strategy.
