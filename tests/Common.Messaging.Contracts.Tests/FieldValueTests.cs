@@ -23,6 +23,43 @@ public sealed class FieldValueTests
     }
 
     [Fact]
+    public void ClearFieldValue_WireSupportedTypes_ConstructAndCarryTheValue()
+    {
+        object[] supported =
+        [
+            "text",
+            true,
+            123.45m,
+            9_000_000_000L,
+            42,
+            new DateOnly(2022, 11, 7),
+            new DateTimeOffset(2022, 11, 7, 0, 0, 0, TimeSpan.Zero),
+        ];
+
+        foreach (var value in supported)
+        {
+            Assert.Equal(value, new ClearFieldValue(value).Value);
+        }
+    }
+
+    [Fact]
+    public void ClearFieldValue_UnsupportedTypes_ThrowAtConstruction()
+    {
+        object[] unsupported =
+        [
+            1.5d,                      // double: can overflow decimal on read — unsupported by design
+            Guid.NewGuid(),
+            new DateTime(2022, 11, 7), // DateTime (vs DateTimeOffset) is not a wire type
+        ];
+
+        foreach (var value in unsupported)
+        {
+            var ex = Assert.Throws<ArgumentException>(() => new ClearFieldValue(value));
+            Assert.Equal("value", ex.ParamName);
+        }
+    }
+
+    [Fact]
     public void EncryptedFieldValue_HoldsEnvelope()
     {
         var envelope = Envelope();

@@ -15,12 +15,36 @@ public abstract record FieldValue
 }
 
 /// <summary>A field value carried in clear (unencrypted) form.</summary>
-/// <param name="Value">
-/// The clear scalar value (for example a string, number, boolean, or date). May be
-/// null to represent a present-but-empty field. Its concrete type is defined by the
-/// referenced layout, not by this contract.
-/// </param>
-public sealed record ClearFieldValue(object? Value) : FieldValue;
+public sealed record ClearFieldValue : FieldValue
+{
+    /// <summary>
+    /// The clear scalar value (for example a string, number, boolean, or date). May be
+    /// null to represent a present-but-empty field. Its concrete type is defined by the
+    /// referenced layout, not by this contract.
+    /// </summary>
+    public object? Value { get; }
+
+    /// <summary>Creates a clear field value.</summary>
+    /// <param name="value">
+    /// The clear scalar: null, or a type the wire format can carry — <see cref="string"/>,
+    /// <see cref="bool"/>, <see cref="decimal"/>, <see cref="long"/>, <see cref="int"/>,
+    /// <see cref="DateOnly"/>, or <see cref="DateTimeOffset"/>. Validated here so an out-of-contract
+    /// value fails at construction rather than deep inside serialization.
+    /// </param>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is a type the wire format cannot carry.</exception>
+    public ClearFieldValue(object? value)
+    {
+        if (value is not (null or string or bool or decimal or long or int or DateOnly or DateTimeOffset))
+        {
+            throw new ArgumentException(
+                $"Clear field value type '{value.GetType()}' is not supported by the wire format; " +
+                "use null, string, bool, decimal, long, int, DateOnly, or DateTimeOffset.",
+                nameof(value));
+        }
+
+        Value = value;
+    }
+}
 
 /// <summary>A field value carried as an encrypted ciphertext envelope.</summary>
 public sealed record EncryptedFieldValue : FieldValue

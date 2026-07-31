@@ -44,10 +44,6 @@ public sealed class SerializationTests
         Assert.Equal("42", Serialize(new ClearFieldValue(42)));
 
     [Fact]
-    public void Write_ClearDouble_Throws() => // double can overflow decimal on read; unsupported by design
-        Assert.Throws<JsonException>(() => Serialize(new ClearFieldValue(1.5d)));
-
-    [Fact]
     public void Write_ClearDateOnly_EmitsIsoString() =>
         Assert.Equal("\"2022-11-07\"", Serialize(new ClearFieldValue(new DateOnly(2022, 11, 7))));
 
@@ -57,10 +53,6 @@ public sealed class SerializationTests
         var dto = new DateTimeOffset(2022, 11, 7, 0, 0, 0, TimeSpan.Zero);
         Assert.Equal($"\"{dto.ToString("O", CultureInfo.InvariantCulture)}\"", Serialize(new ClearFieldValue(dto)));
     }
-
-    [Fact]
-    public void Write_ClearUnsupportedType_Throws() =>
-        Assert.Throws<JsonException>(() => Serialize(new ClearFieldValue(Guid.NewGuid())));
 
     // ---- clear field value: read side (canonical CLR types) ----
 
