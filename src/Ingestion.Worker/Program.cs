@@ -18,6 +18,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using StackExchange.Redis;
 
 // Composition root — wiring only (excluded from coverage). Fails fast on missing configuration.
@@ -50,9 +52,19 @@ services.AddInMemoryKeyProvider();
 services.AddSingleton<IPayloadProtector, DefaultPayloadProtector>();
 
 // Shared telemetry.
-services.AddObservability(builder.Configuration.GetSection("Observability")); // binds name/version, registers OTel export
+services.AddObservability(builder.Configuration.GetSection("Observability")); // binds name/version, registers OTel SDK
 services.AddSingleton<IngestionMetrics>();
 services.AddSingleton<IngestionTracing>();
+
+// Downstream-agnostic export: OTLP traces + metrics to any collector/backend, added onto the same OTel
+// builder. Endpoint from the Otlp config section; when unset, telemetry is collected but not exported.
+var otlpEndpoint = (builder.Configuration.GetSection("Otlp").Get<OtlpExportOptions>() ?? new OtlpExportOptions()).ResolveEndpoint();
+if (otlpEndpoint is not null)
+{
+    services.AddOpenTelemetry()
+        .WithTracing(tracing => tracing.AddOtlpExporter(exporter => exporter.Endpoint = otlpEndpoint))
+        .WithMetrics(metrics => metrics.AddOtlpExporter(exporter => exporter.Endpoint = otlpEndpoint));
+}
 
 // Per-record lineage (§8): bounded channel emitter, drained off the hot path to a structured-log sink.
 services.AddSingleton(new ChannelLineageEmitter(RequiredConfig.Integer(ingestion, "LineageChannelCapacity")));

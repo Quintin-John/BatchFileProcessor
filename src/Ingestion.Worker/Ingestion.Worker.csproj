@@ -15,6 +15,9 @@
          which carries GHSA-hh2w-p6rv-4g7w / GHSA-8g4q-xg66-9fp4 (High). 8.0.5 resolves both. -->
     <PackageReference Include="System.Text.Json" />
     <PackageReference Include="StackExchange.Redis" />
+    <!-- Downstream-agnostic telemetry export: OTLP to any collector/backend. The exporter lives in the host
+         (composition root), not the shared Common.Observability library, which stays exporter-free. -->
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
   </ItemGroup>
 
   <!-- ASP.NET Core for the K8s liveness/readiness HTTP probe endpoints. -->
