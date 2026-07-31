@@ -26,3 +26,6 @@ sonar-project.properties
 
 # OS
 .DS_Store
+
+# Local test data — production-shaped sample files (financial data) must never be committed
+docs/g266tpeo_*
