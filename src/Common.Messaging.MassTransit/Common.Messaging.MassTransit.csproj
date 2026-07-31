@@ -17,4 +17,8 @@
     <ProjectReference Include="..\Common.Messaging.Contracts\Common.Messaging.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Common.Messaging.MassTransit.Tests" />
+  </ItemGroup>
+
 </Project>

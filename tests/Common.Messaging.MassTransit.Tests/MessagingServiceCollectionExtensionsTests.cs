@@ -22,7 +22,8 @@ public sealed class MessagingServiceCollectionExtensionsTests
         using var provider = services.BuildServiceProvider();
 
         Assert.NotNull(provider.GetRequiredService<IBus>());
-        Assert.IsType<MassTransitPublisher>(provider.GetRequiredService<IMessagePublisher>());
+        // The publisher is decorated with the transport-agnostic send-retry policy.
+        Assert.IsType<RetryingMessagePublisher>(provider.GetRequiredService<IMessagePublisher>());
     }
 
     [Fact]

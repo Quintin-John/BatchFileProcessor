@@ -1,6 +1,7 @@
 using MassTransit;
 using Common.Messaging.Contracts;
 using Common.Messaging.MassTransit;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -64,7 +65,15 @@ public static class MessagingServiceCollectionExtensions
             }
         });
 
-        services.AddSingleton<IMessagePublisher, MassTransitPublisher>();
+        // Producer resilience: the transport adapter does the raw send; a transport-agnostic decorator retries
+        // send faults (naks/connection loss) with backoff, fail-closed on exhaustion. TimeProvider drives the
+        // backoff and is only defaulted if the host has not already registered one.
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<MassTransitPublisher>();
+        services.AddSingleton<IMessagePublisher>(sp => new RetryingMessagePublisher(
+            sp.GetRequiredService<MassTransitPublisher>(),
+            sp.GetRequiredService<MessagingResilienceOptions>(),
+            sp.GetRequiredService<TimeProvider>()));
         return services;
     }
 }
