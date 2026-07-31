@@ -89,6 +89,7 @@ services.AddMessaging(
     },
     resilience);
 services.AddMediator(cfg => cfg.AddConsumer<IngestFileConsumer>());
+services.AddSingleton<IIngestFileDispatcher, MediatorIngestFileDispatcher>();
 
 services.AddHostedService<FolderIngestionWorker>();
 

@@ -3,21 +3,19 @@ using Common.FileIngestion.Health;
 using Common.FileIngestion.Sources;
 using Common.Observability;
 using Ingestion.Worker.Messages;
-using MassTransit;
-using MassTransit.Mediator;
 
 namespace Ingestion.Worker;
 
 /// <summary>
-/// Polls a <see cref="IFileSource"/> and drives each claimed file through the mediator. On startup it
+/// Polls a <see cref="IFileSource"/> and drives each claimed file through the dispatcher. On startup it
 /// re-offers orphaned claims (crash recovery), then loops claiming new arrivals. Each file is
-/// dispatched as an <see cref="IngestFile"/> command; a successful send completes the file, any
+/// dispatched as an <see cref="IngestFile"/> command; a successful dispatch completes the file, any
 /// failure quarantines it (fail-closed) and the loop continues — one bad file never stalls the run.
 /// </summary>
-public sealed partial class FolderIngestionWorker : BackgroundService
+internal sealed partial class FolderIngestionWorker : BackgroundService
 {
     private readonly IFileSource _source;
-    private readonly IMediator _mediator;
+    private readonly IIngestFileDispatcher _dispatcher;
     private readonly ReadinessGate _readiness;
     private readonly WorkerOptions _options;
     private readonly ILogger<FolderIngestionWorker> _logger;
@@ -27,21 +25,21 @@ public sealed partial class FolderIngestionWorker : BackgroundService
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
     public FolderIngestionWorker(
         IFileSource source,
-        IMediator mediator,
+        IIngestFileDispatcher dispatcher,
         ReadinessGate readiness,
         WorkerOptions options,
         ILogger<FolderIngestionWorker> logger,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(mediator);
+        ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(readiness);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _source = source;
-        _mediator = mediator;
+        _dispatcher = dispatcher;
         _readiness = readiness;
         _options = options;
         _logger = logger;
@@ -80,7 +78,7 @@ public sealed partial class FolderIngestionWorker : BackgroundService
 
     private async Task DispatchAsync(ClaimedFile file, CancellationToken cancellationToken)
     {
-        // One run per file. The scope is ambient (AsyncLocal), so it flows through the in-process mediator
+        // One run per file. The scope is ambient (AsyncLocal), so it flows through the in-process dispatch
         // into the pipeline: its spans pick up run/correlation ids, and this worker's own logs are enriched
         // via the log scope. The command carries the same correlation id downstream as provenance.
         var run = RunContext.NewRun();
@@ -96,13 +94,21 @@ public sealed partial class FolderIngestionWorker : BackgroundService
                 _options.ProfileId,
                 _options.LayoutVersion);
 
-            await _mediator.Send(command, cancellationToken).ConfigureAwait(false);
+            await _dispatcher.DispatchAsync(command, cancellationToken).ConfigureAwait(false);
             _source.Complete(file);
             _readiness.MarkHealthy(); // a clean publish means downstream is reachable
             LogIngested(file.Name);
         }
-#pragma warning disable CA1031 // fail-closed: any ingestion failure quarantines the file and the loop continues
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Genuine shutdown: leave the claim in place so the next run re-offers it (crash recovery),
+            // and let cancellation unwind the loop. Distinguished by the actual stopping signal, not by the
+            // exception type — a non-shutdown cancellation (e.g. a downstream timeout) falls through to the
+            // fail-closed handler below rather than propagating and stopping the host.
+            throw;
+        }
+#pragma warning disable CA1031 // fail-closed: any non-shutdown failure quarantines the file and the loop continues
+        catch (Exception ex)
 #pragma warning restore CA1031
         {
             _source.Fail(file);
