@@ -17,6 +17,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _provider = new ServiceCollection()
+            .AddSingleton<ContentTypeSpy>()
             .AddMassTransitTestHarness(cfg =>
             {
                 cfg.AddConsumer<BatchConsumer>();
@@ -28,6 +29,10 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
                         MessagingJson.Configure(options);
                         return options;
                     });
+
+                    // Mirror production: bare domain JSON, not the MassTransit envelope. AnyMessageType lets the
+                    // in-memory consumer bind the raw payload back to its type for the round-trip assertions.
+                    bus.UseRawJsonSerializer(RawSerializerOptions.AnyMessageType);
 
                     // Explicit endpoints so an addressed Send to queue:<destination> is received.
                     bus.ReceiveEndpoint(BatchDestination, e => e.ConfigureConsumer<BatchConsumer>(context));
@@ -137,6 +142,18 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PublishBatchAsync_SendsBareDomainJson_NotTheMassTransitEnvelope()
+    {
+        var publisher = new MassTransitPublisher(_harness.Bus);
+
+        await publisher.PublishBatchAsync(SampleBatch(), BatchDestination, CancellationToken.None);
+
+        Assert.True(await _harness.GetConsumerHarness<BatchConsumer>().Consumed.Any<IngestBatchMessage>());
+        // Raw JSON => content-type application/json; the MassTransit envelope would be application/vnd.masstransit+json.
+        Assert.Equal("application/json", _provider.GetRequiredService<ContentTypeSpy>().BatchContentType);
+    }
+
+    [Fact]
     public async Task PublishBatchAsync_NullBatch_Throws()
     {
         var publisher = new MassTransitPublisher(_harness.Bus);
@@ -170,10 +187,24 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
     }
 }
 
-/// <summary>Test consumer used to prove a sent batch round-trips and is consumed.</summary>
+/// <summary>Captures the wire content-type seen by the consumer, to prove bare JSON vs the MT envelope.</summary>
+public sealed class ContentTypeSpy
+{
+    public string? BatchContentType { get; set; }
+}
+
+/// <summary>Test consumer used to prove a sent batch round-trips and to capture its wire content-type.</summary>
 public sealed class BatchConsumer : IConsumer<IngestBatchMessage>
 {
-    public Task Consume(ConsumeContext<IngestBatchMessage> context) => Task.CompletedTask;
+    private readonly ContentTypeSpy _spy;
+
+    public BatchConsumer(ContentTypeSpy spy) => _spy = spy;
+
+    public Task Consume(ConsumeContext<IngestBatchMessage> context)
+    {
+        _spy.BatchContentType = context.ReceiveContext.ContentType?.MediaType;
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Test consumer used to prove a sent reject round-trips and is consumed.</summary>

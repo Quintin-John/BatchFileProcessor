@@ -56,6 +56,12 @@ public static class MessagingServiceCollectionExtensions
                             MessagingJson.Configure(options);
                             return options;
                         });
+
+                        // Publish bare domain JSON (content-type application/json), not the MassTransit
+                        // envelope, so any downstream consumer can read the messages without knowing MassTransit.
+                        // The message-id property and X-Correlation-Id / traceparent headers still ride the
+                        // transport, so dedup and tracing are unaffected.
+                        rabbit.UseRawJsonSerializer();
                         rabbit.ConfigureEndpoints(context);
                     });
                     break;
