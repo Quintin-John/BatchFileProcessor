@@ -3,7 +3,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using Common.FileIngestion.Batching;
-using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Lineage;
 using Common.FileIngestion.Parsing;
