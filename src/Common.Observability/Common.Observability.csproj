@@ -20,4 +20,8 @@
     <PackageReference Include="OpenTelemetry.Api" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Common.Observability.Tests" />
+  </ItemGroup>
+
 </Project>
