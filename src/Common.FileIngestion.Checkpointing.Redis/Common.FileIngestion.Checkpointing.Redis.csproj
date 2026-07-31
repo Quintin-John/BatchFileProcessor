@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Public library: ship XML docs; keep the public surface deliberate. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common.FileIngestion.Abstractions\Common.FileIngestion.Abstractions.csproj" />
+  </ItemGroup>
+
+  <!-- The Redis backend seam (IRedisWatermarkBackend) is internal; the tests mock it. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Common.FileIngestion.Tests" />
+  </ItemGroup>
+
+</Project>

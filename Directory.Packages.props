@@ -20,6 +20,7 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
 
     <!-- Serialization / IO -->
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.Text.Json" Version="8.0.5" />
     <PackageVersion Include="YamlDotNet" Version="16.2.1" />
