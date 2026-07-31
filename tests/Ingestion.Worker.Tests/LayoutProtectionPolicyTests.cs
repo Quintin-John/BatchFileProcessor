@@ -40,6 +40,53 @@ public sealed class LayoutProtectionPolicyTests
     }
 
     [Fact]
+    public void From_SameFieldName_ConsistentClassification_AcrossRecordTypes_IsAllowed()
+    {
+        // The same name may legitimately recur across record types as long as it classifies identically
+        // (e.g. a shared FILLER). Collapsing consistent duplicates is safe and must not throw.
+        var layout = new Layout("1.0", 10, "ascii", 1, 2, new[]
+        {
+            new RecordDefinition("a", "AA", new[]
+            {
+                new FieldDefinition("shared", 1, 5),
+                new FieldDefinition("tailA", 6, 5),
+            }),
+            new RecordDefinition("b", "BB", new[]
+            {
+                new FieldDefinition("shared", 1, 5),
+                new FieldDefinition("tailB", 6, 5),
+            }),
+        });
+
+        var policy = LayoutProtectionPolicy.From(layout);
+
+        Assert.Equal(ProtectionAction.Clear, policy.GetProtection("shared").Action);
+    }
+
+    [Fact]
+    public void From_SameFieldName_ConflictingClassification_AcrossRecordTypes_Throws()
+    {
+        // 'dup' is encrypted in one record type and clear in another. Collapsing it would silently
+        // declassify the encrypted side, so construction must fail closed.
+        var layout = new Layout("1.0", 10, "ascii", 1, 2, new[]
+        {
+            new RecordDefinition("a", "AA", new[]
+            {
+                new FieldDefinition("dup", 1, 5, encrypt: true),
+                new FieldDefinition("tailA", 6, 5),
+            }),
+            new RecordDefinition("b", "BB", new[]
+            {
+                new FieldDefinition("dup", 1, 5),
+                new FieldDefinition("tailB", 6, 5),
+            }),
+        });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => LayoutProtectionPolicy.From(layout));
+        Assert.Contains("dup", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void From_NullLayout_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => LayoutProtectionPolicy.From(null!));
