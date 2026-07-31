@@ -1,6 +1,7 @@
 using Common.FileIngestion.Abstractions;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Sources;
+using Common.Observability;
 using Ingestion.Worker.Messages;
 using MassTransit;
 using MassTransit.Mediator;
@@ -75,13 +76,19 @@ public sealed partial class FolderIngestionWorker : BackgroundService
 
     private async Task DispatchAsync(ClaimedFile file, CancellationToken cancellationToken)
     {
+        // One run per file. The scope is ambient (AsyncLocal), so it flows through the in-process mediator
+        // into the pipeline: its spans pick up run/correlation ids, and this worker's own logs are enriched
+        // via the log scope. The command carries the same correlation id downstream as provenance.
+        var run = RunContext.NewRun();
+        using var scope = CorrelationScope.Begin(run);
+        using var logScope = _logger.BeginCorrelationScope();
         try
         {
             var command = new IngestFile(
                 file.Name,
                 file.Name,
                 file.ProcessingPath,
-                Guid.NewGuid().ToString("N"),
+                run.CorrelationId,
                 _options.ProfileId,
                 _options.LayoutVersion);
 

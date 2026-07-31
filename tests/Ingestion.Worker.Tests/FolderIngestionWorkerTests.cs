@@ -1,6 +1,7 @@
 using Common.FileIngestion.Abstractions;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Sources;
+using Common.Observability;
 using Ingestion.Worker;
 using Ingestion.Worker.Messages;
 using MassTransit;
@@ -74,6 +75,34 @@ public sealed class FolderIngestionWorkerTests
         Assert.Equal(HealthStatus.Degraded, gate.Status);
     }
 
+    [Fact]
+    public async Task Dispatch_OpensCorrelationScope_ThatFlowsToConsumer_WithMatchingCorrelationId()
+    {
+        var (mediator, spy, provider) = Mediator();
+        await using var _ = provider;
+        var worker = new FolderIngestionWorker(
+            new FakeFileSource(), mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
+
+        await worker.ProcessAsync([new ClaimedFile("ok.dat", "p/ok.dat")], CancellationToken.None);
+
+        Assert.NotNull(spy.ObservedRun); // a scope was active while the pipeline ran
+        Assert.Equal(spy.ObservedRun!.CorrelationId, spy.ObservedCommandCorrelationId); // command carries the scope's id
+        Assert.Equal(spy.ObservedRun.RunId, spy.ObservedRun.CorrelationId); // fresh run: run id == correlation id
+    }
+
+    [Fact]
+    public async Task Dispatch_RestoresCorrelationScope_AfterEachFile_NoAmbientLeak()
+    {
+        var (mediator, _, provider) = Mediator();
+        await using var __ = provider;
+        var worker = new FolderIngestionWorker(
+            new FakeFileSource(), mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
+
+        await worker.ProcessAsync([new ClaimedFile("ok.dat", "p/ok.dat")], CancellationToken.None);
+
+        Assert.Null(CorrelationScope.Current); // scope disposed after dispatch; nothing leaks to the caller
+    }
+
     private static async Task WaitUntil(Func<bool> condition)
     {
         for (var i = 0; i < 200 && !condition(); i++)
@@ -86,7 +115,20 @@ public sealed class FolderIngestionWorkerTests
     {
         private readonly List<string> _received = [];
         public List<string> Received => _received;
+
+        /// <summary>The ambient correlation scope observed inside the consumer (i.e. what the pipeline sees).</summary>
+        public RunContext? ObservedRun { get; private set; }
+
+        /// <summary>The correlation id carried on the dispatched command.</summary>
+        public string? ObservedCommandCorrelationId { get; private set; }
+
         public void Record(string name) => _received.Add(name);
+
+        public void Observe(RunContext? run, string commandCorrelationId)
+        {
+            ObservedRun = run;
+            ObservedCommandCorrelationId = commandCorrelationId;
+        }
     }
 
     private sealed class SpyIngestConsumer : IConsumer<IngestFile>
@@ -97,6 +139,7 @@ public sealed class FolderIngestionWorkerTests
 
         public Task Consume(ConsumeContext<IngestFile> context)
         {
+            _state.Observe(CorrelationScope.Current, context.Message.CorrelationId);
             _state.Record(context.Message.SourceKey);
             return context.Message.SourceKey.Contains("boom", StringComparison.Ordinal)
                 ? throw new InvalidOperationException("boom")
