@@ -36,6 +36,7 @@
     <ProjectReference Include="..\Common.FileIngestion.Reading\Common.FileIngestion.Reading.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Sources.Folder\Common.FileIngestion.Sources.Folder.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Checkpointing\Common.FileIngestion.Checkpointing.csproj" />
+    <ProjectReference Include="..\Common.FileIngestion.Parsing\Common.FileIngestion.Parsing.csproj" />
   </ItemGroup>
 
 </Project>
