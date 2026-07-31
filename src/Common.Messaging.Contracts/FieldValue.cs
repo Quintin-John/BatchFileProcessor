@@ -44,6 +44,16 @@ public sealed record ClearFieldValue : FieldValue
 
         Value = value;
     }
+
+    /// <summary>
+    /// Redacted rendering: the clear value is never emitted to logs or diagnostics. A field the layout marks
+    /// <c>encrypt</c> is an <see cref="EncryptedFieldValue"/> by the time it is published, but before that it
+    /// is carried here in clear; redacting the rendering means an accidental log/interpolation of the value
+    /// cannot leak it. The value itself remains accessible via <see cref="Value"/> for deliberate use.
+    /// </summary>
+    public override string ToString() => $"{nameof(ClearFieldValue)} {{ Value = {Redacted} }}";
+
+    private const string Redacted = "[redacted]";
 }
 
 /// <summary>A field value carried as an encrypted ciphertext envelope.</summary>
@@ -60,4 +70,8 @@ public sealed record EncryptedFieldValue : FieldValue
         ArgumentNullException.ThrowIfNull(value);
         Value = value;
     }
+
+    /// <summary>Renders as an encrypted marker — algorithm and key reference only, never ciphertext.</summary>
+    public override string ToString() =>
+        $"{nameof(EncryptedFieldValue)} {{ {Value.Algorithm}, key={Value.KeyId}/{Value.KeyVersion} }}";
 }

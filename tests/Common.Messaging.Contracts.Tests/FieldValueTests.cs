@@ -98,4 +98,29 @@ public sealed class FieldValueTests
     {
         Assert.Equal(new EncryptedFieldValue(Envelope()), new EncryptedFieldValue(Envelope()));
     }
+
+    [Fact]
+    public void ClearFieldValue_ToString_RedactsValue_NeverEmitsIt()
+    {
+        Assert.DoesNotContain("4111111111111111", new ClearFieldValue("4111111111111111").ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("221.73", new ClearFieldValue(221.73m).ToString(), StringComparison.Ordinal);
+        Assert.Contains("redacted", new ClearFieldValue("secret").ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ClearFieldValue_ToString_NullValue_DoesNotThrow_AndRedacts()
+    {
+        Assert.Contains("redacted", new ClearFieldValue(null).ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EncryptedFieldValue_ToString_MarksEncrypted_WithoutCiphertext()
+    {
+        var text = new EncryptedFieldValue(Envelope()).ToString();
+
+        Assert.Contains("AES-256-GCM", text, StringComparison.Ordinal); // marked as encrypted (algorithm)
+        Assert.DoesNotContain("Y2lwaGVy", text, StringComparison.Ordinal); // ciphertext
+        Assert.DoesNotContain("bm9uY2U=", text, StringComparison.Ordinal); // nonce
+        Assert.DoesNotContain("dGFn", text, StringComparison.Ordinal);     // tag
+    }
 }
