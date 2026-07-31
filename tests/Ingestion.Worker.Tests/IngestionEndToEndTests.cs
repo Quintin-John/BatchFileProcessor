@@ -12,15 +12,11 @@ using Common.FileIngestion.Telemetry;
 using Common.Observability;
 using Common.Security.DataProtection;
 using Common.Messaging.Contracts;
-using Ingestion.Worker.Consumers;
 using Ingestion.Worker.Messages;
-using MassTransit;
-using MassTransit.Mediator;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Ingestion.Worker.Tests;
 
-// Proves the host wiring end to end: mediator -> IngestFileConsumer -> FileIngestionPipeline -> publish.
+// Proves the host wiring end to end: PipelineIngestFileDispatcher -> FileIngestionPipeline -> publish.
 // Fakes sit only at the parser/protector/publisher edges, each covered by its own component's tests.
 public sealed class IngestionEndToEndTests : IDisposable
 {
@@ -32,22 +28,30 @@ public sealed class IngestionEndToEndTests : IDisposable
     public void Dispose() => File.Delete(_file);
 
     [Fact]
-    public async Task Send_IngestFile_RunsPipeline_PublishesBatchesAndRejects()
+    public async Task Dispatch_IngestFile_RunsPipeline_PublishesBatchesAndRejects()
     {
         await File.WriteAllTextAsync(_file, FileText);
+        var dispatcher = new PipelineIngestFileDispatcher(BuildPipeline());
 
-        await using var provider = new ServiceCollection()
-            .AddSingleton(BuildPipeline())
-            .AddMediator(cfg => cfg.AddConsumer<IngestFileConsumer>())
-            .BuildServiceProvider(true);
-        var mediator = provider.GetRequiredService<IMediator>();
-
-        await mediator.Send(new IngestFile("e2e.dat", "e2e.dat", _file, "run-1", "g266", "4.8"));
+        await dispatcher.DispatchAsync(
+            new IngestFile("e2e.dat", "e2e.dat", _file, "run-1", "g266", "4.8"), CancellationToken.None);
 
         Assert.NotEmpty(_publisher.Batches);
         Assert.IsType<EncryptedFieldValue>(Assert.Single(_publisher.Rejects).RawRecord);
         Assert.All(_publisher.Batches, b => Assert.StartsWith(b.Provenance.FileId, b.MessageId, StringComparison.Ordinal));
         Assert.Null(await _checkpoints.LoadAsync("e2e.dat", CancellationToken.None));
+    }
+
+    [Fact]
+    public void Constructor_NullPipeline_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => new PipelineIngestFileDispatcher(null!));
+
+    [Fact]
+    public async Task DispatchAsync_NullCommand_Throws()
+    {
+        var dispatcher = new PipelineIngestFileDispatcher(BuildPipeline());
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => dispatcher.DispatchAsync(null!, CancellationToken.None));
     }
 
     private FileIngestionPipeline BuildPipeline()

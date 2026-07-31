@@ -16,9 +16,7 @@ using Common.Messaging.MassTransit;
 using Common.Observability;
 using Common.Security.DataProtection;
 using Ingestion.Worker;
-using Ingestion.Worker.Consumers;
 using Ingestion.Worker.Health;
-using MassTransit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
@@ -96,8 +94,8 @@ services.AddHealthChecks()
     .AddCheck<LivenessHealthCheck>("liveness", tags: liveTags)
     .AddCheck<ReadinessHealthCheck>("readiness", tags: readyTags);
 
-// Bus publishes batches/rejects to the broker; mediator dispatches IngestFile in-process.
-// retry/circuit-breaker policy is config, not hardcoded; Get<T> binds into the immutable options.
+// Bus publishes batches and rejects to the broker (this service is a producer only). The send-retry policy
+// is bound from configuration rather than hardcoded, falling back to the option defaults when absent.
 var resilience = messaging.GetSection("Resilience").Get<MessagingResilienceOptions>() ?? new MessagingResilienceOptions();
 services.AddMessaging(
     new MessagingTransportOptions
@@ -107,8 +105,10 @@ services.AddMessaging(
         EndpointPrefix = messaging["EndpointPrefix"],
     },
     resilience);
-services.AddMediator(cfg => cfg.AddConsumer<IngestFileConsumer>());
-services.AddSingleton<IIngestFileDispatcher, MediatorIngestFileDispatcher>();
+// IngestFile is dispatched in-process straight to the pipeline; the durable unit is the file on disk
+// (orphan recovery) plus the checkpoint, so no broker command queue is needed.
+services.AddSingleton<IIngestFileDispatcher>(sp =>
+    new PipelineIngestFileDispatcher(sp.GetRequiredService<FileIngestionPipeline>()));
 
 services.AddHostedService<FolderIngestionWorker>();
 
