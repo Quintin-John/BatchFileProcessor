@@ -79,6 +79,33 @@ public sealed class LayoutLoaderTests
     }
 
     [Fact]
+    public void Load_SkipRecordType_LoadsWithoutFields()
+    {
+        const string yaml = """
+            version: "1"
+            recordLength: 10
+            encoding: ascii
+            discriminator: { start: 1, length: 2 }
+            recordTypes:
+              hd:
+                match: "HD"
+                skip: true
+              dt:
+                match: "DT"
+                fields:
+                  - { name: rectype, start: 1, length: 2 }
+                  - { name: body, start: 3, length: 8 }
+            """;
+
+        var layout = LayoutLoader.Load(yaml);
+
+        var header = layout.ResolveByDiscriminator("HD")!;
+        Assert.True(header.Skip);            // consumed for framing, never emitted
+        Assert.Empty(header.Fields);         // a skip record may omit fields
+        Assert.False(layout.ResolveByDiscriminator("DT")!.Skip);
+    }
+
+    [Fact]
     public void Load_ParsesTerminator_WhenPresent()
     {
         const string yaml = """
@@ -234,5 +261,10 @@ public sealed class LayoutLoaderTests
         Assert.Equal(4, layout.RecordTypes.Count);
         Assert.Equal("per", layout.ResolveByDiscriminator("TRAN")!.Name);
         Assert.Equal("aer", layout.ResolveByDiscriminator("AUTH")!.Name);
+
+        // Header/trailer are control records: skipped (consumed for framing, not emitted); data records are not.
+        Assert.True(layout.ResolveByDiscriminator("HEAD")!.Skip);
+        Assert.True(layout.ResolveByDiscriminator("TRAI")!.Skip);
+        Assert.False(layout.ResolveByDiscriminator("TRAN")!.Skip);
     }
 }

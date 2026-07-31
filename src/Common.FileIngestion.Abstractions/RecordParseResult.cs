@@ -4,18 +4,20 @@ using Common.Messaging.Contracts;
 namespace Common.FileIngestion.Abstractions;
 
 /// <summary>
-/// The outcome of parsing one record: either a mapped <see cref="Record"/>, or a rejection with
-/// the record type, the raw record text, and every field-level <see cref="Reasons"/>.
+/// The outcome of parsing one record: a mapped <see cref="Record"/>, a rejection with the record type, the
+/// raw record text and every field-level <see cref="Reasons"/>, or a <see cref="IsSkipped">skip</see> — a
+/// control record (header/trailer) the layout marks skip, consumed for framing but neither emitted nor rejected.
 /// </summary>
 public sealed class RecordParseResult
 {
     private RecordParseResult(
-        IngestRecord? record, string recordType, string? rawRecord, IReadOnlyList<RejectReason>? reasons)
+        IngestRecord? record, string recordType, string? rawRecord, IReadOnlyList<RejectReason>? reasons, bool skipped)
     {
         Record = record;
         RecordType = recordType;
         RawRecord = rawRecord;
         Reasons = reasons;
+        IsSkipped = skipped;
     }
 
     /// <summary>The mapped record when successful; otherwise null.</summary>
@@ -33,13 +35,25 @@ public sealed class RecordParseResult
     /// <summary>True when the record parsed successfully.</summary>
     public bool IsSuccess => Record is not null;
 
+    /// <summary>True when the record is a skipped control record — consumed for framing, not emitted or rejected.</summary>
+    public bool IsSkipped { get; }
+
     /// <summary>Creates a successful result.</summary>
     /// <param name="record">The mapped record; required.</param>
     /// <exception cref="ArgumentNullException"><paramref name="record"/> is null.</exception>
     public static RecordParseResult Success(IngestRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
-        return new RecordParseResult(record, record.Locator.RecordType, null, null);
+        return new RecordParseResult(record, record.Locator.RecordType, null, null, skipped: false);
+    }
+
+    /// <summary>Creates a skipped result for a control record consumed for framing but not emitted.</summary>
+    /// <param name="recordType">The record type / discriminator value; required, non-blank.</param>
+    /// <exception cref="ArgumentException"><paramref name="recordType"/> is null, empty, or whitespace.</exception>
+    public static RecordParseResult Skipped(string recordType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recordType);
+        return new RecordParseResult(null, recordType, null, null, skipped: true);
     }
 
     /// <summary>Creates a rejected result.</summary>
@@ -70,6 +84,6 @@ public sealed class RecordParseResult
             copy.Add(reason);
         }
 
-        return new RecordParseResult(null, recordType, rawRecord, new ReadOnlyCollection<RejectReason>(copy));
+        return new RecordParseResult(null, recordType, rawRecord, new ReadOnlyCollection<RejectReason>(copy), skipped: false);
     }
 }

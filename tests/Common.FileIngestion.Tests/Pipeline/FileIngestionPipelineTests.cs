@@ -349,6 +349,29 @@ public sealed class FileIngestionPipelineTests
         Assert.Equal("CODE", events.Single(e => e.Locator.RecordSeq == 3 && e.State == LineageState.Rejected).ReasonCode);
     }
 
+    [Fact]
+    public async Task Ingest_SkippedRecord_IsNotEmitted_AndTracedAsSkipped()
+    {
+        var harness = new Harness();
+        var bytes = Bytes("SKIP0001\nDATA0002\n"); // record 1 = control (skip), record 2 = emitted
+
+        var outcome = await harness.Build(maxRecords: 2).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+        harness.Lineage.Complete();
+
+        Assert.Equal(1, outcome.RecordsAccepted);        // only DATA
+        Assert.Equal(0, outcome.RecordsRejected);        // skip is not a reject
+        Assert.Single(Assert.Single(harness.Publisher.Batches).Records); // one batch, the DATA record only
+        Assert.Empty(harness.Publisher.Rejects);
+
+        var events = new List<LineageEvent>();
+        await foreach (var e in harness.Lineage.Reader.ReadAllAsync())
+        {
+            events.Add(e);
+        }
+
+        Assert.Equal([LineageState.Skipped], States(events, recordSeq: 1)); // control record: only Skipped
+    }
+
     private static List<LineageState> States(IEnumerable<LineageEvent> events, long recordSeq) =>
         events.Where(e => e.Locator.RecordSeq == recordSeq).Select(e => e.State).ToList();
 
@@ -384,6 +407,11 @@ public sealed class FileIngestionPipelineTests
         public RecordParseResult Parse(long recordSeq, long byteOffset, ReadOnlySpan<char> record)
         {
             var content = record.ToString();
+            if (content.StartsWith("SKIP", StringComparison.Ordinal))
+            {
+                return RecordParseResult.Skipped("SKIP");
+            }
+
             if (content.StartsWith("REJ", StringComparison.Ordinal))
             {
                 return RecordParseResult.Rejected("REJ", content,

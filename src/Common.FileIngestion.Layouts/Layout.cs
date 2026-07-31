@@ -83,7 +83,12 @@ public sealed class Layout
                 throw new ArgumentException($"Duplicate discriminator value '{record.Match}'.", nameof(recordTypes));
             }
 
-            ValidateContiguousCoverage(record, recordLength);
+            // A skipped record (header/trailer) is consumed for framing but never sliced, so it emits no
+            // fields and is exempt from the byte-coverage invariant that applies to emitted records.
+            if (!record.Skip)
+            {
+                ValidateContiguousCoverage(record, recordLength);
+            }
         }
 
         Version = version;

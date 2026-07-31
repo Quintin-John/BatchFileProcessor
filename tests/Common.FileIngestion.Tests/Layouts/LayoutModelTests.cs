@@ -96,6 +96,15 @@ public sealed class LayoutModelTests
     }
 
     [Fact]
+    public void RecordDefinition_Skip_AllowsNoFields()
+    {
+        var record = new RecordDefinition("ftr", "TRAI", Array.Empty<FieldDefinition>(), skip: true);
+
+        Assert.True(record.Skip);
+        Assert.Empty(record.Fields);
+    }
+
+    [Fact]
     public void RecordDefinition_NullFieldElement_Throws()
     {
         Assert.Throws<ArgumentException>(() => new RecordDefinition("r", "M", new FieldDefinition[] { null! }));
@@ -191,6 +200,20 @@ public sealed class LayoutModelTests
         {
             Record("r", "M", Field(1, 2), Field(3, 7)),
         }));
+    }
+
+    [Fact]
+    public void Layout_SkipRecord_IsExemptFromCoverage()
+    {
+        // An emitted record must tile; a skip record (no fields) is consumed for framing and coverage-exempt.
+        var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
+        {
+            Record("detail", "DT", Field(1, 2), Field(3, 8)),
+            new RecordDefinition("trailer", "TR", Array.Empty<FieldDefinition>(), skip: true),
+        });
+
+        Assert.True(layout.ResolveByDiscriminator("TR")!.Skip);
+        Assert.False(layout.ResolveByDiscriminator("DT")!.Skip);
     }
 
     [Theory]

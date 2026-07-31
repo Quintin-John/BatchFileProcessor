@@ -87,9 +87,9 @@ public static class LayoutLoader
             throw new FormatException("Record type names must be non-blank.");
         }
 
-        if (dto?.Fields is null || dto.Fields.Count == 0)
+        if (dto is null)
         {
-            throw new FormatException($"Record type '{name}' must define fields.");
+            throw new FormatException($"Record type '{name}' is empty.");
         }
 
         if (string.IsNullOrWhiteSpace(dto.Match))
@@ -97,8 +97,15 @@ public static class LayoutLoader
             throw new FormatException($"Record type '{name}' must define a match value.");
         }
 
-        var fields = new List<FieldDefinition>(dto.Fields.Count);
-        foreach (var field in dto.Fields)
+        // A skipped record (header/trailer) is consumed for framing but never sliced, so it may omit fields.
+        if (!dto.Skip && (dto.Fields is null || dto.Fields.Count == 0))
+        {
+            throw new FormatException($"Record type '{name}' must define fields.");
+        }
+
+        List<FieldDto> source = dto.Fields ?? [];
+        var fields = new List<FieldDefinition>(source.Count);
+        foreach (var field in source)
         {
             if (field is null || string.IsNullOrWhiteSpace(field.Name))
             {
@@ -117,7 +124,7 @@ public static class LayoutLoader
 
         try
         {
-            return new RecordDefinition(name, dto.Match, fields);
+            return new RecordDefinition(name, dto.Match, fields, dto.Skip);
         }
         catch (ArgumentException ex)
         {
@@ -152,6 +159,8 @@ public static class LayoutLoader
     private sealed class RecordTypeDto
     {
         public string? Match { get; set; }
+
+        public bool Skip { get; set; }
 
         public List<FieldDto>? Fields { get; set; }
     }

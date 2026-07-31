@@ -266,6 +266,16 @@ public sealed class FileIngestionPipeline
 
         var parseResult = _parser.Parse(framed.RecordSeq, framed.ByteOffset, framed.Content);
         var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, parseResult.RecordType);
+
+        // A skipped control record such as a header or trailer is consumed for framing but never emitted
+        // and never rejected, so record it in the lineage for a complete trace and return.
+        if (parseResult.IsSkipped)
+        {
+            await _lineage.EmitAsync(run.Provenance, locator, LineageState.Skipped, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
         await _lineage.EmitAsync(run.Provenance, locator, LineageState.Consumed, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 

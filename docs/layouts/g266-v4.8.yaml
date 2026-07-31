@@ -23,6 +23,7 @@ recordTypes:
 
   fhr:                       # File Header Record
     match: "HEAD"            # observed in sample
+    skip: true               # control record: consumed for framing, never emitted upstream
     fields:
       - { name: W136-ECT-HDR-IDN-CDE, start: 1,  length: 4 }
       - { name: W136-ECT-HDR-DTE,     start: 5,  length: 10 }
@@ -172,6 +173,7 @@ recordTypes:
 
   ftr:                       # File Trailer Record
     match: "TRAI"            # confirmed
+    skip: true               # control record: consumed for framing, never emitted upstream
     fields:
       - { name: W136-ECT-TLR-IDN-CDE, start: 1,  length: 4 }  # "TRAI"
       - { name: FILLER-1,             start: 5,  length: 5 }

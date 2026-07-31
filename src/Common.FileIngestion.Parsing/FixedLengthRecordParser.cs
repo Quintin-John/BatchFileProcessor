@@ -8,7 +8,9 @@ namespace Common.FileIngestion.Parsing;
 /// <summary>
 /// Slices a fixed-width record into named raw fields against a layout: it checks the record length,
 /// resolves the record type from the discriminator, and emits each field's raw text verbatim (spaces
-/// preserved), except fields the layout marks <c>skip</c> — tiled for coverage but omitted from output.
+/// preserved), except fields the layout marks <c>skip</c> — tiled for coverage but omitted from output. A
+/// record type the layout marks <c>skip</c> (a header/trailer control record) is recognised and consumed for
+/// framing but produces no output — neither emitted nor rejected.
 /// It interprets no value — types and meaning are downstream's concern. A record is rejected
 /// only structurally (wrong length, unknown record type) or when a field the layout marks
 /// <c>required</c> is blank. Everything it knows about the format comes from the layout.
@@ -59,6 +61,12 @@ public sealed class FixedLengthRecordParser : IRecordParser
             var recordType = string.IsNullOrWhiteSpace(discriminator) ? UnknownRecordType : discriminator;
             var reason = new RejectReason(RecordField, RecordTypeRule, UnknownRecordTypeCode, actual: discriminator);
             return RecordParseResult.Rejected(recordType, record.ToString(), [reason]);
+        }
+
+        // A skipped record (header/trailer) is consumed for framing but never sliced or emitted.
+        if (recordDefinition.Skip)
+        {
+            return RecordParseResult.Skipped(recordDefinition.Match);
         }
 
         var fields = new Dictionary<string, FieldValue>(recordDefinition.Fields.Count, StringComparer.Ordinal);

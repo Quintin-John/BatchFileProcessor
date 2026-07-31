@@ -95,6 +95,23 @@ public sealed class FixedLengthRecordParserTests
     }
 
     [Fact]
+    public void Parse_SkipRecordType_ReturnsSkipped_NotSuccessOrReject()
+    {
+        var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
+        {
+            new RecordDefinition("dt", "DT", new[] { new FieldDefinition("rectype", 1, 2), new FieldDefinition("body", 3, 8) }),
+            new RecordDefinition("hd", "HD", Array.Empty<FieldDefinition>(), skip: true),
+        });
+
+        var result = new FixedLengthRecordParser(layout).Parse(1, 0, "HD12345678".AsSpan());
+
+        Assert.True(result.IsSkipped);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Record);
+        Assert.Equal("HD", result.RecordType);
+    }
+
+    [Fact]
     public void Parse_WrongLength_Rejects()
     {
         var result = Parser().Parse(1, 0, "HD1".AsSpan());
