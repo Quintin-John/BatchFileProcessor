@@ -91,7 +91,7 @@ profiles:
 ### DRY boundary (correctly drawn — varies vs shared)
 
 - **Varies (Strategy):** how a record's raw field slices are *extracted* — by fixed offset (`FixedLengthRecordParser`) vs by delimiter index (`DelimitedRecordParser`).
-- **Shared (single-sourced):** converting a raw slice → typed value (`decimal` scale/sign, `date` format, `trim`) is **one** `FieldValueConverter`, used by both parsers. Extraction differs; coercion does not — that is the DRY line. Not "one giant parser", not two duplicated coercion blocks.
+- **Not done at all:** the pump does **not** convert or validate values. Every field is emitted as its **raw text** with its name — no typed-value coercion (no `decimal`/`date`/`scale`/`sign`); interpreting a value is a downstream concern. The only per-field policy is **data in the layout** (`encrypt`, `required`), applied uniformly by the generic slicer, so there is nothing to duplicate across parsers.
 
 ### Explicitly rejected (premature — would add debt)
 
@@ -226,26 +226,25 @@ The mapper is generic; all record structure is data, loaded and validated at sta
 # layout.yaml  (mounted, not baked into the image)
 encoding: ascii                    # single-byte; offsets are byte offsets
 recordLength: 1200
-discriminator: { offset: 0, length: 4 }
+discriminator: { start: 1, length: 4 }
 recordTypes:
-  TRAN:
+  per:
+    match: "TRAN"
     fields:
-      - { name: recordType, offset: 0,  length: 4,  type: string }
-      - { name: token,      offset: 11, length: 26, type: string, trim: true }
-      - { name: amount,     offset: 84, length: 17, type: decimal, scale: 2, sign: <TBD> }
-      - { name: postDate,   offset: 62, length: 10, type: date, format: yyyy-MM-dd }
-      # ... transcribed from ACI Issuer 4.8 spec — offsets above are ILLUSTRATIVE, not real
-  HEAD: { fields: [ ... ] }
-  TRAI: { fields: [ ... ] }
+      - { name: W136-ECT-PTG-RCD-IDN-CDE, start: 1,   length: 4 }
+      - { name: W136-ECT-PTG-EXT-ACT-NBR, start: 72,  length: 34, encrypt: true, required: true }
+      - { name: W136-ECT-PTG-PAN-TXT,     start: 323, length: 28, encrypt: true }
+      # ... every byte of the record is tiled; padding is just a named field, sliced like any other
+  fhr: { match: "HEAD", fields: [ ... ] }
+  ftr: { match: "TRAI", fields: [ ... ] }
 ```
 
 **Startup validation (fail-closed, no partial run):**
-- every field within `[0, recordLength)`;
-- unknown `type` rejected;
-- optional overlap detection;
-- required record types present.
+- fields tile each record type with no gap or overlap, summing to `recordLength`;
+- each record type has a unique discriminator match;
+- at least one record type is defined.
 
-**Supported field types:** `string` (optional `trim`), `decimal` (`scale`, sign convention TBD per spec), `date`/`time` (explicit `format`), `int`. Types are closed; adding one is a deliberate code change with tests.
+**No field types.** Every field is carried as its **raw text** — the pump does not interpret values. A field declares only `name`, `start` (1-based), `length`, and two optional, data-driven flags: `encrypt` (encrypt the value before publish) and `required` (reject the record if the value is blank). Data types, scale, sign, and date/time formats are a downstream concern and are deliberately not modelled here — that is what keeps *swap the YAML = new format, zero code* true.
 
 ---
 
@@ -338,7 +337,7 @@ Every exit path (success, terminal fault, retries-exhausted, cancellation, unexp
 
 Per-record data failures (Q5) are quarantined to a **dedicated durable reject queue** — not dropped, not a local file — so every formatting failure is **actionable, queryable, and dashboard-able**. The run continues.
 
-**What counts as a reject** (distinct from the fail-closed classes): a record that frames but fails field validation/coercion — non-numeric amount, bad date format, bad sign, unknown discriminator, wrong record length, out-of-range value. *(Startup/layout errors are fail-closed; publish/system errors are fail-closed §6.1. Only per-record data errors are rejects.)*
+**What counts as a reject** (distinct from the fail-closed classes): a record the pump cannot map — **wrong record length**, **unknown record type** (the discriminator matches no layout entry), or a field the layout marks **`required`** is blank. The pump does **not** validate values, so there is no "non-numeric"/"bad date" reject. *(Startup/layout errors are fail-closed; publish/system errors are fail-closed §6.1. Only per-record structural/required errors are rejects.)*
 
 **Reject message contract (must support both diagnosis and replay):**
 - **Identity:** `RunId, fileId, fileName, profile, layoutVersion, recordSeq, byteOffset, recordType`, `correlationId`/`traceparent`.
@@ -464,28 +463,22 @@ Banking context: **all data — in transit and at rest — is encrypted with str
 
 **Tests:** TLS-required (plaintext connection refused); encrypt→decrypt **round-trip** (both ways); key-unavailable → fail-closed with **no plaintext emitted**; no-sensitive-data-in-logs assertion.
 
-## 8.3 Field classification (soft-coded — drives encryption, masking, redaction)
+## 8.3 Field protection (soft-coded — the layout's `encrypt` flag)
 
-**Yes — sensitivity is data, not code.** A dedicated, **security-owned** classification YAML declares what each field is and how it must be protected; the format **layout stays format-only**. Two files because they change for **different reasons and different owners** (data format vs compliance policy) — SRP applied to config.
+**Sensitivity is data, not code — and it lives in the layout.** Each field carries an optional `encrypt: true`; the host derives the field-protection policy from those flags at startup. One soft-coded file — the layout — describes *both* how to slice and what to protect, so a PAN or account-number field is classified right next to its position.
 
 ```yaml
-# data-protection.yaml  (owned by security; validated against the layout at startup)
-classifications:
-  pan:             { protect: encrypt, maskInDiagnostics: first6last4, redactInLogs: true }
-  cardholder-name: { protect: encrypt, redactInLogs: true }
-  token:           { protect: encrypt, redactInLogs: true }
-  amount:          { protect: clear }        # diagnostic, non-sensitive
-  post-date:       { protect: clear }
-# Preferred (DRY): tag each layout field `classification: pan`, and this policy maps tag → action,
-# so one rule protects every PAN field across all profiles/formats.
+# in the layout — classification travels with the field
+- { name: W136-ECT-PTG-PAN-TXT,     start: 323, length: 28, encrypt: true }
+- { name: W136-ECT-PTG-EXT-ACT-NBR, start: 72,  length: 34, encrypt: true, required: true }
 ```
 
-**Single-sourced enforcement** — one `IFieldProtector`, driven by this policy, is consulted by **every** sink (mapper→publish, reject sink, lineage/log emitter), so protection can't be applied in one place and forgotten in another:
-- `encrypt` → AES-256-GCM field-level (§8.2)
-- `maskInDiagnostics` → e.g. PAN → first6/last4 on the reject queue & dashboards (§6.2)
-- `redactInLogs` → never emitted in clear to logs / lineage / metrics
+**Single-sourced enforcement** — one `IFieldProtector`, driven by the layout-derived policy, is the only thing that encrypts, so protection can't be applied in one place and forgotten in another:
+- `encrypt: true` → AES-256-GCM field-level (§8.2); the encrypted value is **self-describing on the wire** (an envelope object carrying `keyId`/`keyVersion`/`algorithm`), so a consumer knows which fields are encrypted and how to decrypt — no out-of-band schema;
+- flagged fields are also **redacted from logs/lineage** (never emitted in clear);
+- the **reject path** encrypts the whole raw record (`ProtectRaw`) — a record that failed to map has no field structure to classify, so it is protected unconditionally.
 
-**Fail-closed classification (bank-grade):** startup **validates the policy against the layout** — **every layout field must be classified**; an **unclassified field fails startup** (a newly-added field can never silently leak as plaintext). A classified field absent from the layout also fails. **No default-allow.**
+**Classified by construction, decoupled by design:** every layout field is Encrypt or Clear (flag present or absent), so the fail-closed policy lookup never faults on a field the layout defines. The crypto and the layout stay independent — bridged only at the composition root (`LayoutProtectionPolicy`). *(Masking — e.g. PAN→first6/last4 for diagnostics — is not layout-driven today; it would be a further per-field flag if needed.)*
 
 ---
 
@@ -516,8 +509,7 @@ classifications:
 | `IFileSource` (`FolderFileSource`; later `AzureBlobFileSource`) | yield a claimed, complete, readable stream + `complete`/`fail` lifecycle | Adapter |
 | `StreamReaderCore` | `PipeReader` over the source stream; streaming SHA-256; byte-offset/seq assignment | generic |
 | `Layout` | schema model + YAML loader + startup validator (per profile) | — |
-| `IRecordParser` (`FixedLengthRecordParser`; later `DelimitedRecordParser`) | frame + extract raw field slices per layout | Strategy |
-| `FieldValueConverter` | raw slice → typed value (`decimal`/`date`/`trim`); accept/reject outcome | shared DRY core |
+| `IRecordParser` (`FixedLengthRecordParser`; later `DelimitedRecordParser`) | frame + slice each field to its **raw** value per layout; reject only structurally (wrong length / unknown type) or on a blank `required` field | Strategy |
 | `RejectSink` | build the reject message (raw record + all-field `reasons[]` + identity), publish to the durable reject queue with confirmed/fail-closed delivery, emit reject metrics; run continues (§6.2) | — |
 | `MessageContract` | batch envelope DTO | — |
 | `IMessagePublisher` (`MassTransitPublisher` → RabbitMQ · ASB) | batched confirmed publish (ACK/NACK) to the profile's destination | Strategy / Adapter (MassTransit) |
@@ -539,9 +531,9 @@ classifications:
 
 | Component | What is proven |
 |---|---|
-| `IRecordParser` (fixed-length) | golden record → exact fields; frame boundaries; wrong-length detection |
-| `FieldValueConverter` | decimal scale/sign, date formats, trim; each bad input → correct `reason` (all-field collection) |
-| `Layout` validator | overlap / out-of-range / unknown-type / missing type → **startup fail** |
+| `IRecordParser` (fixed-length) | golden record → exact **raw** fields (spaces preserved); wrong length, unknown discriminator, and blank `required` field each → reject |
+| `LayoutProtectionPolicy` | `encrypt: true` → Encrypt + redact; unflagged → Clear; every field classified |
+| `Layout` validator | gap / overlap / under- or over-coverage → **startup fail**; duplicate discriminator → **startup fail** |
 | `IProfileResolver` | folder + glob ordered rules; first-match; no-match handling (Q10) |
 | Batching + window `W` | correct batch envelope, `first/lastRecordSeq`, bounded in-flight |
 | `IMessagePublisher` (MassTransit) | ack → continue; **nack/exhausted → abort, non-zero exit, nothing marked done** |
@@ -565,7 +557,7 @@ Built against a **synthetic fixture layout** until the real G266 tables (V4.8/V4
 
 | # | Question | Impact | Default if unanswered |
 |---|---|---|---|
-| **Q1** | **PARTIAL — V4.8 received; V4.11 still pending.** V4.8 layout transcribed to [`docs/layouts/g266-v4.8.yaml`](layouts/g266-v4.8.yaml) from the ACI mapping workbook (sheet `G266_4.8.2`). Record types are **FHR / PER / AER / FTR** (each 1200 bytes); the 4-char discriminator at start 1 maps to the type — **confirmed: HEAD→FHR, TRAN→PER, AUTH→AER, TRAI→FTR**. Positional integrity verified (all 144 fields chain; each record sums to 1200). **Still open:** (a) V4.11 layout, (b) confirm data **types/decimal scale/sign** and date/time formats against the ACI data-element spec (the layout images show positions only — types in the YAML are inferred), (c) active-version selection (config vs detected). | Positions/lengths authoritative; **types/scale/sign provisional** — wrong scale = silent money bug. | V4.8 positional layout done; treat types as provisional until confirmed; V4.11 to follow. |
+| **Q1** | **PARTIAL — V4.8 received; V4.11 still pending.** V4.8 layout transcribed to [`docs/layouts/g266-v4.8.yaml`](layouts/g266-v4.8.yaml) from the ACI mapping workbook (sheet `G266_4.8.2`). Record types are **FHR / PER / AER / FTR** (each 1200 bytes); the 4-char discriminator at start 1 maps to the type — **confirmed: HEAD→FHR, TRAN→PER, AUTH→AER, TRAI→FTR**. Positional integrity verified (all 144 fields chain; each record sums to 1200) **and validated against the real sample — 20,298 records slice cleanly**. **Field data types/scale/sign are no longer this component's concern** — the pump ships raw bytes, so there is nothing to type here. **Still open:** (a) V4.11 layout, (b) active-version selection (config vs detected). | Positions/lengths authoritative. No money math here → **no silent-scale risk**; value interpretation is downstream. | V4.8 layout in use; the raw-slicer design retired the "provisional types" risk; V4.11 to follow. |
 | ~~Q2~~ | **RESOLVED** — Trigger model = **Mode B folder-watch worker** over a configured path (Windows/macOS local + Azure Files SMB); Azure Blob = future `IFileSource` (Mode C). See §3.2.1–3.2.3. | — | — |
 | ~~Q2b~~ | **RESOLVED** — **Signal-driven completion is first-class**: prefer producer **atomic-rename** / **`.done` sentinel**; **stable-size + lock-probe is fallback only**. Every discovery/claim/complete/fail transition is **logged** (feeds lineage/Datadog). Signals + logs both required. | — | — |
 | ~~Q3~~ | **RESOLVED (approach)** — batch size `N` + payload-byte cap are **per-profile config**, resolved per transport, with the ASB 256 KB ceiling enforced. Concrete default values are finalized when the ingestion component is built (they don't affect the contract or shared libraries). | — | — |
