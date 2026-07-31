@@ -30,7 +30,7 @@ var services = builder.Services;
 var ingestion = builder.Configuration.GetSection("Ingestion");
 var messaging = builder.Configuration.GetSection("Messaging");
 
-var layout = LayoutLoader.LoadFromFile(Required(ingestion, "LayoutPath"));
+var layout = LayoutLoader.LoadFromFile(RequiredConfig.Text(ingestion, "LayoutPath"));
 var policy = LayoutProtectionPolicy.From(layout); // classification comes from the layout's encrypt flags
 var encoding = Encoding.GetEncoding(layout.Encoding);
 
@@ -47,7 +47,7 @@ services.AddSingleton<IngestionMetrics>();
 services.AddSingleton<IngestionTracing>();
 
 // Per-record lineage (§8): bounded channel emitter, drained off the hot path to a structured-log sink.
-services.AddSingleton(new ChannelLineageEmitter(ingestion.GetValue<int>("LineageChannelCapacity")));
+services.AddSingleton(new ChannelLineageEmitter(RequiredConfig.Integer(ingestion, "LineageChannelCapacity")));
 services.AddSingleton<ILineageEmitter>(sp => sp.GetRequiredService<ChannelLineageEmitter>());
 services.AddSingleton<RecordLineage>();
 services.AddSingleton<ILineageSink, StructuredLogLineageSink>();
@@ -55,21 +55,21 @@ services.AddHostedService<LineageDrainService>();
 
 services.AddSingleton<Heartbeat>();
 services.AddSingleton(new IngestionOptions(
-    ingestion.GetValue<int>("MaxRecordsPerBatch"), ingestion.GetValue<int>("MaxContentBytesPerBatch"),
-    ingestion.GetValue<int>("BatchChannelCapacity"), ingestion.GetValue<int>("PublisherConcurrency"),
-    ingestion.GetValue<int>("PublisherConfirmWindow")));
+    RequiredConfig.Integer(ingestion, "MaxRecordsPerBatch"), RequiredConfig.Integer(ingestion, "MaxContentBytesPerBatch"),
+    RequiredConfig.Integer(ingestion, "BatchChannelCapacity"), RequiredConfig.Integer(ingestion, "PublisherConcurrency"),
+    RequiredConfig.Integer(ingestion, "PublisherConfirmWindow")));
 services.AddSingleton<RecordProtector>();
 services.AddSingleton<RejectSink>();
-services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(Required(ingestion, "CheckpointDirectory")));
+services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(RequiredConfig.Text(ingestion, "CheckpointDirectory")));
 services.AddSingleton<FileIngestionPipeline>();
 services.AddSingleton<IFileSource>(sp => new FolderFileSource(
-    Required(ingestion, "RootDirectory"), sp.GetRequiredService<ILogger<FolderFileSource>>()));
+    RequiredConfig.Text(ingestion, "RootDirectory"), sp.GetRequiredService<ILogger<FolderFileSource>>()));
 services.AddSingleton(new WorkerOptions(
-    Required(ingestion, "ProfileId"), layout.Version, TimeSpan.FromSeconds(ingestion.GetValue<int>("PollIntervalSeconds"))));
+    RequiredConfig.Text(ingestion, "ProfileId"), layout.Version, TimeSpan.FromSeconds(RequiredConfig.Integer(ingestion, "PollIntervalSeconds"))));
 
 // Health: liveness from heartbeat staleness, readiness from the publish-outcome gate.
 services.AddSingleton(sp => new LivenessProbe(
-    sp.GetRequiredService<Heartbeat>(), TimeSpan.FromSeconds(ingestion.GetValue<int>("LivenessStalenessSeconds"))));
+    sp.GetRequiredService<Heartbeat>(), TimeSpan.FromSeconds(RequiredConfig.Integer(ingestion, "LivenessStalenessSeconds"))));
 services.AddSingleton<ReadinessGate>();
 string[] liveTags = ["live"];
 string[] readyTags = ["ready"];
@@ -83,8 +83,8 @@ messaging.GetSection("Resilience").Bind(resilience); // retry/circuit-breaker po
 services.AddMessaging(
     new MessagingTransportOptions
     {
-        Transport = messaging.GetValue<MessagingTransport>("Transport"),
-        ConnectionString = Required(messaging, "ConnectionString"),
+        Transport = RequiredConfig.Enum<MessagingTransport>(messaging, "Transport"),
+        ConnectionString = RequiredConfig.Text(messaging, "ConnectionString"),
         EndpointPrefix = messaging["EndpointPrefix"],
     },
     resilience);
@@ -96,6 +96,3 @@ var app = builder.Build();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 await app.RunAsync().ConfigureAwait(false);
-
-static string Required(IConfigurationSection section, string key) =>
-    section[key] ?? throw new InvalidOperationException($"Missing required configuration '{section.Key}:{key}'.");
