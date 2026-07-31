@@ -1,0 +1,186 @@
+using YamlDotNet.Core;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
+
+namespace Ingestion.Worker.Profiles;
+
+/// <summary>
+/// Loads the operational routing profiles from soft-coded YAML (folders → layout/format/completion/
+/// destinations). Generic and fail-closed: malformed YAML, an unknown format/completion token, or any
+/// invariant violation is rejected. Parsing/mapping of records is not here — that stays in each profile's
+/// layout YAML; this only routes.
+/// </summary>
+internal static class ProfileLoader
+{
+    // Recognised YAML tokens and the model values they map to. Only tokens with a built implementation
+    // are listed, so an unknown token fails closed instead of silently defaulting.
+    private static readonly Dictionary<string, RecordFormat> FormatTokens =
+        new(StringComparer.OrdinalIgnoreCase) { ["fixed-length"] = RecordFormat.FixedLength };
+
+    private static readonly Dictionary<string, CompletionMode> CompletionTokens =
+        new(StringComparer.OrdinalIgnoreCase) { ["stable-size"] = CompletionMode.StableSize };
+
+    /// <summary>Loads and validates the profile set from a YAML string.</summary>
+    /// <param name="yaml">The profiles YAML; required, non-blank.</param>
+    /// <exception cref="ArgumentException"><paramref name="yaml"/> is null, empty, or whitespace.</exception>
+    /// <exception cref="FormatException">The YAML is malformed or violates a profile invariant.</exception>
+    public static ProfileSet Load(string yaml)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(yaml);
+
+        var deserializer = new DeserializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .IgnoreUnmatchedProperties()
+            .Build();
+
+        RootDto? dto;
+        try
+        {
+            dto = deserializer.Deserialize<RootDto>(yaml);
+        }
+        catch (YamlException ex)
+        {
+            throw new FormatException("Invalid profiles YAML.", ex);
+        }
+
+        if (dto?.Profiles is null || dto.Profiles.Count == 0)
+        {
+            throw new FormatException("At least one profile must be defined.");
+        }
+
+        var profiles = new List<Profile>(dto.Profiles.Count);
+        foreach (var profile in dto.Profiles)
+        {
+            profiles.Add(MapProfile(profile));
+        }
+
+        try
+        {
+            return new ProfileSet(profiles);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new FormatException($"Invalid profiles: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>Loads and validates the profile set from a YAML file.</summary>
+    /// <param name="path">Path to the profiles YAML file; required, non-blank.</param>
+    /// <exception cref="ArgumentException"><paramref name="path"/> is null, empty, or whitespace.</exception>
+    public static ProfileSet LoadFromFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return Load(File.ReadAllText(path));
+    }
+
+    private static Profile MapProfile(ProfileDto? dto)
+    {
+        if (dto is null)
+        {
+            throw new FormatException("A profile entry is empty.");
+        }
+
+        var name = dto.Name ?? string.Empty;
+
+        if (dto.Format is null || !FormatTokens.TryGetValue(dto.Format, out var format))
+        {
+            throw new FormatException($"Profile '{name}': unknown format '{dto.Format}'.");
+        }
+
+        var completion = MapCompletion(name, dto.Completion);
+
+        if (dto.Batch is null)
+        {
+            throw new FormatException($"Profile '{name}': batch limits are required.");
+        }
+
+        try
+        {
+            var folders = new ProfileFolders(
+                dto.Incoming ?? string.Empty,
+                dto.Processing ?? string.Empty,
+                dto.Done ?? string.Empty,
+                dto.Failed ?? string.Empty);
+
+            var routing = new RoutingTargets(dto.Destination ?? string.Empty, dto.RejectDestination ?? string.Empty);
+            var batch = new BatchLimits(dto.Batch.MaxRecords, dto.Batch.MaxContentBytes);
+
+            return new Profile(name, folders, dto.Layout ?? string.Empty, format, completion, routing, batch);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new FormatException($"Profile '{name}': {ex.Message}", ex);
+        }
+    }
+
+    private static CompletionSettings MapCompletion(string profileName, CompletionDto? dto)
+    {
+        if (dto is null)
+        {
+            throw new FormatException($"Profile '{profileName}': completion settings are required.");
+        }
+
+        if (dto.Mode is null || !CompletionTokens.TryGetValue(dto.Mode, out var mode))
+        {
+            throw new FormatException($"Profile '{profileName}': unknown completion mode '{dto.Mode}'.");
+        }
+
+        try
+        {
+            return new CompletionSettings(
+                mode, TimeSpan.FromSeconds(dto.QuietSeconds), TimeSpan.FromSeconds(dto.PollSeconds));
+        }
+        catch (ArgumentException ex)
+        {
+            throw new FormatException($"Profile '{profileName}': {ex.Message}", ex);
+        }
+    }
+
+#pragma warning disable S1144, S3459, CA1812 // DTOs are populated by YamlDotNet via reflection.
+    private sealed class RootDto
+    {
+        public List<ProfileDto>? Profiles { get; set; }
+    }
+
+    private sealed class ProfileDto
+    {
+        public string? Name { get; set; }
+
+        public string? Incoming { get; set; }
+
+        public string? Processing { get; set; }
+
+        public string? Done { get; set; }
+
+        public string? Failed { get; set; }
+
+        public string? Layout { get; set; }
+
+        public string? Format { get; set; }
+
+        public CompletionDto? Completion { get; set; }
+
+        public string? Destination { get; set; }
+
+        public string? RejectDestination { get; set; }
+
+        public BatchDto? Batch { get; set; }
+    }
+
+    private sealed class CompletionDto
+    {
+        public string? Mode { get; set; }
+
+        public int QuietSeconds { get; set; }
+
+        public int PollSeconds { get; set; }
+    }
+
+    private sealed class BatchDto
+    {
+        public int MaxRecords { get; set; }
+
+        public int MaxContentBytes { get; set; }
+    }
+#pragma warning restore S1144, S3459, CA1812
+}
