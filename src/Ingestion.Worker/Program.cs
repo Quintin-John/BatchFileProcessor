@@ -30,7 +30,7 @@ var ingestion = builder.Configuration.GetSection("Ingestion");
 var messaging = builder.Configuration.GetSection("Messaging");
 
 var layout = LayoutLoader.LoadFromFile(Required(ingestion, "LayoutPath"));
-var policy = DataProtectionPolicyLoader.LoadFromFile(Required(ingestion, "DataProtectionPolicyPath"));
+var policy = LayoutProtectionPolicy.From(layout); // classification comes from the layout's encrypt flags
 var encoding = Encoding.GetEncoding(layout.Encoding);
 
 // Field-level data protection. InMemory key provider is dev/POC only — production wires a Key Vault provider.
