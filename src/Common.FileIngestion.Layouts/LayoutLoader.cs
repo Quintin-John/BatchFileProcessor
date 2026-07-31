@@ -11,17 +11,6 @@ namespace Common.FileIngestion.Layouts;
 /// </summary>
 public static class LayoutLoader
 {
-    // Layout type vocabulary (as written in the YAML) mapped to the model's field types.
-    private static readonly Dictionary<string, FieldType> FieldTypeTokens =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["string"] = FieldType.Text,
-            ["decimal"] = FieldType.Number,
-            ["date"] = FieldType.Date,
-            ["time"] = FieldType.Time,
-            ["filler"] = FieldType.Filler,
-        };
-
     /// <summary>Loads and validates a layout from a YAML string.</summary>
     /// <param name="yaml">The layout YAML; required, non-blank.</param>
     /// <exception cref="ArgumentException"><paramref name="yaml"/> is null, empty, or whitespace.</exception>
@@ -115,14 +104,9 @@ public static class LayoutLoader
                 throw new FormatException($"Record type '{name}' has a field without a name.");
             }
 
-            if (field.Type is null || !FieldTypeTokens.TryGetValue(field.Type, out var type))
-            {
-                throw new FormatException($"Record type '{name}', field '{field.Name}': unknown type '{field.Type}'.");
-            }
-
             try
             {
-                fields.Add(new FieldDefinition(field.Name, field.Start, field.Length, type, field.Scale, field.Format));
+                fields.Add(new FieldDefinition(field.Name, field.Start, field.Length, field.Encrypt, field.Required));
             }
             catch (ArgumentException ex)
             {
@@ -176,11 +160,9 @@ public static class LayoutLoader
 
         public int Length { get; set; }
 
-        public string? Type { get; set; }
+        public bool Encrypt { get; set; }
 
-        public int Scale { get; set; }
-
-        public string? Format { get; set; }
+        public bool Required { get; set; }
     }
 #pragma warning restore S1144, S3459, CA1812
 }

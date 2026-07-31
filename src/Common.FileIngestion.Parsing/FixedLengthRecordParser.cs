@@ -1,14 +1,16 @@
-using Common.FileIngestion.Abstractions;
 using System.Globalization;
+using Common.FileIngestion.Abstractions;
 using Common.FileIngestion.Layouts;
 using Common.Messaging.Contracts;
 
 namespace Common.FileIngestion.Parsing;
 
 /// <summary>
-/// Parses fixed-width records against a layout: reads the discriminator, resolves the record type,
-/// and extracts each field (skipping fillers) via <see cref="FieldValueConverter"/>. Any field
-/// failure quarantines the whole record with its reasons.
+/// Slices a fixed-width record into named raw fields against a layout: it checks the record length,
+/// resolves the record type from the discriminator, and emits each field's raw text verbatim (spaces
+/// preserved). It interprets no value — types and meaning are downstream's concern. A record is rejected
+/// only structurally (wrong length, unknown record type) or when a field the layout marks
+/// <c>required</c> is blank. Everything it knows about the format comes from the layout.
 /// </summary>
 public sealed class FixedLengthRecordParser : IRecordParser
 {
@@ -17,12 +19,14 @@ public sealed class FixedLengthRecordParser : IRecordParser
     private const string WrongLengthCode = "WRONG_LENGTH";
     private const string RecordTypeRule = "record-type";
     private const string UnknownRecordTypeCode = "UNKNOWN_RECORD_TYPE";
+    private const string RequiredRule = "required";
+    private const string RequiredMissingCode = "REQUIRED_MISSING";
     private const string UnknownRecordType = "?";
 
     private readonly Layout _layout;
 
     /// <summary>Creates a parser for the given layout.</summary>
-    /// <param name="layout">The layout to parse against; required.</param>
+    /// <param name="layout">The layout to slice against; required.</param>
     /// <exception cref="ArgumentNullException"><paramref name="layout"/> is null.</exception>
     public FixedLengthRecordParser(Layout layout)
     {
@@ -42,39 +46,35 @@ public sealed class FixedLengthRecordParser : IRecordParser
                 RecordField, RecordLengthRule, WrongLengthCode,
                 expected: _layout.RecordLength.ToString(CultureInfo.InvariantCulture),
                 actual: record.Length.ToString(CultureInfo.InvariantCulture));
-            return RecordParseResult.Rejected(UnknownRecordType, record.ToString(), new[] { reason });
+            return RecordParseResult.Rejected(UnknownRecordType, record.ToString(), [reason]);
         }
 
-        var discriminator = record.Slice(_layout.DiscriminatorStart - 1, _layout.DiscriminatorLength).ToString();
+        var discriminator = record.Slice(_layout.DiscriminatorOffset, _layout.DiscriminatorLength).ToString();
         var recordDefinition = _layout.ResolveByDiscriminator(discriminator);
         if (recordDefinition is null)
         {
-            // A blank discriminator has no usable type label; fall back to the unknown-type placeholder
-            // so the reject still carries a non-blank record type (RecordLocator requires one).
+            // A blank discriminator has no usable type label; fall back to a non-blank placeholder so the
+            // reject still carries a record type (RecordLocator requires one).
             var recordType = string.IsNullOrWhiteSpace(discriminator) ? UnknownRecordType : discriminator;
             var reason = new RejectReason(RecordField, RecordTypeRule, UnknownRecordTypeCode, actual: discriminator);
-            return RecordParseResult.Rejected(recordType, record.ToString(), new[] { reason });
+            return RecordParseResult.Rejected(recordType, record.ToString(), [reason]);
         }
 
         var fields = new Dictionary<string, FieldValue>(recordDefinition.Fields.Count, StringComparer.Ordinal);
         List<RejectReason>? reasons = null;
-
         foreach (var field in recordDefinition.Fields)
         {
-            if (field.Type == FieldType.Filler)
+            // Slice the field's raw text verbatim — spaces included. The pump does not interpret the value.
+            var raw = record.Slice(field.Offset, field.Length).ToString();
+
+            if (field.Required && string.IsNullOrWhiteSpace(raw))
             {
+                (reasons ??= []).Add(new RejectReason(
+                    field.Name, RequiredRule, RequiredMissingCode, actual: raw, offset: field.Offset, length: field.Length));
                 continue;
             }
 
-            var conversion = FieldValueConverter.Convert(field, record.Slice(field.Offset, field.Length).ToString());
-            if (conversion.IsSuccess)
-            {
-                fields[field.Name] = conversion.Value!;
-            }
-            else
-            {
-                (reasons ??= []).Add(conversion.Reason!);
-            }
+            fields[field.Name] = new ClearFieldValue(raw);
         }
 
         if (reasons is not null)

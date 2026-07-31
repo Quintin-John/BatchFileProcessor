@@ -13,12 +13,12 @@ public sealed class LayoutLoaderTests
           head:
             match: "HD"
             fields:
-              - { name: rectype, start: 1, length: 2, type: string }
-              - { name: amount, start: 3, length: 8, type: decimal }
+              - { name: rectype, start: 1, length: 2 }
+              - { name: acct, start: 3, length: 8, encrypt: true, required: true }
         """;
 
     [Fact]
-    public void Load_ValidLayout_ProducesModel()
+    public void Load_ValidLayout_ProducesModel_WithFlags()
     {
         var layout = LayoutLoader.Load(ValidYaml);
 
@@ -30,8 +30,30 @@ public sealed class LayoutLoaderTests
         var head = layout.ResolveByDiscriminator("HD")!;
         Assert.Equal("head", head.Name);
         Assert.Equal(2, head.Fields.Count);
-        Assert.Equal(FieldType.Text, head.Fields[0].Type);
-        Assert.Equal(FieldType.Number, head.Fields[1].Type);
+        Assert.False(head.Fields[0].Encrypt);   // absent flags default to false
+        Assert.False(head.Fields[0].Required);
+        Assert.True(head.Fields[1].Encrypt);     // encrypt/required read from the layout
+        Assert.True(head.Fields[1].Required);
+    }
+
+    [Fact]
+    public void Load_IgnoresUnknownFieldKeys()
+    {
+        // 'type' (and any other unmodelled key) is not the pump's concern — it must be ignored, not fail.
+        const string yaml = """
+            version: "1"
+            recordLength: 4
+            encoding: ascii
+            discriminator: { start: 1, length: 2 }
+            recordTypes:
+              r:
+                match: "M"
+                fields: [ { name: f, start: 1, length: 4, type: whatever } ]
+            """;
+
+        var layout = LayoutLoader.Load(yaml);
+
+        Assert.Single(layout.ResolveByDiscriminator("M")!.Fields);
     }
 
     [Theory]
@@ -54,22 +76,6 @@ public sealed class LayoutLoaderTests
         Assert.Throws<FormatException>(() => LayoutLoader.Load("discriminator: { start: 1, length: 2 }\nrecordLength: 4"));
 
     [Fact]
-    public void Load_UnknownFieldType_Throws()
-    {
-        const string yaml = """
-            recordLength: 4
-            discriminator: { start: 1, length: 2 }
-            recordTypes:
-              r:
-                match: "M"
-                fields:
-                  - { name: f, start: 1, length: 4, type: banana }
-            """;
-
-        Assert.Throws<FormatException>(() => LayoutLoader.Load(yaml));
-    }
-
-    [Fact]
     public void Load_NonContiguousFields_Throws()
     {
         const string yaml = """
@@ -81,11 +87,11 @@ public sealed class LayoutLoaderTests
               r:
                 match: "M"
                 fields:
-                  - { name: a, start: 1, length: 2, type: string }
-                  - { name: b, start: 3, length: 7, type: filler }
+                  - { name: a, start: 1, length: 2 }
+                  - { name: b, start: 3, length: 7 }
             """;
 
-        Assert.Throws<FormatException>(() => LayoutLoader.Load(yaml)); // covers 1-9 of 10
+        Assert.Throws<FormatException>(() => LayoutLoader.Load(yaml)); // covers 1-9 of 10; fields must tile
     }
 
     [Fact]

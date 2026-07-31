@@ -26,6 +26,9 @@ public sealed class Layout
     /// <summary>Length of the discriminator.</summary>
     public int DiscriminatorLength { get; }
 
+    /// <summary>0-based offset of the discriminator (derived from <see cref="DiscriminatorStart"/>).</summary>
+    public int DiscriminatorOffset => DiscriminatorStart - 1;
+
     /// <summary>The record types. Defensively copied; read-only.</summary>
     public IReadOnlyList<RecordDefinition> RecordTypes { get; }
 
@@ -35,8 +38,8 @@ public sealed class Layout
     /// <param name="encoding">Encoding name; required, non-blank.</param>
     /// <param name="discriminatorStart">1-based discriminator start; must fit within the record.</param>
     /// <param name="discriminatorLength">Discriminator length; must fit within the record.</param>
-    /// <param name="recordTypes">Record types; required, non-empty, unique matches, each field set contiguously covering the record.</param>
-    /// <exception cref="ArgumentException">Any string is blank, record types are empty, matches collide, or a record's fields do not contiguously cover the record.</exception>
+    /// <param name="recordTypes">Record types; required, non-empty, unique matches, each field set tiling the record with no gaps.</param>
+    /// <exception cref="ArgumentException">Any string is blank, record types are empty, matches collide, or a record's fields do not tile the record.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A numeric value is out of range or the discriminator exceeds the record.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="recordTypes"/> is null.</exception>
     public Layout(
@@ -102,6 +105,7 @@ public sealed class Layout
     private static void ValidateContiguousCoverage(RecordDefinition record, int recordLength)
     {
         // Fields must tile the record exactly: start at 1, chain with no gap/overlap, end at recordLength.
+        // This is a completeness guarantee on the layout (every byte is accounted for), not value policing.
         var expected = 1;
         foreach (var field in record.Fields)
         {

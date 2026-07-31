@@ -4,8 +4,7 @@ namespace Common.FileIngestion.Tests.Layouts;
 
 public sealed class LayoutModelTests
 {
-    private static FieldDefinition Field(int start, int length, FieldType type = FieldType.Text) =>
-        new($"f{start}", start, length, type);
+    private static FieldDefinition Field(int start, int length) => new($"f{start}", start, length);
 
     private static RecordDefinition Record(string name, string match, params FieldDefinition[] fields) =>
         new(name, match, fields);
@@ -13,19 +12,30 @@ public sealed class LayoutModelTests
     private static Layout ValidLayout() =>
         new("1.0", 10, "ascii", 1, 2, new[]
         {
-            Record("head", "HD", Field(1, 2), Field(3, 8, FieldType.Number)),
-            Record("detail", "DT", Field(1, 2), Field(3, 8, FieldType.Filler)),
+            Record("head", "HD", Field(1, 2), Field(3, 8)),
+            Record("detail", "DT", Field(1, 2), Field(3, 8)),
         });
 
     // ---- FieldDefinition ----
 
     [Fact]
-    public void FieldDefinition_ComputesOffsetAndEnd()
+    public void FieldDefinition_ComputesOffsetAndEnd_FlagsDefaultToFalse()
     {
-        var field = new FieldDefinition("amount", 141, 17, FieldType.Number);
+        var field = new FieldDefinition("amount", 141, 17);
 
         Assert.Equal(140, field.Offset);
         Assert.Equal(157, field.EndInclusive);
+        Assert.False(field.Encrypt);
+        Assert.False(field.Required);
+    }
+
+    [Fact]
+    public void FieldDefinition_CarriesEncryptAndRequiredFlags()
+    {
+        var field = new FieldDefinition("pan", 1, 16, encrypt: true, required: true);
+
+        Assert.True(field.Encrypt);
+        Assert.True(field.Required);
     }
 
     [Theory]
@@ -35,7 +45,7 @@ public sealed class LayoutModelTests
     [InlineData("f", 1, 0)]
     public void FieldDefinition_InvalidArguments_Throw(string? name, int start, int length)
     {
-        Assert.ThrowsAny<ArgumentException>(() => new FieldDefinition(name!, start, length, FieldType.Text));
+        Assert.ThrowsAny<ArgumentException>(() => new FieldDefinition(name!, start, length));
     }
 
     // ---- RecordDefinition ----
@@ -134,7 +144,7 @@ public sealed class LayoutModelTests
         // Fields 1-2 then 4-10 leaves a gap at position 3.
         Assert.Throws<ArgumentException>(() => new Layout("1.0", 10, "ascii", 1, 2, new[]
         {
-            Record("r", "M", Field(1, 2), new FieldDefinition("f", 4, 7, FieldType.Filler)),
+            Record("r", "M", Field(1, 2), new FieldDefinition("f", 4, 7)),
         }));
     }
 
