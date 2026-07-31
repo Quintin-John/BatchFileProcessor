@@ -40,13 +40,13 @@ public sealed class MessagingOptionsTests
     {
         var options = new MessagingTransportOptions
         {
-            Transport = MessagingTransport.AzureServiceBus,
-            ConnectionString = "sb://x",
+            Transport = MessagingTransport.RabbitMq,
+            ConnectionString = "amqp://x",
             EndpointPrefix = "g266",
         };
 
-        Assert.Equal(MessagingTransport.AzureServiceBus, options.Transport);
-        Assert.Equal("sb://x", options.ConnectionString);
+        Assert.Equal(MessagingTransport.RabbitMq, options.Transport);
+        Assert.Equal("amqp://x", options.ConnectionString);
         Assert.Equal("g266", options.EndpointPrefix);
     }
 

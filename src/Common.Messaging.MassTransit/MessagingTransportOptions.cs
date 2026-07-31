@@ -1,13 +1,12 @@
 namespace Common.Messaging.MassTransit;
 
-/// <summary>Supported message transports.</summary>
+/// <summary>Supported message transports. Every member must be wired in the composition switch —
+/// a value that validates but is not actually registered is a fail-closed gap, so unimplemented
+/// transports are not declared here until they are supported.</summary>
 public enum MessagingTransport
 {
     /// <summary>RabbitMQ (AMQP).</summary>
     RabbitMq,
-
-    /// <summary>Azure Service Bus.</summary>
-    AzureServiceBus,
 }
 
 /// <summary>

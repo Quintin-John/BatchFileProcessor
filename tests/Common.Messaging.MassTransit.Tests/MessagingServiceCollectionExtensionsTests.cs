@@ -26,16 +26,19 @@ public sealed class MessagingServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddMessaging_AzureServiceBus_IsNotYetSupported()
+    public void AddMessaging_EveryDefinedTransport_IsWired_NoValidateCapabilityGap()
     {
-        var options = new MessagingTransportOptions
+        // Validate() must never certify a transport the registration then rejects. This guards that
+        // invariant: a new enum member added without a matching switch case fails here.
+        foreach (var transport in Enum.GetValues<MessagingTransport>())
         {
-            Transport = MessagingTransport.AzureServiceBus,
-            ConnectionString = "Endpoint=sb://example",
-        };
+            var options = new MessagingTransportOptions { Transport = transport, ConnectionString = "rabbitmq://localhost" };
+            options.Validate();
 
-        Assert.Throws<NotSupportedException>(
-            () => new ServiceCollection().AddMessaging(options, Resilience()));
+            var exception = Record.Exception(() => new ServiceCollection().AddMessaging(options, Resilience()));
+
+            Assert.Null(exception);
+        }
     }
 
     [Fact]
