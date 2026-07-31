@@ -37,6 +37,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Layout
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Reading", "src\Common.FileIngestion.Reading\Common.FileIngestion.Reading.csproj", "{07D17971-8343-4DE9-A0DE-B1DB7B0F9560}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Sources.Folder", "src\Common.FileIngestion.Sources.Folder\Common.FileIngestion.Sources.Folder.csproj", "{C998CEFA-004E-4FC1-BAA3-2E9DD4644B02}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -106,6 +108,10 @@ Global
 		{07D17971-8343-4DE9-A0DE-B1DB7B0F9560}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07D17971-8343-4DE9-A0DE-B1DB7B0F9560}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{07D17971-8343-4DE9-A0DE-B1DB7B0F9560}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C998CEFA-004E-4FC1-BAA3-2E9DD4644B02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C998CEFA-004E-4FC1-BAA3-2E9DD4644B02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C998CEFA-004E-4FC1-BAA3-2E9DD4644B02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C998CEFA-004E-4FC1-BAA3-2E9DD4644B02}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
@@ -123,5 +129,6 @@ Global
 		{39C2AB3D-4220-46F9-8BA7-FBD34974AE29} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{93813590-C5E4-40CB-A60A-8A7E25230CFE} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{07D17971-8343-4DE9-A0DE-B1DB7B0F9560} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
+		{C998CEFA-004E-4FC1-BAA3-2E9DD4644B02} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 	EndGlobalSection
 EndGlobal
