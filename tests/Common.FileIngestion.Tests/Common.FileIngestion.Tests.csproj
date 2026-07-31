@@ -12,7 +12,7 @@
     <Threshold>90</Threshold>
     <ThresholdType>line</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
-    <Include>[Common.FileIngestion]*,[Common.FileIngestion.Abstractions]*</Include>
+    <Include>[Common.FileIngestion]*,[Common.FileIngestion.Abstractions]*,[Common.FileIngestion.Layouts]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Common.FileIngestion\Common.FileIngestion.csproj" />
+    <ProjectReference Include="..\..\src\Common.FileIngestion.Layouts\Common.FileIngestion.Layouts.csproj" />
   </ItemGroup>
 
   <!-- Real G266 V4.8 layout, so tests prove the generic loader accepts the actual spec. -->

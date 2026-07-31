@@ -33,6 +33,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ingestion.Worker.Tests", "t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Abstractions", "src\Common.FileIngestion.Abstractions\Common.FileIngestion.Abstractions.csproj", "{39C2AB3D-4220-46F9-8BA7-FBD34974AE29}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Layouts", "src\Common.FileIngestion.Layouts\Common.FileIngestion.Layouts.csproj", "{93813590-C5E4-40CB-A60A-8A7E25230CFE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -94,6 +96,10 @@ Global
 		{39C2AB3D-4220-46F9-8BA7-FBD34974AE29}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{39C2AB3D-4220-46F9-8BA7-FBD34974AE29}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{39C2AB3D-4220-46F9-8BA7-FBD34974AE29}.Release|Any CPU.Build.0 = Release|Any CPU
+		{93813590-C5E4-40CB-A60A-8A7E25230CFE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93813590-C5E4-40CB-A60A-8A7E25230CFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93813590-C5E4-40CB-A60A-8A7E25230CFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93813590-C5E4-40CB-A60A-8A7E25230CFE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
@@ -109,5 +115,6 @@ Global
 		{B72FC060-7D46-48E3-BA14-4CE3D39BF178} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{E670C4D3-E5F8-4BEB-A7A7-01AC119D0CC3} = {93DE55B5-161C-4A97-B921-2A27DAE602B4}
 		{39C2AB3D-4220-46F9-8BA7-FBD34974AE29} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
+		{93813590-C5E4-40CB-A60A-8A7E25230CFE} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 	EndGlobalSection
 EndGlobal

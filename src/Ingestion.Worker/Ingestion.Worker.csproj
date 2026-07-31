@@ -32,6 +32,7 @@
     <ProjectReference Include="..\Common.Observability\Common.Observability.csproj" />
     <ProjectReference Include="..\Common.Security.DataProtection\Common.Security.DataProtection.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Abstractions\Common.FileIngestion.Abstractions.csproj" />
+    <ProjectReference Include="..\Common.FileIngestion.Layouts\Common.FileIngestion.Layouts.csproj" />
   </ItemGroup>
 
 </Project>
