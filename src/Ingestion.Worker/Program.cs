@@ -71,8 +71,8 @@ services.AddSingleton(new WorkerOptions(
 services.AddSingleton(sp => new LivenessProbe(
     sp.GetRequiredService<Heartbeat>(), TimeSpan.FromSeconds(RequiredConfig.Integer(ingestion, "LivenessStalenessSeconds"))));
 services.AddSingleton<ReadinessGate>();
-string[] liveTags = ["live"];
-string[] readyTags = ["ready"];
+string[] liveTags = [HealthTags.Live];
+string[] readyTags = [HealthTags.Ready];
 services.AddHealthChecks()
     .AddCheck<LivenessHealthCheck>("liveness", tags: liveTags)
     .AddCheck<ReadinessHealthCheck>("readiness", tags: readyTags);
@@ -93,6 +93,6 @@ services.AddMediator(cfg => cfg.AddConsumer<IngestFileConsumer>());
 services.AddHostedService<FolderIngestionWorker>();
 
 var app = builder.Build();
-app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
-app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = check => check.Tags.Contains(HealthTags.Live) });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains(HealthTags.Ready) });
 await app.RunAsync().ConfigureAwait(false);
