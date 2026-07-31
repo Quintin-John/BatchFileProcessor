@@ -58,13 +58,14 @@ public sealed class IngestionEndToEndTests : IDisposable
             new FakeParser(),
             new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
             _publisher,
-            new RejectSink(_publisher),
+            new RejectSink(_publisher, "rejects"),
             _checkpoints,
             new IngestionMetrics(instrumentation),
             new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System),
             new IngestionTracing(instrumentation),
             new Heartbeat(TimeProvider.System),
-            new IngestionOptions(2, 100_000, 64, 1, 64));
+            new IngestionOptions(2, 100_000, 64, 1, 64),
+            "batches");
     }
 
     private sealed class FakeParser : IRecordParser
@@ -104,13 +105,13 @@ public sealed class IngestionEndToEndTests : IDisposable
         public List<IngestBatchMessage> Batches { get; } = [];
         public List<RejectMessage> Rejects { get; } = [];
 
-        public Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
+        public Task PublishBatchAsync(IngestBatchMessage batch, string destination, CancellationToken cancellationToken)
         {
             Batches.Add(batch);
             return Task.CompletedTask;
         }
 
-        public Task PublishRejectAsync(RejectMessage reject, CancellationToken cancellationToken)
+        public Task PublishRejectAsync(RejectMessage reject, string destination, CancellationToken cancellationToken)
         {
             Rejects.Add(reject);
             return Task.CompletedTask;

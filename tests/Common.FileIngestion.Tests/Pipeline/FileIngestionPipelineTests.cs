@@ -43,7 +43,7 @@ public sealed class FileIngestionPipelineTests
                 new FakeParser(),
                 new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
                 Publisher,
-                new RejectSink(Publisher),
+                new RejectSink(Publisher, "rejects"),
                 Checkpoints,
                 new IngestionMetrics(instrumentation),
                 new RecordLineage(Lineage, TimeProvider.System),
@@ -51,7 +51,8 @@ public sealed class FileIngestionPipelineTests
                 new Heartbeat(TimeProvider.System),
                 new IngestionOptions(
                     maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity, PublisherConcurrency,
-                    PublisherConfirmWindow));
+                    PublisherConfirmWindow),
+                "batches");
         }
     }
 
@@ -437,7 +438,7 @@ public sealed class FileIngestionPipelineTests
 
         public void ReleaseGate() => _gate.TrySetResult();
 
-        public async Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
+        public async Task PublishBatchAsync(IngestBatchMessage batch, string destination, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _publishCalls);
 
@@ -462,7 +463,7 @@ public sealed class FileIngestionPipelineTests
             }
         }
 
-        public Task PublishRejectAsync(RejectMessage reject, CancellationToken cancellationToken)
+        public Task PublishRejectAsync(RejectMessage reject, string destination, CancellationToken cancellationToken)
         {
             if (FailOnReject)
             {

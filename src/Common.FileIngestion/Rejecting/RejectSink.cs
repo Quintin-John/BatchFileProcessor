@@ -14,14 +14,19 @@ public sealed class RejectSink
     private const string IdSuffix = "reject";
 
     private readonly IMessagePublisher _publisher;
+    private readonly string _destination;
 
     /// <summary>Creates a reject sink.</summary>
     /// <param name="publisher">The confirmed-delivery publisher; required.</param>
+    /// <param name="destination">Reject destination queue/topic name; required, non-blank.</param>
     /// <exception cref="ArgumentNullException"><paramref name="publisher"/> is null.</exception>
-    public RejectSink(IMessagePublisher publisher)
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is blank.</exception>
+    public RejectSink(IMessagePublisher publisher, string destination)
     {
         ArgumentNullException.ThrowIfNull(publisher);
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         _publisher = publisher;
+        _destination = destination;
     }
 
     /// <summary>Builds and publishes the reject message for a quarantined record.</summary>
@@ -45,6 +50,6 @@ public sealed class RejectSink
 
         var messageId = $"{provenance.FileId}{IdSeparator}{locator.RecordSeq}{IdSeparator}{IdSuffix}";
         var message = new RejectMessage(messageId, provenance, locator, rawRecord, reasons);
-        return _publisher.PublishRejectAsync(message, cancellationToken);
+        return _publisher.PublishRejectAsync(message, _destination, cancellationToken);
     }
 }

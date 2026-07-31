@@ -4,45 +4,49 @@ using Common.Messaging.Contracts;
 namespace Common.Messaging.MassTransit;
 
 /// <summary>
-/// Publishes batches through a MassTransit <see cref="IPublishEndpoint"/>. With publisher confirms
-/// enabled on the transport, the publish task completes only when the broker has accepted the
-/// message, so any failure faults the task (fail-closed).
+/// Publishes messages to a named destination via an addressed MassTransit send (<c>queue:{name}</c>), so
+/// each profile routes to its own queue/topic. With publisher confirms enabled on the transport, the send
+/// task completes only when the broker has accepted the message, so any failure faults the task (fail-closed).
 /// </summary>
 public sealed class MassTransitPublisher : IMessagePublisher
 {
     /// <summary>Header carrying the run correlation id for downstream trace continuity.</summary>
     public const string CorrelationIdHeader = "X-Correlation-Id";
 
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IBus _bus;
 
     /// <summary>Creates the publisher.</summary>
-    /// <param name="publishEndpoint">MassTransit publish endpoint (typically the bus).</param>
-    /// <exception cref="ArgumentNullException"><paramref name="publishEndpoint"/> is null.</exception>
-    public MassTransitPublisher(IPublishEndpoint publishEndpoint)
+    /// <param name="bus">The MassTransit bus (resolves send endpoints); required.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="bus"/> is null.</exception>
+    public MassTransitPublisher(IBus bus)
     {
-        ArgumentNullException.ThrowIfNull(publishEndpoint);
-        _publishEndpoint = publishEndpoint;
+        ArgumentNullException.ThrowIfNull(bus);
+        _bus = bus;
     }
 
     /// <inheritdoc />
-    public Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken)
+    public Task PublishBatchAsync(IngestBatchMessage batch, string destination, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(batch);
-
-        return _publishEndpoint.Publish(
-            batch,
-            context => context.Headers.Set(CorrelationIdHeader, batch.Provenance.CorrelationId),
-            cancellationToken);
+        return SendAsync(batch, batch.Provenance.CorrelationId, destination, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task PublishRejectAsync(RejectMessage reject, CancellationToken cancellationToken)
+    public Task PublishRejectAsync(RejectMessage reject, string destination, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(reject);
-
-        return _publishEndpoint.Publish(
-            reject,
-            context => context.Headers.Set(CorrelationIdHeader, reject.Provenance.CorrelationId),
-            cancellationToken);
+        return SendAsync(reject, reject.Provenance.CorrelationId, destination, cancellationToken);
     }
+
+    private async Task SendAsync<T>(T message, string correlationId, string destination, CancellationToken cancellationToken)
+        where T : class
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+
+        var endpoint = await _bus.GetSendEndpoint(DestinationAddress(destination)).ConfigureAwait(false);
+        await endpoint.Send(message, context => context.Headers.Set(CorrelationIdHeader, correlationId), cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static Uri DestinationAddress(string destination) => new("queue:" + destination);
 }

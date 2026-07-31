@@ -8,15 +8,19 @@ namespace Common.Messaging.Contracts;
 /// </summary>
 public interface IMessagePublisher
 {
-    /// <summary>Publishes a batch, completing when the broker confirms acceptance.</summary>
+    /// <summary>Publishes a batch to a named destination, completing when the broker confirms acceptance.</summary>
     /// <param name="batch">The batch to publish; required.</param>
+    /// <param name="destination">Destination queue/topic name; required, non-blank.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <exception cref="ArgumentNullException"><paramref name="batch"/> is null.</exception>
-    Task PublishBatchAsync(IngestBatchMessage batch, CancellationToken cancellationToken);
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is blank.</exception>
+    Task PublishBatchAsync(IngestBatchMessage batch, string destination, CancellationToken cancellationToken);
 
-    /// <summary>Publishes a rejected record, completing when the broker confirms acceptance.</summary>
+    /// <summary>Publishes a rejected record to a named destination, completing when the broker confirms acceptance.</summary>
     /// <param name="reject">The reject message to publish; required.</param>
+    /// <param name="destination">Destination queue/topic name; required, non-blank.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <exception cref="ArgumentNullException"><paramref name="reject"/> is null.</exception>
-    Task PublishRejectAsync(RejectMessage reject, CancellationToken cancellationToken);
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is blank.</exception>
+    Task PublishRejectAsync(RejectMessage reject, string destination, CancellationToken cancellationToken);
 }

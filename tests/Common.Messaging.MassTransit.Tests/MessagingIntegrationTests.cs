@@ -25,7 +25,9 @@ public sealed class MessagingIntegrationTests : IAsyncLifetime
                         MessagingJson.Configure(options);
                         return options;
                     });
-                    bus.ConfigureEndpoints(context);
+
+                    // Explicit endpoint so the addressed Send to queue:batches is received.
+                    bus.ReceiveEndpoint("batches", e => e.ConfigureConsumer<CapturingBatchConsumer>(context));
                 });
             })
             .BuildServiceProvider(true);
@@ -56,7 +58,7 @@ public sealed class MessagingIntegrationTests : IAsyncLifetime
         var batch = SampleBatch();
         var publisher = new MassTransitPublisher(_harness.Bus);
 
-        await publisher.PublishBatchAsync(batch, CancellationToken.None);
+        await publisher.PublishBatchAsync(batch, "batches", CancellationToken.None);
 
         var context = await _collector.Received.WaitAsync(TimeSpan.FromSeconds(10));
         var received = context.Message;

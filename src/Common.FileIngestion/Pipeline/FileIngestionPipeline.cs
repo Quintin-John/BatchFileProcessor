@@ -36,6 +36,7 @@ public sealed class FileIngestionPipeline
     private readonly IngestionTracing _tracing;
     private readonly Heartbeat _heartbeat;
     private readonly IngestionOptions _options;
+    private readonly string _batchDestination;
 
     /// <summary>Creates the pipeline from its collaborators.</summary>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
@@ -54,7 +55,8 @@ public sealed class FileIngestionPipeline
         RecordLineage lineage,
         IngestionTracing tracing,
         Heartbeat heartbeat,
-        IngestionOptions options)
+        IngestionOptions options,
+        string batchDestination)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(parser);
@@ -67,6 +69,7 @@ public sealed class FileIngestionPipeline
         ArgumentNullException.ThrowIfNull(tracing);
         ArgumentNullException.ThrowIfNull(heartbeat);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentException.ThrowIfNullOrWhiteSpace(batchDestination);
 
         _reader = reader;
         _parser = parser;
@@ -79,6 +82,7 @@ public sealed class FileIngestionPipeline
         _tracing = tracing;
         _heartbeat = heartbeat;
         _options = options;
+        _batchDestination = batchDestination;
     }
 
     /// <summary>Ingests one file, resuming from its watermark if a prior run was interrupted.</summary>
@@ -305,7 +309,7 @@ public sealed class FileIngestionPipeline
 
         try
         {
-            await _publisher.PublishBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+            await _publisher.PublishBatchAsync(batch, _batchDestination, cancellationToken).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // record terminal lineage for the batch's records, then rethrow (fail-closed)
         catch (Exception)

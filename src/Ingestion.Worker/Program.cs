@@ -59,9 +59,9 @@ services.AddSingleton(new IngestionOptions(
     RequiredConfig.Integer(ingestion, "BatchChannelCapacity"), RequiredConfig.Integer(ingestion, "PublisherConcurrency"),
     RequiredConfig.Integer(ingestion, "PublisherConfirmWindow")));
 services.AddSingleton<RecordProtector>();
-services.AddSingleton<RejectSink>();
+services.AddSingleton(sp => ActivatorUtilities.CreateInstance<RejectSink>(sp, RequiredConfig.Text(messaging, "RejectDestination")));
 services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(RequiredConfig.Text(ingestion, "CheckpointDirectory")));
-services.AddSingleton<FileIngestionPipeline>();
+services.AddSingleton(sp => ActivatorUtilities.CreateInstance<FileIngestionPipeline>(sp, RequiredConfig.Text(messaging, "Destination")));
 var root = RequiredConfig.Text(ingestion, "RootDirectory");
 var completionGuard = new StableSizeCompletionGuard(
     TimeSpan.FromSeconds(RequiredConfig.Integer(ingestion, "CompletionQuietSeconds")), TimeProvider.System);
