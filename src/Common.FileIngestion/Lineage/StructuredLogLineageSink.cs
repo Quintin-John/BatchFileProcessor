@@ -33,16 +33,36 @@ public sealed partial class StructuredLogLineageSink : ILineageSink
     {
         ArgumentNullException.ThrowIfNull(lineageEvent);
 
-        // Pass a cheap wrapper, not a pre-serialized string: the JSON is produced by the wrapper's
-        // ToString(), which the source-generated LogLineage calls only after its own IsEnabled gate.
-        // So serialization never runs when the sink category is disabled (CA1873), with no manual guard.
-        LogLineage(new LineageLogValue(lineageEvent));
+        // Level by state so real logs carry only what matters: per-record progress is Debug (off by default),
+        // a rejected record is a Warning, a terminal publish failure is an Error. Pass a cheap wrapper, not a
+        // pre-serialized string: the JSON is produced by the wrapper's ToString(), which the source-generated
+        // methods call only after their own IsEnabled gate — so serialization never runs for a disabled level
+        // (CA1873), and the Debug firehose costs nothing when Debug is off.
+        var value = new LineageLogValue(lineageEvent);
+        switch (lineageEvent.State)
+        {
+            case LineageState.Failed:
+                LogLineageFailure(value);
+                break;
+            case LineageState.Rejected:
+                LogLineageRejected(value);
+                break;
+            default:
+                LogLineageProgress(value);
+                break;
+        }
 
         return Task.CompletedTask;
     }
 
-    [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "lineage {Lineage}")]
-    private partial void LogLineage(LineageLogValue lineage);
+    [LoggerMessage(EventId = 100, Level = LogLevel.Debug, Message = "lineage {Lineage}")]
+    private partial void LogLineageProgress(LineageLogValue lineage);
+
+    [LoggerMessage(EventId = 101, Level = LogLevel.Warning, Message = "lineage {Lineage}")]
+    private partial void LogLineageRejected(LineageLogValue lineage);
+
+    [LoggerMessage(EventId = 102, Level = LogLevel.Error, Message = "lineage {Lineage}")]
+    private partial void LogLineageFailure(LineageLogValue lineage);
 
     /// <summary>
     /// Deferred JSON rendering of a lineage event. The serialize runs in <see cref="ToString"/>, which the
