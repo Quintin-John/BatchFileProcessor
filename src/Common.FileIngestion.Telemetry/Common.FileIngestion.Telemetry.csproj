@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common.Messaging.Contracts\Common.Messaging.Contracts.csproj" />
+    <ProjectReference Include="..\Common.Observability\Common.Observability.csproj" />
+  </ItemGroup>
+
+</Project>

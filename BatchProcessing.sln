@@ -43,6 +43,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Checkp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Parsing", "src\Common.FileIngestion.Parsing\Common.FileIngestion.Parsing.csproj", "{09F963DD-208E-4E1E-B6E9-3CC44D58368C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Telemetry", "src\Common.FileIngestion.Telemetry\Common.FileIngestion.Telemetry.csproj", "{9D907A0B-5FDC-4E67-9AFE-C76B84F9FAAE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -124,6 +126,10 @@ Global
 		{09F963DD-208E-4E1E-B6E9-3CC44D58368C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{09F963DD-208E-4E1E-B6E9-3CC44D58368C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{09F963DD-208E-4E1E-B6E9-3CC44D58368C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D907A0B-5FDC-4E67-9AFE-C76B84F9FAAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D907A0B-5FDC-4E67-9AFE-C76B84F9FAAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D907A0B-5FDC-4E67-9AFE-C76B84F9FAAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D907A0B-5FDC-4E67-9AFE-C76B84F9FAAE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6EDF5702-01EE-4D9D-9DAF-26EE4FA25FBD} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
@@ -144,5 +150,6 @@ Global
 		{C998CEFA-004E-4FC1-BAA3-2E9DD4644B02} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{716A6F25-53D1-43F7-8E85-F4DA63B6E7AD} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{09F963DD-208E-4E1E-B6E9-3CC44D58368C} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
+		{9D907A0B-5FDC-4E67-9AFE-C76B84F9FAAE} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 	EndGlobalSection
 EndGlobal
