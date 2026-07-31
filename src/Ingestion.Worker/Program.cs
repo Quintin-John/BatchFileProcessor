@@ -32,7 +32,15 @@ var messaging = builder.Configuration.GetSection("Messaging");
 
 var profiles = ProfileLoader.LoadFromFile(RequiredConfig.Text(ingestion, "ProfilesPath"));
 
+// Load each profile's layout once, up front (fail-fast), and reuse it for pipeline wiring and log redaction.
+var layoutsByProfile = profiles.Profiles.ToDictionary(
+    profile => profile.Name, profile => LayoutLoader.LoadFromFile(profile.LayoutPath), StringComparer.Ordinal);
+
 services.AddSingleton(TimeProvider.System);
+
+// Redact encrypt-flagged field values from every log (layout-driven; no hardcoded field names). Must run
+// after the host's default logging is registered, which WebApplication.CreateBuilder has already done.
+services.AddSensitiveKeyRedaction(SensitiveFieldNames.From(layoutsByProfile.Values));
 
 // Field-level data protection, shared across profiles. Each profile's field protector is built per-layout
 // by the pipeline factory; the crypto primitives below are the shared building blocks. InMemory key
@@ -104,9 +112,9 @@ services.AddHealthChecks()
 // profile's pipeline. Checkpoint keys are namespaced by profile name inside the worker.
 foreach (var profile in profiles.Profiles)
 {
+    var layout = layoutsByProfile[profile.Name];
     services.AddSingleton<IHostedService>(sp =>
     {
-        var layout = LayoutLoader.LoadFromFile(profile.LayoutPath);
         var pipeline = sp.GetRequiredService<ProfilePipelineFactory>().Create(profile, layout);
         var completionGuard = new StableSizeCompletionGuard(profile.Completion.QuietPeriod, sp.GetRequiredService<TimeProvider>());
         var source = new FolderFileSource(
