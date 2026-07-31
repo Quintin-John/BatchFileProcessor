@@ -69,6 +69,18 @@ public sealed class FolderIngestionWorkerTests
     }
 
     [Fact]
+    public async Task Dispatch_NamespacesCheckpointSourceKey_WithProfileId()
+    {
+        var dispatcher = new FakeDispatcher();
+        var worker = Worker(new FakeFileSource(), dispatcher, new ReadinessGate());
+
+        await worker.ProcessAsync([new("ok.dat", "p/ok.dat")], CancellationToken.None);
+
+        // ProfileId ("g266") + "__" + file name, so same-named files under different profiles never collide.
+        Assert.Equal("g266__ok.dat", dispatcher.ObservedSourceKey);
+    }
+
+    [Fact]
     public async Task Dispatch_OpensCorrelationScope_ThatFlowsToDispatcher_WithMatchingCorrelationId()
     {
         var dispatcher = new FakeDispatcher();
@@ -169,6 +181,9 @@ public sealed class FolderIngestionWorkerTests
         /// <summary>The correlation id carried on the dispatched command.</summary>
         public string? ObservedCommandCorrelationId { get; private set; }
 
+        /// <summary>The profile-namespaced checkpoint key carried on the last dispatched command.</summary>
+        public string? ObservedSourceKey { get; private set; }
+
         /// <summary>Optional per-command behaviour; returns/throws to simulate dispatch outcomes.</summary>
         public Func<IngestFile, Task>? Behavior { get; set; }
 
@@ -176,7 +191,8 @@ public sealed class FolderIngestionWorkerTests
         {
             ObservedRun = CorrelationScope.Current;
             ObservedCommandCorrelationId = command.CorrelationId;
-            Received.Add(command.SourceKey);
+            ObservedSourceKey = command.SourceKey;
+            Received.Add(command.FileName); // identity of the file dispatched (SourceKey is profile-namespaced)
             return Behavior?.Invoke(command) ?? Task.CompletedTask;
         }
     }

@@ -1,0 +1,32 @@
+# Operational routing profiles. One isolated worker + pipeline is built per profile and run concurrently,
+# so files in different folders never contend for performance.
+#
+# This file is ROUTING ONLY — it never describes how records are parsed or mapped (that lives in each
+# profile's layout YAML, referenced by `layout`). It carries NO secrets or connection strings: broker and
+# checkpoint connection details are infra and live in appsettings / Helm / Key Vault.
+#
+# Each profile is independent; add another entry to ingest a new folder/format with its own destinations.
+# Names and incoming directories must be unique across profiles.
+profiles:
+  - name: g266
+    # The four working directories a file moves through; all four must be distinct.
+    incoming: /data/g266/incoming
+    processing: /data/g266/processing
+    done: /data/g266/done
+    failed: /data/g266/failed
+    # Parsing/mapping definition for this profile's records.
+    layout: /config/g266-v4.8.yaml
+    # Framing format; selects the record-parser strategy. Only built formats are accepted (fail-closed).
+    format: fixed-length
+    # How a fully-written file is detected before it is claimed (producer is not controlled).
+    completion:
+      mode: stable-size
+      quietSeconds: 5
+      pollSeconds: 5
+    # Where this profile's messages go (queue/topic names; transport-agnostic).
+    destination: g266-batches
+    rejectDestination: g266-rejects
+    # Per-batch limits for this profile.
+    batch:
+      maxRecords: 500
+      maxContentBytes: 200000

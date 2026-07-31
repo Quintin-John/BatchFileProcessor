@@ -14,6 +14,11 @@ namespace Ingestion.Worker;
 /// </summary>
 internal sealed partial class FolderIngestionWorker : BackgroundService
 {
+    // Checkpoint keys are namespaced by profile so two profiles holding a same-named file never collide on
+    // one watermark. The separator must be filename-safe: FileCheckpointStore derives a file name from the
+    // key and rejects invalid path characters (so "/" cannot be used).
+    private const string SourceKeySeparator = "__";
+
     private readonly IFileSource _source;
     private readonly IIngestFileDispatcher _dispatcher;
     private readonly ReadinessGate _readiness;
@@ -87,7 +92,7 @@ internal sealed partial class FolderIngestionWorker : BackgroundService
         try
         {
             var command = new IngestFile(
-                file.Name,
+                $"{_options.ProfileId}{SourceKeySeparator}{file.Name}",
                 file.Name,
                 file.ProcessingPath,
                 run.CorrelationId,
