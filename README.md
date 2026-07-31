@@ -99,10 +99,10 @@ seams when a concrete case arrives.
 
 ```bash
 # Build
-dotnet build BatchProcessing.sln
+dotnet build BatchFileProcessor.sln
 
 # Test (mocked unit tests + 90% line-coverage gate per project)
-dotnet test BatchProcessing.sln
+dotnet test BatchFileProcessor.sln
 
 # Run the worker (expects config + a reachable broker/checkpoint)
 dotnet run --project src/Ingestion.Worker
