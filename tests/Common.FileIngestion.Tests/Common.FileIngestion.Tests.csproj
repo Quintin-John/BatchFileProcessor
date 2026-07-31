@@ -12,7 +12,7 @@
     <Threshold>90</Threshold>
     <ThresholdType>line</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
-    <Include>[Common.FileIngestion]*,[Common.FileIngestion.Abstractions]*,[Common.FileIngestion.Layouts]*,[Common.FileIngestion.Reading]*,[Common.FileIngestion.Sources.Folder]*,[Common.FileIngestion.Checkpointing]*,[Common.FileIngestion.Parsing]*,[Common.FileIngestion.Telemetry]*</Include>
+    <Include>[Common.FileIngestion]*,[Common.FileIngestion.Abstractions]*,[Common.FileIngestion.Layouts]*,[Common.FileIngestion.Reading]*,[Common.FileIngestion.Sources.Folder]*,[Common.FileIngestion.Checkpointing]*,[Common.FileIngestion.Parsing]*,[Common.FileIngestion.Telemetry]*,[Common.FileIngestion.Protection]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\src\Common.FileIngestion.Checkpointing\Common.FileIngestion.Checkpointing.csproj" />
     <ProjectReference Include="..\..\src\Common.FileIngestion.Parsing\Common.FileIngestion.Parsing.csproj" />
     <ProjectReference Include="..\..\src\Common.FileIngestion.Telemetry\Common.FileIngestion.Telemetry.csproj" />
+    <ProjectReference Include="..\..\src\Common.FileIngestion.Protection\Common.FileIngestion.Protection.csproj" />
   </ItemGroup>
 
   <!-- Real G266 V4.8 layout, so tests prove the generic loader accepts the actual spec. -->

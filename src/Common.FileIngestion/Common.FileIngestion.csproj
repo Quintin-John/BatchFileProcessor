@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Common.FileIngestion.Layouts\Common.FileIngestion.Layouts.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Reading\Common.FileIngestion.Reading.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Telemetry\Common.FileIngestion.Telemetry.csproj" />
+    <ProjectReference Include="..\Common.FileIngestion.Protection\Common.FileIngestion.Protection.csproj" />
   </ItemGroup>
 
 </Project>
