@@ -31,6 +31,7 @@
     <ProjectReference Include="..\Common.Messaging.MassTransit\Common.Messaging.MassTransit.csproj" />
     <ProjectReference Include="..\Common.Observability\Common.Observability.csproj" />
     <ProjectReference Include="..\Common.Security.DataProtection\Common.Security.DataProtection.csproj" />
+    <ProjectReference Include="..\Common.FileIngestion.Abstractions\Common.FileIngestion.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-namespace Common.FileIngestion.Parsing;
+namespace Common.FileIngestion.Abstractions;
 
 /// <summary>
 /// Parses one framed record into an <see cref="RecordParseResult"/>. The Strategy seam over record

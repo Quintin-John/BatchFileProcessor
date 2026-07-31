@@ -1,4 +1,4 @@
-namespace Common.FileIngestion.Sources;
+namespace Common.FileIngestion.Abstractions;
 
 /// <summary>
 /// Supplies files to ingest and records their terminal outcome. A claim is exclusive and makes the

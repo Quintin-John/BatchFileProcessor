@@ -1,3 +1,4 @@
+using Common.FileIngestion.Abstractions;
 using System.Diagnostics;
 using System.Text;
 using Common.FileIngestion.Checkpointing;

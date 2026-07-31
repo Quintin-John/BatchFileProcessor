@@ -1,3 +1,4 @@
+using Common.FileIngestion.Abstractions;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Sources;
 using Ingestion.Worker;

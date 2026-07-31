@@ -1,3 +1,4 @@
+using Common.FileIngestion.Abstractions;
 using Common.FileIngestion.Checkpointing;
 
 namespace Common.FileIngestion.Tests.Checkpointing;

@@ -1,4 +1,4 @@
-namespace Common.FileIngestion.Reading;
+namespace Common.FileIngestion.Abstractions;
 
 /// <summary>One framed record: its 1-based sequence, byte offset in the file, and decoded content.</summary>
 /// <param name="RecordSeq">1-based record sequence.</param>

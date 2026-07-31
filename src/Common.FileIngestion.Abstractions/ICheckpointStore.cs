@@ -1,4 +1,4 @@
-namespace Common.FileIngestion.Checkpointing;
+namespace Common.FileIngestion.Abstractions;
 
 /// <summary>
 /// Durable store for the per-file high-water mark, keyed by a stable source key known before the

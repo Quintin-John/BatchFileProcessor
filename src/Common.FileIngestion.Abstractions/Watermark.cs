@@ -1,4 +1,4 @@
-namespace Common.FileIngestion.Checkpointing;
+namespace Common.FileIngestion.Abstractions;
 
 /// <summary>
 /// The last confirmed position for a source file: how far the broker has acknowledged. A restart

@@ -1,3 +1,4 @@
+using Common.FileIngestion.Abstractions;
 using System.Text.Json;
 
 namespace Common.FileIngestion.Checkpointing;

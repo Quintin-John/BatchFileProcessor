@@ -1,3 +1,4 @@
+using Common.FileIngestion.Abstractions;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;

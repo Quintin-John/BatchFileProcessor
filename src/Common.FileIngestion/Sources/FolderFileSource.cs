@@ -1,3 +1,4 @@
+using Common.FileIngestion.Abstractions;
 namespace Common.FileIngestion.Sources;
 
 /// <summary>

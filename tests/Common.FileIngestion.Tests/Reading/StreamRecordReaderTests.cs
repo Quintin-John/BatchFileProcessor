@@ -1,3 +1,4 @@
+using Common.FileIngestion.Abstractions;
 using System.Security.Cryptography;
 using System.Text;
 using Common.FileIngestion.Reading;

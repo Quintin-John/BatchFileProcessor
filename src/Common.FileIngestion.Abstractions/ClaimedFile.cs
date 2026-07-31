@@ -1,4 +1,4 @@
-namespace Common.FileIngestion.Sources;
+namespace Common.FileIngestion.Abstractions;
 
 /// <summary>
 /// A file a source has exclusively claimed for processing. <see cref="Name"/> is the stable identity

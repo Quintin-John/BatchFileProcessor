@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using Common.Messaging.Contracts;
 
-namespace Common.FileIngestion.Parsing;
+namespace Common.FileIngestion.Abstractions;
 
 /// <summary>
 /// The outcome of parsing one record: either a mapped <see cref="Record"/>, or a rejection with

@@ -12,7 +12,7 @@
     <Threshold>90</Threshold>
     <ThresholdType>line</ThresholdType>
     <ThresholdStat>total</ThresholdStat>
-    <Include>[Common.FileIngestion]*</Include>
+    <Include>[Common.FileIngestion]*,[Common.FileIngestion.Abstractions]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
