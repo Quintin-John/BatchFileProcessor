@@ -21,6 +21,7 @@ public sealed partial class FolderIngestionWorker : BackgroundService
     private readonly ReadinessGate _readiness;
     private readonly WorkerOptions _options;
     private readonly ILogger<FolderIngestionWorker> _logger;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Creates the worker.</summary>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
@@ -29,19 +30,22 @@ public sealed partial class FolderIngestionWorker : BackgroundService
         IMediator mediator,
         ReadinessGate readiness,
         WorkerOptions options,
-        ILogger<FolderIngestionWorker> logger)
+        ILogger<FolderIngestionWorker> logger,
+        TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(mediator);
         ArgumentNullException.ThrowIfNull(readiness);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(timeProvider);
 
         _source = source;
         _mediator = mediator;
         _readiness = readiness;
         _options = options;
         _logger = logger;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -55,7 +59,7 @@ public sealed partial class FolderIngestionWorker : BackgroundService
 
             try
             {
-                await Task.Delay(_options.PollInterval, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(_options.PollInterval, _timeProvider, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

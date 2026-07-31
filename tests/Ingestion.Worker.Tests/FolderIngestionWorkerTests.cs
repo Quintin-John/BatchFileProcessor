@@ -8,6 +8,7 @@ using MassTransit;
 using MassTransit.Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Ingestion.Worker.Tests;
 
@@ -30,7 +31,7 @@ public sealed class FolderIngestionWorkerTests
         var (mediator, spy, provider) = Mediator();
         await using var _ = provider;
         var source = new FakeFileSource();
-        var worker = new FolderIngestionWorker(source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
+        var worker = new FolderIngestionWorker(source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance, TimeProvider.System);
 
         List<ClaimedFile> files = [new("ok.dat", "p/ok.dat"), new("boom.dat", "p/boom.dat")];
 
@@ -49,7 +50,7 @@ public sealed class FolderIngestionWorkerTests
         var (mediator, spy, provider) = Mediator();
         await using var _ = provider;
         var source = new FakeFileSource { Orphans = { new ClaimedFile("orphan.dat", "p/orphan.dat") } };
-        var worker = new FolderIngestionWorker(source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
+        var worker = new FolderIngestionWorker(source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance, TimeProvider.System);
 
         await worker.StartAsync(CancellationToken.None);
         await WaitUntil(() => source.Completed.Contains("orphan.dat"));
@@ -66,7 +67,7 @@ public sealed class FolderIngestionWorkerTests
         await using var __ = provider;
         var gate = new ReadinessGate();
         var worker = new FolderIngestionWorker(
-            new FakeFileSource(), mediator, gate, Options(), NullLogger<FolderIngestionWorker>.Instance);
+            new FakeFileSource(), mediator, gate, Options(), NullLogger<FolderIngestionWorker>.Instance, TimeProvider.System);
 
         await worker.ProcessAsync([new ClaimedFile("ok.dat", "p/ok.dat")], CancellationToken.None);
         Assert.Equal(HealthStatus.Healthy, gate.Status);
@@ -81,7 +82,7 @@ public sealed class FolderIngestionWorkerTests
         var (mediator, spy, provider) = Mediator();
         await using var _ = provider;
         var worker = new FolderIngestionWorker(
-            new FakeFileSource(), mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
+            new FakeFileSource(), mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance, TimeProvider.System);
 
         await worker.ProcessAsync([new ClaimedFile("ok.dat", "p/ok.dat")], CancellationToken.None);
 
@@ -96,11 +97,35 @@ public sealed class FolderIngestionWorkerTests
         var (mediator, _, provider) = Mediator();
         await using var __ = provider;
         var worker = new FolderIngestionWorker(
-            new FakeFileSource(), mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance);
+            new FakeFileSource(), mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance, TimeProvider.System);
 
         await worker.ProcessAsync([new ClaimedFile("ok.dat", "p/ok.dat")], CancellationToken.None);
 
         Assert.Null(CorrelationScope.Current); // scope disposed after dispatch; nothing leaks to the caller
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PollsAgain_OnlyAfterTheInjectedClockAdvances()
+    {
+        var (mediator, _, provider) = Mediator();
+        await using var __ = provider;
+        var clock = new FakeTimeProvider();
+        var source = new CountingFileSource();
+        var worker = new FolderIngestionWorker(
+            source, mediator, new ReadinessGate(), Options(), NullLogger<FolderIngestionWorker>.Instance, clock);
+
+        await worker.StartAsync(CancellationToken.None);
+        await WaitUntil(() => source.ClaimCount >= 1); // first poll ran; the loop now waits on the injected clock
+        var afterFirstPoll = source.ClaimCount;
+
+        await Task.Delay(50); // real time passes, but the fake clock does not
+        Assert.Equal(afterFirstPoll, source.ClaimCount); // no further poll while the clock is frozen
+
+        clock.Advance(TimeSpan.FromMilliseconds(10)); // == the configured poll interval
+        await WaitUntil(() => source.ClaimCount > afterFirstPoll);
+        await worker.StopAsync(CancellationToken.None);
+
+        Assert.True(source.ClaimCount > afterFirstPoll); // the next poll fired only once the injected clock moved
     }
 
     private static async Task WaitUntil(Func<bool> condition)
@@ -173,5 +198,30 @@ public sealed class FolderIngestionWorkerTests
         public void Complete(ClaimedFile file) => _completed.Add(file.Name);
 
         public void Fail(ClaimedFile file) => _failed.Add(file.Name);
+    }
+
+    private sealed class CountingFileSource : IFileSource
+    {
+        private int _claimCount;
+
+        public int ClaimCount => Volatile.Read(ref _claimCount);
+
+        public IReadOnlyList<ClaimedFile> RecoverOrphans() => Array.Empty<ClaimedFile>();
+
+        public IReadOnlyList<ClaimedFile> Claim()
+        {
+            Interlocked.Increment(ref _claimCount);
+            return Array.Empty<ClaimedFile>();
+        }
+
+        public void Complete(ClaimedFile file)
+        {
+            // no-op: this source never yields files to complete
+        }
+
+        public void Fail(ClaimedFile file)
+        {
+            // no-op: this source never yields files to fail
+        }
     }
 }
