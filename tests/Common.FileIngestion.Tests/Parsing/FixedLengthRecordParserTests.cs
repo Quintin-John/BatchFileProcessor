@@ -74,6 +74,27 @@ public sealed class FixedLengthRecordParserTests
     }
 
     [Fact]
+    public void Parse_SkipField_TiledForCoverage_ButNotEmitted()
+    {
+        var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
+        {
+            new RecordDefinition("r", "MX", new[]
+            {
+                new FieldDefinition("rectype", 1, 2),
+                new FieldDefinition("data", 3, 4),
+                new FieldDefinition("filler", 7, 4, skip: true),
+            }),
+        });
+
+        var result = new FixedLengthRecordParser(layout).Parse(1, 0, "MXDATA9999".AsSpan());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Record!.Fields.Count);              // filler is tiled but not emitted
+        Assert.Equal(new ClearFieldValue("DATA"), result.Record.Fields["data"]);
+        Assert.False(result.Record.Fields.ContainsKey("filler"));  // skipped from the upstream message
+    }
+
+    [Fact]
     public void Parse_WrongLength_Rejects()
     {
         var result = Parser().Parse(1, 0, "HD1".AsSpan());

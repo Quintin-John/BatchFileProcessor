@@ -107,7 +107,7 @@ public static class LayoutLoader
 
             try
             {
-                fields.Add(new FieldDefinition(field.Name, field.Start, field.Length, field.Encrypt, field.Required));
+                fields.Add(new FieldDefinition(field.Name, field.Start, field.Length, field.Encrypt, field.Required, field.Skip));
             }
             catch (ArgumentException ex)
             {
@@ -167,6 +167,8 @@ public static class LayoutLoader
         public bool Encrypt { get; set; }
 
         public bool Required { get; set; }
+
+        public bool Skip { get; set; }
     }
 #pragma warning restore S1144, S3459, CA1812
 }

@@ -27,6 +27,7 @@ public sealed class LayoutModelTests
         Assert.Equal(157, field.EndInclusive);
         Assert.False(field.Encrypt);
         Assert.False(field.Required);
+        Assert.False(field.Skip);
     }
 
     [Fact]
@@ -36,6 +37,25 @@ public sealed class LayoutModelTests
 
         Assert.True(field.Encrypt);
         Assert.True(field.Required);
+    }
+
+    [Fact]
+    public void FieldDefinition_CarriesSkipFlag()
+    {
+        var field = new FieldDefinition("filler", 1, 8, skip: true);
+
+        Assert.True(field.Skip);
+        Assert.False(field.Encrypt);
+        Assert.False(field.Required);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void FieldDefinition_SkipCombinedWithEncryptOrRequired_Throws(bool encrypt, bool required)
+    {
+        // A field that is never emitted cannot also be encrypted or required.
+        Assert.Throws<ArgumentException>(() => new FieldDefinition("f", 1, 8, encrypt, required, skip: true));
     }
 
     [Theory]

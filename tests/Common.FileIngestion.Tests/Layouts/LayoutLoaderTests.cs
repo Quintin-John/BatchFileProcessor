@@ -38,6 +38,47 @@ public sealed class LayoutLoaderTests
     }
 
     [Fact]
+    public void Load_ParsesSkipFlag()
+    {
+        const string yaml = """
+            version: "1"
+            recordLength: 10
+            encoding: ascii
+            discriminator: { start: 1, length: 2 }
+            recordTypes:
+              r:
+                match: "M"
+                fields:
+                  - { name: rectype, start: 1, length: 2 }
+                  - { name: filler, start: 3, length: 8, skip: true }
+            """;
+
+        var fields = LayoutLoader.Load(yaml).ResolveByDiscriminator("M")!.Fields;
+
+        Assert.False(fields[0].Skip);
+        Assert.True(fields[1].Skip); // filler is tiled for coverage but marked skip
+    }
+
+    [Fact]
+    public void Load_SkipCombinedWithEncrypt_Throws()
+    {
+        const string yaml = """
+            version: "1"
+            recordLength: 10
+            encoding: ascii
+            discriminator: { start: 1, length: 2 }
+            recordTypes:
+              r:
+                match: "M"
+                fields:
+                  - { name: rectype, start: 1, length: 2 }
+                  - { name: filler, start: 3, length: 8, skip: true, encrypt: true }
+            """;
+
+        Assert.Throws<FormatException>(() => LayoutLoader.Load(yaml));
+    }
+
+    [Fact]
     public void Load_ParsesTerminator_WhenPresent()
     {
         const string yaml = """

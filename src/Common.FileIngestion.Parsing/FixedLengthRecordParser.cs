@@ -8,7 +8,8 @@ namespace Common.FileIngestion.Parsing;
 /// <summary>
 /// Slices a fixed-width record into named raw fields against a layout: it checks the record length,
 /// resolves the record type from the discriminator, and emits each field's raw text verbatim (spaces
-/// preserved). It interprets no value — types and meaning are downstream's concern. A record is rejected
+/// preserved), except fields the layout marks <c>skip</c> — tiled for coverage but omitted from output.
+/// It interprets no value — types and meaning are downstream's concern. A record is rejected
 /// only structurally (wrong length, unknown record type) or when a field the layout marks
 /// <c>required</c> is blank. Everything it knows about the format comes from the layout.
 /// </summary>
@@ -64,6 +65,13 @@ public sealed class FixedLengthRecordParser : IRecordParser
         List<RejectReason>? reasons = null;
         foreach (var field in recordDefinition.Fields)
         {
+            // A skipped field is tiled by the layout for record coverage (FILLER/padding) but never emitted
+            // upstream. It cannot be required (enforced by the layout), so there is nothing to validate here.
+            if (field.Skip)
+            {
+                continue;
+            }
+
             // Slice the field's raw text verbatim — spaces included. The pump does not interpret the value.
             var raw = record.Slice(field.Offset, field.Length).ToString();
 
