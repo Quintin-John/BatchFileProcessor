@@ -4,56 +4,68 @@ using Microsoft.Extensions.Logging;
 namespace Common.FileIngestion.Sources;
 
 /// <summary>
-/// File-system <see cref="IFileSource"/> over a root with four conventional subdirectories:
-/// <c>incoming</c> (arrivals), <c>processing</c> (claimed), <c>done</c> (completed), and
-/// <c>failed</c> (quarantined). Claiming is an atomic same-volume rename into <c>processing</c>, so a
-/// file is claimed by exactly one caller and stays immutable while processed. Files left in
-/// <c>processing</c> after a crash are re-offered by <see cref="RecoverOrphans"/> and resumed from
-/// their watermark.
+/// File-system <see cref="IFileSource"/> over four explicit directories: <c>incoming</c> (arrivals),
+/// <c>processing</c> (claimed), <c>done</c> (completed archive), and <c>failed</c> (quarantine). A file is
+/// claimed only once a <see cref="ICompletionGuard"/> reports it fully written, then atomic-renamed into
+/// <c>processing</c> (same-volume), so it is claimed by exactly one caller and stays immutable while
+/// processed. Files left in <c>processing</c> after a crash are re-offered by <see cref="RecoverOrphans"/>.
+/// Directories are supplied explicitly so each profile owns its own set.
 /// </summary>
 public sealed partial class FolderFileSource : IFileSource, IDisposable
 {
-    private const string IncomingDir = "incoming";
-    private const string ProcessingDir = "processing";
-    private const string DoneDir = "done";
-    private const string FailedDir = "failed";
     private const string LockFileName = ".ingestion.lock";
 
     private readonly string _incoming;
     private readonly string _processing;
     private readonly string _done;
     private readonly string _failed;
+    private readonly ICompletionGuard _completionGuard;
     private readonly FileStream _ownershipLock;
     private readonly ILogger<FolderFileSource> _logger;
 
     /// <summary>
-    /// Creates the source, creating the four subdirectories if missing and taking exclusive ownership
-    /// of the root. Orphan recovery re-offers files sitting in <c>processing</c>, which is only safe if
-    /// exactly one instance owns the root — so a second instance on the same root fails closed here
+    /// Creates the source, creating the four directories if missing and taking exclusive ownership (a lock
+    /// file in <c>processing</c>). Orphan recovery re-offers files in <c>processing</c>, which is only safe
+    /// if exactly one instance owns them — so a second instance on the same directories fails closed here
     /// rather than stealing a file the first is actively processing.
     /// </summary>
-    /// <param name="rootDirectory">Root directory; required, non-blank.</param>
+    /// <param name="incoming">Arrivals directory; required, non-blank.</param>
+    /// <param name="processing">Claimed directory; required, non-blank.</param>
+    /// <param name="done">Completed archive directory; required, non-blank.</param>
+    /// <param name="failed">Quarantine directory; required, non-blank.</param>
+    /// <param name="completionGuard">Decides when a file is fully written; required.</param>
     /// <param name="logger">Logger for skipped-claim diagnostics; required.</param>
-    /// <exception cref="ArgumentException"><paramref name="rootDirectory"/> is blank.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="logger"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">Another instance already owns the root.</exception>
-    public FolderFileSource(string rootDirectory, ILogger<FolderFileSource> logger)
+    /// <exception cref="ArgumentException">Any directory is blank.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="completionGuard"/> or <paramref name="logger"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Another instance already owns the directories.</exception>
+    public FolderFileSource(
+        string incoming,
+        string processing,
+        string done,
+        string failed,
+        ICompletionGuard completionGuard,
+        ILogger<FolderFileSource> logger)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(incoming);
+        ArgumentException.ThrowIfNullOrWhiteSpace(processing);
+        ArgumentException.ThrowIfNullOrWhiteSpace(done);
+        ArgumentException.ThrowIfNullOrWhiteSpace(failed);
+        ArgumentNullException.ThrowIfNull(completionGuard);
         ArgumentNullException.ThrowIfNull(logger);
-        _logger = logger;
 
-        _incoming = Path.Combine(rootDirectory, IncomingDir);
-        _processing = Path.Combine(rootDirectory, ProcessingDir);
-        _done = Path.Combine(rootDirectory, DoneDir);
-        _failed = Path.Combine(rootDirectory, FailedDir);
+        _incoming = incoming;
+        _processing = processing;
+        _done = done;
+        _failed = failed;
+        _completionGuard = completionGuard;
+        _logger = logger;
 
         Directory.CreateDirectory(_incoming);
         Directory.CreateDirectory(_processing);
         Directory.CreateDirectory(_done);
         Directory.CreateDirectory(_failed);
 
-        _ownershipLock = AcquireOwnership(rootDirectory);
+        _ownershipLock = AcquireOwnership(_processing);
     }
 
     /// <inheritdoc />
@@ -65,6 +77,12 @@ public sealed partial class FolderFileSource : IFileSource, IDisposable
         var claimed = new List<ClaimedFile>();
         foreach (var path in Directory.EnumerateFiles(_incoming).OrderBy(p => p, StringComparer.Ordinal))
         {
+            // Never claim a file the producer may still be writing; leave it for a later poll.
+            if (!_completionGuard.IsComplete(path))
+            {
+                continue;
+            }
+
             var name = Path.GetFileName(path);
             var destination = Path.Combine(_processing, name);
             try
@@ -102,7 +120,7 @@ public sealed partial class FolderFileSource : IFileSource, IDisposable
     /// <inheritdoc />
     public void Fail(ClaimedFile file) => MoveTo(file, _failed);
 
-    /// <summary>Releases exclusive ownership of the root.</summary>
+    /// <summary>Releases exclusive ownership.</summary>
     public void Dispose() => _ownershipLock.Dispose();
 
     [LoggerMessage(EventId = 1, Level = LogLevel.Debug,
@@ -113,9 +131,9 @@ public sealed partial class FolderFileSource : IFileSource, IDisposable
         Message = "Could not claim {File}; skipping it this poll.")]
     private partial void LogClaimFailed(Exception exception, string file);
 
-    private static FileStream AcquireOwnership(string rootDirectory)
+    private static FileStream AcquireOwnership(string directory)
     {
-        var lockPath = Path.Combine(rootDirectory, LockFileName);
+        var lockPath = Path.Combine(directory, LockFileName);
         try
         {
             // Exclusive handle held for this source's lifetime; a second instance's open fails while held.
@@ -124,13 +142,15 @@ public sealed partial class FolderFileSource : IFileSource, IDisposable
         catch (IOException ex)
         {
             throw new InvalidOperationException(
-                $"Another ingestion instance already owns '{rootDirectory}'; the folder source is single-instance.",
+                $"Another ingestion instance already owns '{directory}'; the folder source is single-instance.",
                 ex);
         }
     }
 
     private static List<ClaimedFile> Enumerate(string directory) =>
         Directory.EnumerateFiles(directory)
+            // The ownership lock lives in processing; it is not an orphaned data file.
+            .Where(p => !string.Equals(Path.GetFileName(p), LockFileName, StringComparison.Ordinal))
             .OrderBy(p => p, StringComparer.Ordinal)
             .Select(p => new ClaimedFile(Path.GetFileName(p), p))
             .ToList();

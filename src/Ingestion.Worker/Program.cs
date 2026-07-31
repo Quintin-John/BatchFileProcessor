@@ -62,8 +62,16 @@ services.AddSingleton<RecordProtector>();
 services.AddSingleton<RejectSink>();
 services.AddSingleton<ICheckpointStore>(new FileCheckpointStore(RequiredConfig.Text(ingestion, "CheckpointDirectory")));
 services.AddSingleton<FileIngestionPipeline>();
+var root = RequiredConfig.Text(ingestion, "RootDirectory");
+var completionGuard = new StableSizeCompletionGuard(
+    TimeSpan.FromSeconds(RequiredConfig.Integer(ingestion, "CompletionQuietSeconds")), TimeProvider.System);
 services.AddSingleton<IFileSource>(sp => new FolderFileSource(
-    RequiredConfig.Text(ingestion, "RootDirectory"), sp.GetRequiredService<ILogger<FolderFileSource>>()));
+    Path.Combine(root, "incoming"),
+    Path.Combine(root, "processing"),
+    Path.Combine(root, "done"),
+    Path.Combine(root, "failed"),
+    completionGuard,
+    sp.GetRequiredService<ILogger<FolderFileSource>>()));
 services.AddSingleton(new WorkerOptions(
     RequiredConfig.Text(ingestion, "ProfileId"), layout.Version, TimeSpan.FromSeconds(RequiredConfig.Integer(ingestion, "PollIntervalSeconds"))));
 
