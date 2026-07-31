@@ -1,6 +1,6 @@
 # Stage 1 — G266 Ingestion Pump — Design
 
-**Status:** design locked, pending resolution of the open questions in §12.
+**Status:** design locked; **Stage-1 implemented and hardened** (single-profile G266 — see §14). The §12 open questions are business/spec decisions, not implementation blockers.
 **Component scope (single responsibility):** *Turn a dropped file — fixed-length or delimited — into confirmed broker messages, as fast as possible.*
 **G266 is the first configured *profile*, not the product** (see §1.2). Everything downstream — the record state machine, matching ("against what"), lifecycle/reconciliation — is **out of scope** and is a separate bounded context that consumes the messages this component emits.
 
@@ -226,6 +226,7 @@ The mapper is generic; all record structure is data, loaded and validated at sta
 # layout.yaml  (mounted, not baked into the image)
 encoding: ascii                    # single-byte; offsets are byte offsets
 recordLength: 1200
+terminator: 1                      # bytes per record terminator (1=LF, 2=CRLF, 0=none) — framing lives with the layout
 discriminator: { start: 1, length: 4 }
 recordTypes:
   per:
@@ -478,7 +479,7 @@ Banking context: **all data — in transit and at rest — is encrypted with str
 - flagged fields are also **redacted from logs/lineage** (never emitted in clear);
 - the **reject path** encrypts the whole raw record (`ProtectRaw`) — a record that failed to map has no field structure to classify, so it is protected unconditionally.
 
-**Classified by construction, decoupled by design:** every layout field is Encrypt or Clear (flag present or absent), so the fail-closed policy lookup never faults on a field the layout defines. The crypto and the layout stay independent — bridged only at the composition root (`LayoutProtectionPolicy`). *(Masking — e.g. PAN→first6/last4 for diagnostics — is not layout-driven today; it would be a further per-field flag if needed.)*
+**Classified by construction, decoupled by design:** every layout field is Encrypt or Clear (flag present or absent), so the fail-closed policy lookup never faults on a field the layout defines. Protection is keyed by field name; if a name recurs across record types with **conflicting** classifications (encrypt vs clear), policy construction **fails closed** at startup rather than silently collapsing to one — a name resolves to a single classification or the host does not start. The crypto and the layout stay independent — bridged only at the composition root (`LayoutProtectionPolicy`). *(Masking — e.g. PAN→first6/last4 for diagnostics — is not layout-driven today; it would be a further per-field flag if needed.)*
 
 ---
 
@@ -611,31 +612,53 @@ Dependency direction: `Contracts` ← `DataProtection` / `Observability`\* / `Ma
 
 ---
 
-## 13. Build status (POC)
+## 14. Build status (POC)
 
-All slices 0–14 implemented, `main` green: **418 tests**, per-assembly line-coverage gates met
-(`Common.FileIngestion` 97.4%, `Ingestion.Worker` 91.4%, shared libs 98–100%).
+Stage-1 implemented, `main` green: **512 tests**, per-assembly line-coverage gates met (≥90% floor;
+`Common.FileIngestion` ~98%, `Ingestion.Worker` ~95%, shared libs 99–100%), SonarQube gate clean
+(0 new issues). Scope is **single-profile G266** — one layout loaded from config; the profile router /
+keyed factories / delimited parser of §1.2 remain design-level (build scope, §1.2), not yet built.
 
-**Delivered:** generic layout model + loader; fixed-length parser; streaming reader (O(1),
-SHA-256 FileId); config-driven profile router; positional watermark checkpoint (keyed by stable
-source key) + file store; batcher; field-protection stage; reject sink; ingestion metrics/lineage
-tags; worker-host health state (heartbeat/liveness/readiness); the end-to-end `FileIngestionPipeline`
-(hash → resume → parse → protect → batch → confirmed publish → watermark, fail-closed); folder file
-source (claim/complete/fail + orphan recovery); and the `Ingestion.Worker` host wiring a
-**MassTransit.Mediator** command boundary, composition root, and Dockerfile.
+**Delivered:** generic layout model + loader (record length, **terminator**, encoding, discriminator,
+and per-field `encrypt`/`required` — all data); raw-slicer fixed-length parser (emits raw text, no value
+interpretation); streaming reader (O(1) memory, SHA-256 FileId via the single-sourced `FileContentHash`);
+**one layout loaded from a configured path** (not a multi-profile router); positional watermark checkpoint
+(keyed by stable source key) + file store; batcher; field-protection stage (`LayoutProtectionPolicy` →
+`RecordProtector`, fail-closed on a name classified two ways); reject sink (raw record encrypted);
+ingestion metrics + per-record lineage, with the **correlation scope opened at the worker** so spans/logs
+carry run/correlation ids; worker-host health (heartbeat/liveness/readiness on a single-sourced tag
+vocabulary); the end-to-end `FileIngestionPipeline` (hash → resume → parse → protect → batch → confirmed
+publish → watermark, fail-closed); folder file source (claim/complete/fail + orphan recovery; a skipped
+claim is logged, never silently swallowed); and the `Ingestion.Worker` host — composition root with
+fail-closed config binding, a narrow `IIngestFileDispatcher` seam over **MassTransit.Mediator**, a
+`TimeProvider`-driven poll loop, and a Dockerfile.
 
 **Decisions:** worker host for the POC (Azure Functions deferred — see [[host-and-mediator-decision]]);
 mediator = MassTransit.Mediator (OSS) at the host boundary so the library stays transport-agnostic;
-publisher port `IMessagePublisher` relocated to Contracts (DIP).
+publisher port `IMessagePublisher` relocated to Contracts (DIP); the worker depends on a narrow
+`IIngestFileDispatcher` (ISP) rather than the full mediator surface. Message transport currently declares
+**RabbitMQ only** — the Azure Service Bus enum member was removed until it is actually wired, so `Validate()`
+never certifies a transport the composition root would reject (ASB remains a config-selectable case behind
+the MassTransit seam when built, §1.2/§6).
+
+**Review remediation (hardening pass):** a full DRY/SOLID/no-hardcoding review found and fixed 13 proven
+defects, each as a one-concern slice with happy+unhappy tests and a clean Sonar gate before commit —
+notably: terminator moved into the layout (framing fully layout-driven); numeric/enum config **fails
+closed** (`RequiredConfig`, not silent `GetValue` defaults); `ClearFieldValue` validates its wire type at
+construction; the decrypt paths zero recovered cleartext (symmetric with encrypt); the resume-integrity
+hash is single-sourced; the correlation scope is actually opened; messaging options are immutable
+(`init`-only); the worker distinguishes genuine shutdown from a non-shutdown cancellation.
 
 **Backlog (not blocking the POC):**
+- **Multi-profile router + keyed factories** (§1.2) — single-profile today; add when a second profile is real.
 - Azure Functions host (isolated worker, Blob/Event Grid trigger) — deferred by decision.
-- Real G266 **data-protection policy** classifying every field (security-owned) — the fail-closed
-  policy rejects unclassified fields; the POC composition loads it from a configured path.
+- Real G266 **data-protection policy** for the full field set (security-owned) — driven by the layout's
+  `encrypt` flags today; classification is fail-closed on conflicts.
 - ~~**Reject-payload encryption**~~ — **DONE.** The reject raw record is encrypted before the reject
   queue via `IPayloadProtector` (unconditional AEAD, AAD-bound); never carried in clear.
 - **Shared checkpoint store** (Redis/Blob/DB) for cross-instance resume (§12/Q8) — file store today.
 - **EBCDIC / code-page** encodings: register `CodePagesEncodingProvider` when a layout needs a
   non–built-in single-byte encoding.
 - Byte-cap uses a content-length proxy (documented in `Batcher`); tighten if a transport limit is hit.
+- **Azure Service Bus transport** — re-add the enum member with its wiring when the case is real (§6).
 - **V4.11 layout** (external dependency) — V4.8 done.
