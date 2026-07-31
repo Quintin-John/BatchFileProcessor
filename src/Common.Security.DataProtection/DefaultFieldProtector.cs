@@ -71,7 +71,16 @@ public sealed class DefaultFieldProtector : IFieldProtector
 
         var key = _keys.ResolveKey(encrypted.Value.KeyId, encrypted.Value.KeyVersion);
         var plaintext = _crypto.Decrypt(encrypted.Value, key, ProtectionAad.Build(context));
-        return JsonSerializer.Deserialize<FieldValue>(plaintext, MessagingJson.Options)
-            ?? throw new InvalidOperationException("Decrypted field value was null.");
+        try
+        {
+            return JsonSerializer.Deserialize<FieldValue>(plaintext, MessagingJson.Options)
+                ?? throw new InvalidOperationException("Decrypted field value was null.");
+        }
+        finally
+        {
+            // Zero the transient cleartext so a decrypted field value never lingers on the heap
+            // (symmetric with Protect).
+            CryptographicOperations.ZeroMemory(plaintext);
+        }
     }
 }

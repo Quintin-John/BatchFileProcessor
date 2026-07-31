@@ -54,6 +54,15 @@ public sealed class DefaultPayloadProtector : IPayloadProtector
 
         var key = _keys.ResolveKey(payload.Value.KeyId, payload.Value.KeyVersion);
         var plaintext = _crypto.Decrypt(payload.Value, key, ProtectionAad.Build(context));
-        return Encoding.UTF8.GetString(plaintext);
+        try
+        {
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        finally
+        {
+            // Zero the transient cleartext so a decrypted payload never lingers on the heap
+            // (symmetric with Protect).
+            CryptographicOperations.ZeroMemory(plaintext);
+        }
     }
 }
