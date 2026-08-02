@@ -46,7 +46,7 @@ public sealed class FileIngestionPipelineTests
                 new RejectSink(Publisher, "rejects"),
                 Checkpoints,
                 new IngestionMetrics(instrumentation),
-                new RecordLineage(Lineage, TimeProvider.System),
+                new RecordLineage(Lineage, TimeProvider.System, enabled: true),
                 new IngestionTracing(instrumentation),
                 new Heartbeat(TimeProvider.System),
                 new IngestionOptions(

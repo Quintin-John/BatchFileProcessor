@@ -12,17 +12,24 @@ public sealed class RecordLineage
 {
     private readonly ILineageEmitter _emitter;
     private readonly TimeProvider _clock;
+    private readonly bool _enabled;
 
     /// <summary>Creates the lineage helper.</summary>
     /// <param name="emitter">The lineage emitter; required.</param>
     /// <param name="clock">Clock for transition timestamps; required.</param>
-    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    public RecordLineage(ILineageEmitter emitter, TimeProvider clock)
+    /// <param name="enabled">
+    /// Whether lineage is produced. When false, <see cref="EmitAsync"/> is a no-op that allocates nothing —
+    /// a deliberate operator opt-out, uniform across the run (all transitions or none), never a partial trace.
+    /// When true, behaviour is unchanged: every transition is emitted with the block-never-drop guarantee (§8).
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="emitter"/> or <paramref name="clock"/> is null.</exception>
+    public RecordLineage(ILineageEmitter emitter, TimeProvider clock, bool enabled)
     {
         ArgumentNullException.ThrowIfNull(emitter);
         ArgumentNullException.ThrowIfNull(clock);
         _emitter = emitter;
         _clock = clock;
+        _enabled = enabled;
     }
 
     /// <summary>Emits a lineage event for one record's transition.</summary>
@@ -42,6 +49,13 @@ public sealed class RecordLineage
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(provenance);
+
+        // Gate before building the event: when lineage is disabled, no LineageEvent is allocated and the
+        // channel is never touched — the per-record emission cost is fully removed.
+        if (!_enabled)
+        {
+            return ValueTask.CompletedTask;
+        }
 
         var lineageEvent = new LineageEvent(
             provenance.CorrelationId, provenance.FileId, locator, state, _clock.GetUtcNow(), batch, reasonCode);
