@@ -1,4 +1,3 @@
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using Common.Messaging.Contracts;
 
@@ -17,19 +16,10 @@ public sealed class Batcher
 {
     private const char IdSeparator = '-';
 
-    // Escaping must match MessagingJson (relaxed, non-HTML) so the measured size equals the wire size; the
-    // externally-created writer carries its own encoder, and SkipValidation is safe over our own output.
-    private static readonly JsonWriterOptions SizeWriterOptions = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        SkipValidation = true,
-    };
-
     private readonly int _maxRecords;
     private readonly int _maxContentBytes;
     private readonly MessageProvenance _provenance;
     private readonly List<IngestRecord> _pending;
-    private readonly ByteCountingBufferWriter _sizeCounter = new();
     private long _accumulatedBytes;
     private long _batchSeq;
 
@@ -62,7 +52,7 @@ public sealed class Batcher
     {
         ArgumentNullException.ThrowIfNull(record);
 
-        var recordBytes = SerializedSize(record);
+        var recordBytes = MeasureAndCache(record);
 
         // Seal the in-progress batch before this record would push it past the byte cap, so a batch
         // never exceeds the transport limit; this record then opens the next batch.
@@ -96,15 +86,13 @@ public sealed class Batcher
         return batch;
     }
 
-    // Measures the record's exact serialized size through a counting writer, so the byte-cap decision costs
-    // no per-record output allocation (the earlier SerializeToUtf8Bytes materialised a byte[] only to read
-    // its Length). The reused counter is safe because a Batcher drives one file's single-threaded read loop.
-    private long SerializedSize(IngestRecord record)
+    // Serializes the record once, caches those bytes on the record (reused verbatim at publish so it is not
+    // serialized again), and returns their length for the byte-cap decision — the exact wire size, since the
+    // same MessagingJson options drive both this and the transport.
+    private static long MeasureAndCache(IngestRecord record)
     {
-        _sizeCounter.Reset();
-        using var writer = new Utf8JsonWriter(_sizeCounter, SizeWriterOptions);
-        JsonSerializer.Serialize(writer, record, MessagingJson.Options);
-        writer.Flush();
-        return _sizeCounter.BytesWritten;
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(record, MessagingJson.Options);
+        record.SerializedForm = bytes;
+        return bytes.Length;
     }
 }

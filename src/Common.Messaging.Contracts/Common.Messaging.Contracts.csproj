@@ -7,4 +7,10 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The batcher (engine) sets a record's serialized-form memo when sizing it for the byte cap. -->
+    <InternalsVisibleTo Include="Common.FileIngestion" />
+    <InternalsVisibleTo Include="Common.Messaging.Contracts.Tests" />
+  </ItemGroup>
+
 </Project>

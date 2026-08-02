@@ -92,6 +92,31 @@ public sealed class BatcherTests
     }
 
     [Fact]
+    public void SealedBatch_RecordsCachedByBatcher_SerializeIdenticallyToUncached()
+    {
+        // The batcher caches each record's serialized bytes when sizing it; publishing must reuse them and
+        // produce a byte-identical batch to one whose records carry no cache (the fallback path).
+        var batcher = new Batcher(maxRecords: 3, maxContentBytes: 1_000_000, Provenance());
+        batcher.Add(Record(1, "alpha"));
+        batcher.Add(Record(2, "beta"));
+        var cachedBatch = batcher.Flush()!;
+
+        // An equivalent batch built directly, whose records were never measured (SerializedForm null).
+        var uncachedBatch = new IngestBatchMessage(
+            cachedBatch.MessageId, Provenance(), cachedBatch.BatchSeq,
+            new[] { Record(1, "alpha"), Record(2, "beta") });
+
+        var cachedJson = JsonSerializer.Serialize(cachedBatch, MessagingJson.Options);
+        var uncachedJson = JsonSerializer.Serialize(uncachedBatch, MessagingJson.Options);
+
+        Assert.Equal(uncachedJson, cachedJson); // reuse (raw) == fallback, byte-for-byte
+        // And it still round-trips back to equivalent records.
+        var back = JsonSerializer.Deserialize<IngestBatchMessage>(cachedJson, MessagingJson.Options)!;
+        Assert.Equal(2, back.Count);
+        Assert.Equal(1, back.Records[0].Locator.RecordSeq);
+    }
+
+    [Fact]
     public void Flush_Empty_ReturnsNull()
     {
         Assert.Null(new Batcher(2, 1000, Provenance()).Flush());
