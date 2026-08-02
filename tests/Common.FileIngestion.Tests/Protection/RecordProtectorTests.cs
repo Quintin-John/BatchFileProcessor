@@ -32,6 +32,32 @@ public sealed class RecordProtectorTests
     }
 
     [Fact]
+    public void Protect_NoFieldEncrypted_ReturnsSameInstance_NoCopy()
+    {
+        // All fields pass through (nothing encrypts) -> copy-on-write returns the original record untouched.
+        var record = Record(("amount", new ClearFieldValue(221.73m)));
+
+        var result = Protector().Protect("file-abc", record);
+
+        Assert.Same(record, result);
+    }
+
+    [Fact]
+    public void Protect_SomeFieldEncrypted_ReturnsNewRecord_PreservingOtherFields()
+    {
+        var record = Record(
+            ("pan", new ClearFieldValue("1234567890123456")),
+            ("amount", new ClearFieldValue(221.73m)));
+
+        var result = Protector().Protect("file-abc", record);
+
+        Assert.NotSame(record, result); // a change materialises a new record
+        Assert.IsType<EncryptedFieldValue>(result.Fields["pan"]);
+        Assert.Equal(new ClearFieldValue(221.73m), result.Fields["amount"]); // untouched field carried over
+        Assert.Equal(2, result.Fields.Count);
+    }
+
+    [Fact]
     public void Protect_UnclassifiedField_PropagatesFailClosed()
     {
         Assert.Throws<KeyNotFoundException>(
