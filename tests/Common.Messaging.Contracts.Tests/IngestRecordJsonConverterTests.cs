@@ -30,14 +30,21 @@ public sealed class IngestRecordJsonConverterTests
     }
 
     [Fact]
-    public void Write_NoCache_EmitsLocatorAndFieldsShape()
+    public void Write_NoCache_EmitsExactWireShape()
     {
-        var json = JsonSerializer.Serialize(Record(), Options);
+        // Locks the exact wire shape the converter's fallback must reproduce (the shape consumers already
+        // receive): {locator:{recordSeq,byteOffset,recordType}, fields:{...}}, camelCase, in this order,
+        // with no extra properties. A drift here would break consumers and be invisible to cached-vs-uncached
+        // parity tests (which both use this converter), so it is pinned as an explicit string.
+        var record = new IngestRecord(
+            new RecordLocator(7, 70, "TRAN"),
+            new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(221.73m) });
 
-        Assert.Contains("\"locator\":", json, StringComparison.Ordinal);
-        Assert.Contains("\"fields\":", json, StringComparison.Ordinal);
-        Assert.Contains("\"recordType\":\"TRAN\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"amount\":221.73", json, StringComparison.Ordinal);
+        var json = JsonSerializer.Serialize(record, Options);
+
+        Assert.Equal(
+            "{\"locator\":{\"recordSeq\":7,\"byteOffset\":70,\"recordType\":\"TRAN\"},\"fields\":{\"amount\":221.73}}",
+            json);
     }
 
     [Fact]

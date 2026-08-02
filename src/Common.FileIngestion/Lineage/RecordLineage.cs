@@ -32,6 +32,12 @@ public sealed class RecordLineage
         _enabled = enabled;
     }
 
+    /// <summary>
+    /// Whether lineage is produced. When false every <see cref="EmitAsync"/> is a no-op, so callers can also
+    /// skip lineage-only work (e.g. iterating a batch's records to emit per-record events).
+    /// </summary>
+    public bool Enabled => _enabled;
+
     /// <summary>Emits a lineage event for one record's transition.</summary>
     /// <param name="provenance">Run provenance (correlation + file identity); required.</param>
     /// <param name="locator">Record identity; required.</param>
