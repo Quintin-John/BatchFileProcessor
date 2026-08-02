@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Common.FileIngestion.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Common.Messaging.Contracts\Common.Messaging.Contracts.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Abstractions\Common.FileIngestion.Abstractions.csproj" />
     <ProjectReference Include="..\Common.FileIngestion.Layouts\Common.FileIngestion.Layouts.csproj" />

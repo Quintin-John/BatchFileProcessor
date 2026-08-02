@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Common.Messaging.Contracts;
 
@@ -16,10 +17,19 @@ public sealed class Batcher
 {
     private const char IdSeparator = '-';
 
+    // Escaping must match MessagingJson (relaxed, non-HTML) so the measured size equals the wire size; the
+    // externally-created writer carries its own encoder, and SkipValidation is safe over our own output.
+    private static readonly JsonWriterOptions SizeWriterOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        SkipValidation = true,
+    };
+
     private readonly int _maxRecords;
     private readonly int _maxContentBytes;
     private readonly MessageProvenance _provenance;
     private readonly List<IngestRecord> _pending;
+    private readonly ByteCountingBufferWriter _sizeCounter = new();
     private long _accumulatedBytes;
     private long _batchSeq;
 
@@ -86,6 +96,15 @@ public sealed class Batcher
         return batch;
     }
 
-    private static long SerializedSize(IngestRecord record) =>
-        JsonSerializer.SerializeToUtf8Bytes(record, MessagingJson.Options).Length;
+    // Measures the record's exact serialized size through a counting writer, so the byte-cap decision costs
+    // no per-record output allocation (the earlier SerializeToUtf8Bytes materialised a byte[] only to read
+    // its Length). The reused counter is safe because a Batcher drives one file's single-threaded read loop.
+    private long SerializedSize(IngestRecord record)
+    {
+        _sizeCounter.Reset();
+        using var writer = new Utf8JsonWriter(_sizeCounter, SizeWriterOptions);
+        JsonSerializer.Serialize(writer, record, MessagingJson.Options);
+        writer.Flush();
+        return _sizeCounter.BytesWritten;
+    }
 }
