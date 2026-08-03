@@ -10,6 +10,12 @@ namespace Common.FileIngestion.Checkpointing.Redis;
 /// same pod/volume) can resume a crashed job. Redis <c>SET</c> is atomic; at-rest durability is Redis
 /// persistence (AOF/RDB), an infra concern. Watermark monotonicity is enforced by the pipeline, so this
 /// store is a plain persist/load/clear.
+/// <para>
+/// Cancellation is honoured at the call boundary — a cancelled token fails fast before any Redis command is
+/// issued. StackExchange.Redis async operations do not accept a per-call <see cref="CancellationToken"/>
+/// (they take <c>CommandFlags</c>), so an in-flight command cannot be cancelled mid-operation; the boundary
+/// check is the meaningful guarantee this transport can offer.
+/// </para>
 /// </summary>
 public sealed class RedisCheckpointStore : ICheckpointStore
 {
@@ -37,6 +43,7 @@ public sealed class RedisCheckpointStore : ICheckpointStore
     /// <inheritdoc />
     public async Task<Watermark?> LoadAsync(string sourceKey, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var json = await _backend.GetAsync(KeyFor(sourceKey)).ConfigureAwait(false);
         return json is null ? null : JsonSerializer.Deserialize<Watermark>(json);
     }
@@ -45,12 +52,16 @@ public sealed class RedisCheckpointStore : ICheckpointStore
     public Task SaveAsync(Watermark watermark, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(watermark);
+        cancellationToken.ThrowIfCancellationRequested();
         return _backend.SetAsync(KeyFor(watermark.SourceKey), JsonSerializer.Serialize(watermark));
     }
 
     /// <inheritdoc />
-    public Task ClearAsync(string sourceKey, CancellationToken cancellationToken) =>
-        _backend.DeleteAsync(KeyFor(sourceKey));
+    public Task ClearAsync(string sourceKey, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return _backend.DeleteAsync(KeyFor(sourceKey));
+    }
 
     private string KeyFor(string sourceKey)
     {
