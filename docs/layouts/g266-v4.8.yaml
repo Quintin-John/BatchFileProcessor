@@ -39,7 +39,7 @@ recordTypes:
       - { name: W136-ECT-PTG-ACT-TYP-CDE,     start: 13,   length: 4 }
       - { name: W136-ECT-PTG-AGT-RFE-TXT,     start: 17,   length: 30 }
       - { name: W136-ECT-PTG-ACT-RFE-NBR-TXT, start: 47,   length: 20 }
-      - { name: W136-ECT-PTG-ACT-OPE-BCH,     start: 67,   length: 4 }
+      - { name: W136-ECT-PTG-ACT-OPE-BCH,     start: 67,   length: 4, skip: true }
       - { name: W136-ECT-PTG-TXN-EXT-SLT-IND, start: 71,   length: 1 }
       - { name: W136-ECT-PTG-EXT-ACT-NBR,     start: 72,   length: 34, encrypt: true, required: true }
       - { name: W136-ECT-PTG-CLE-NBR,         start: 106,  length: 4 }
@@ -63,7 +63,7 @@ recordTypes:
       - { name: W136-ECT-PTG-ICE-RFE-NBR,     start: 291,  length: 16 }
       - { name: W136-ECT-PTG-GTG-ICE-RFE-NBR, start: 307,  length: 16 }
       - { name: W136-ECT-PTG-PAN-TXT,         start: 323,  length: 28, encrypt: true }
-      - { name: W136-ECT-PTG-CRD-BLK-DTE,     start: 351,  length: 10 }
+      - { name: W136-ECT-PTG-CRD-BLK-DTE,     start: 351,  length: 10, skip: true }
       - { name: W136-ECT-PTG-DBT-CDT-CDE,     start: 361,  length: 4 }
       - { name: W136-ECT-PTG-TXN-SRC-CDE,     start: 365,  length: 4 }
       - { name: W136-ECT-PTG-ATH-CDE-TXT,     start: 369,  length: 6 }
@@ -80,52 +80,52 @@ recordTypes:
       - { name: W136-ECT-PTG-SCM-BLG-AMT,     start: 484,  length: 17 }
       - { name: W136-ECT-PTG-SCM-BLG-CRY-CDE, start: 501,  length: 3 }
       - { name: W136-ECT-PTG-CHQ-NBR,         start: 504,  length: 9 }
-      - { name: W136-ECT-PTG-APM-RTN-RSN-CDE, start: 513,  length: 4 }
+      - { name: W136-ECT-PTG-APM-RTN-RSN-CDE, start: 513,  length: 4, skip: true }
       - { name: W136-ECT-PTG-SGLTXNLMT-ERR-FLG, start: 517, length: 1 }
       - { name: W136-ECT-PTG-MTH-SDL-ERR-FLG, start: 518,  length: 1 }
       - { name: W136-ECT-PTG-MCC-BLK-ERR-FLG, start: 519,  length: 1 }
       - { name: W136-ECT-PTG-PMY-CDR-VER-MHD, start: 520,  length: 4 }
       - { name: W136-ECT-PTG-TXN-DMN-CDE,     start: 524,  length: 4 }
       - { name: W136-ECT-ALT-PAN-TXT,         start: 528,  length: 28 }
-      - { name: W136-ECT-PTG-RPP-IDN-CDE,     start: 556,  length: 4 }
+      - { name: W136-ECT-PTG-RPP-IDN-CDE,     start: 556,  length: 4, skip: true }
       - { name: W136-ECT-OGL-AQR-SVF-AMT,     start: 560,  length: 17 }
       - { name: W136-ECT-PTG-AQR-SVF-AMT,     start: 577,  length: 17 }
       - { name: W136-ECT-SLT-AQR-SVF-AMT,     start: 594,  length: 17 }
       - { name: W136-ECT-OGL-AQR-FEF-AMT,     start: 611,  length: 17 }
       - { name: W136-ECT-PTG-AQR-FEF-AMT,     start: 628,  length: 17 }
       - { name: W136-ECT-SLT-AQR-FEF-AMT,     start: 645,  length: 17 }
-      - { name: W136-ECT-PTG-MSV-PTK-TYP-CDE, start: 662,  length: 4 }
-      - { name: W136-ECT-PTG-MSV-PTK-TXT,     start: 666,  length: 28 }
-      - { name: W136-ECT-PTG-TKN-RQR-IDN-TXT, start: 694,  length: 11 }
-      - { name: W136-ECT-PTG-DVE-TYP-CDE,     start: 705,  length: 4 }
-      - { name: W136-ECT-PTG-WLT-IDN-CDE,     start: 709,  length: 4 }
-      - { name: W136-ECT-PTG-ACY-FEE-1-CDE,   start: 713,  length: 4 }
+      - { name: W136-ECT-PTG-MSV-PTK-TYP-CDE, start: 662,  length: 4, skip: true }
+      - { name: W136-ECT-PTG-MSV-PTK-TXT,     start: 666,  length: 28, skip: true }
+      - { name: W136-ECT-PTG-TKN-RQR-IDN-TXT, start: 694,  length: 11, skip: true }
+      - { name: W136-ECT-PTG-DVE-TYP-CDE,     start: 705,  length: 4, skip: true }
+      - { name: W136-ECT-PTG-WLT-IDN-CDE,     start: 709,  length: 4, skip: true }
+      - { name: W136-ECT-PTG-ACY-FEE-1-CDE,   start: 713,  length: 4, skip: true }
       - { name: W136-ECT-PTG-ACY-FEE-1-AMT,   start: 717,  length: 17 }
-      - { name: W136-ECT-PTG-ACY-FEE-2-CDE,   start: 734,  length: 4 }
+      - { name: W136-ECT-PTG-ACY-FEE-2-CDE,   start: 734,  length: 4, skip: true }
       - { name: W136-ECT-PTG-ACY-FEE-2-AMT,   start: 738,  length: 17 }
-      - { name: W136-ECT-PTG-ACY-FEE-3-CDE,   start: 755,  length: 4 }
+      - { name: W136-ECT-PTG-ACY-FEE-3-CDE,   start: 755,  length: 4, skip: true }
       - { name: W136-ECT-PTG-ACY-FEE-3-AMT,   start: 759,  length: 17 }
-      - { name: W136-ECT-PTG-ACY-FEE-4-CDE,   start: 776,  length: 4 }
+      - { name: W136-ECT-PTG-ACY-FEE-4-CDE,   start: 776,  length: 4, skip: true }
       - { name: W136-ECT-PTG-ACY-FEE-4-AMT,   start: 780,  length: 17 }
-      - { name: W136-ECT-PTG-ACY-FEE-5-CDE,   start: 797,  length: 4 }
+      - { name: W136-ECT-PTG-ACY-FEE-5-CDE,   start: 797,  length: 4, skip: true }
       - { name: W136-ECT-PTG-ACY-FEE-5-AMT,   start: 801,  length: 17 }
-      - { name: W136-ECT-PTG-ACY-FEE-6-CDE,   start: 818,  length: 4 }
+      - { name: W136-ECT-PTG-ACY-FEE-6-CDE,   start: 818,  length: 4, skip: true }
       - { name: W136-ECT-PTG-ACY-FEE-6-AMT,   start: 822,  length: 17 }
-      - { name: W136-ECT-PAS-TGH-DTA-TXT,     start: 839,  length: 100 }
+      - { name: W136-ECT-PAS-TGH-DTA-TXT,     start: 839,  length: 100, skip: true }
       - { name: W136-ECT-MTE-CRG-SEQ-NBR,     start: 939,  length: 4 }
       - { name: W136-ECT-MTE-CRG-SEQ-CNT-NBR, start: 943,  length: 4 }
-      - { name: W136-ECT-PTG-CRT-BAL-AMT,     start: 947,  length: 18 }
-      - { name: W136-ECT-PTG-AVE-BAL-AMT,     start: 965,  length: 18 }
-      - { name: W136-ECT-PTG-PTG-MHE-DTE,     start: 983,  length: 10 }
-      - { name: W136-ECT-PTG-PTG-MHE-TME,     start: 993,  length: 8 }
-      - { name: W136-ECT-PTG-MSG-TYP-IDN-CDE, start: 1001, length: 4 }
-      - { name: W136-ECT-NWK-IDN-TXT,         start: 1005, length: 6 }
-      - { name: W136-ECT-RTV-RFE-NBR-TXT,     start: 1011, length: 12 }
-      - { name: W136-ECT-ATH-RTV-RFE-NBR-TXT, start: 1023, length: 12 }
-      - { name: W136-ECT-CSB-TXN-AMT,         start: 1035, length: 17 }
-      - { name: W136-ECT-CSB-PTG-AMT,         start: 1052, length: 17 }
-      - { name: W136-ECT-EXX-TXN-DES-TXT,     start: 1069, length: 82 }
-      - { name: FILLER,                       start: 1151, length: 50 }
+      - { name: W136-ECT-PTG-CRT-BAL-AMT,     start: 947,  length: 18, skip: true }
+      - { name: W136-ECT-PTG-AVE-BAL-AMT,     start: 965,  length: 18, skip: true }
+      - { name: W136-ECT-PTG-PTG-MHE-DTE,     start: 983,  length: 10, skip: true }
+      - { name: W136-ECT-PTG-PTG-MHE-TME,     start: 993,  length: 8, skip: true }
+      - { name: W136-ECT-PTG-MSG-TYP-IDN-CDE, start: 1001, length: 4, skip: true }
+      - { name: W136-ECT-NWK-IDN-TXT,         start: 1005, length: 6, skip: true }
+      - { name: W136-ECT-RTV-RFE-NBR-TXT,     start: 1011, length: 12, skip: true }
+      - { name: W136-ECT-ATH-RTV-RFE-NBR-TXT, start: 1023, length: 12, skip: true }
+      - { name: W136-ECT-CSB-TXN-AMT,         start: 1035, length: 17, skip: true }
+      - { name: W136-ECT-CSB-PTG-AMT,         start: 1052, length: 17, skip: true }
+      - { name: W136-ECT-EXX-TXN-DES-TXT,     start: 1069, length: 82, skip: true }
+      - { name: FILLER,                       start: 1151, length: 50, skip: true }
 
   aer:                       # Authorisation Extract Record
     match: "AUTH"            # confirmed: authorisation records start with AUTH
