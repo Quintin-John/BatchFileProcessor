@@ -13,6 +13,15 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class MessagingServiceCollectionExtensions
 {
+    /// <summary>
+    /// Raw-JSON publish options for producers: bare domain JSON with the MassTransit transport headers
+    /// suppressed. It deliberately omits <see cref="RawSerializerOptions.AddTransportHeaders"/> (the default),
+    /// so MT-Host-Info (host/version/OS disclosure), MT-MessageType, MT-Source-Address, ConversationId, and
+    /// the duplicate MessageId/CorrelationId headers are not stamped. Only the message-id/correlation_id AMQP
+    /// properties and our own X-Correlation-Id header remain.
+    /// </summary>
+    internal const RawSerializerOptions PublishSerializerOptions = RawSerializerOptions.AnyMessageType;
+
     /// <summary>Registers MassTransit and the publisher from validated options.</summary>
     /// <param name="services">The service collection.</param>
     /// <param name="transport">Transport options; validated.</param>
@@ -57,11 +66,14 @@ public static class MessagingServiceCollectionExtensions
                             return options;
                         });
 
-                        // Publish bare domain JSON (content-type application/json), not the MassTransit
-                        // envelope, so any downstream consumer can read the messages without knowing MassTransit.
-                        // The message-id property and X-Correlation-Id / traceparent headers still ride the
-                        // transport, so dedup and tracing are unaffected.
-                        rabbit.UseRawJsonSerializer();
+                        // Publish bare domain JSON (content-type application/json), not the MassTransit envelope,
+                        // so any downstream consumer can read the messages without knowing MassTransit. Passing
+                        // AnyMessageType (i.e. omitting the default AddTransportHeaders) also stops the MT-*
+                        // application headers — MT-Host-Info (which leaks machine/version/OS), MT-MessageType,
+                        // MT-Source-Address, ConversationId, and the duplicate MessageId/CorrelationId — from
+                        // being stamped. The message-id/correlation_id AMQP properties and our X-Correlation-Id
+                        // header still ride the transport, so dedup and tracing are unaffected.
+                        rabbit.UseRawJsonSerializer(PublishSerializerOptions);
                         rabbit.ConfigureEndpoints(context);
                     });
                     break;

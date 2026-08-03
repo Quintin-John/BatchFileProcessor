@@ -1,0 +1,247 @@
+# =============================================================================
+# G266 fixed-width layout — version 4.11 (ACI EPS-ISSUER / CMM)
+# Transcribed 2026-08-03 from the ACI mapping workbook, sheet "G266_4.11"
+# (compared against the existing 4.8.2 positions in that workbook).
+#
+# Same soft-coded model as g266-v4.8.yaml — the pump slices bytes and emits them raw:
+#   - record types (FHR / PER / TFT / FTR), each exactly 2400 bytes; discriminator at start 1, length 4
+#       HEAD -> fhr,  T010 -> per,  T020 -> tft,  TRAI -> ftr
+#     (In 4.11 the transaction rows use discriminators T010/T020, where 4.8 used TRAN/AUTH.)
+#   - every field's NAME, START (1-based), LENGTH — fields must tile each record with no gaps
+#   - optional per-field flags:
+#       encrypt: true   -> the field is encrypted before publish (PAN / account / PII)
+#       required: true  -> the record is rejected if this field is blank
+#
+# TRANSCRIPTION NOTE: New Start/End/Length were read from photographed spreadsheet cells and validated by
+# tiling each record to exactly 2400 (see the accompanying check). Field names transcribed from column C.
+#
+# ENCRYPTION NOTE (awaiting sign-off): carries 4.8 (EXT-ACT-NBR encrypt+required, PAN-TXT encrypt) and adds
+# encrypt on new PAN/token/account/PII fields. Every encrypted field is listed for the owner to approve.
+# Location-only PII (city/state/country/postal) is deliberately NOT encrypted; adjust before shipping.
+# =============================================================================
+version: "4.11"
+recordLength: 2400
+encoding: ascii
+terminator: 1          # unchanged from 4.8 (1 = LF); confirm the framing spec if 4.11 differs
+discriminator: { start: 1, length: 4 }
+
+recordTypes:
+
+  fhr:                       # File Header Record
+    match: "HEAD"
+    skip: true               # control record: consumed for framing, never emitted upstream
+    fields:
+      - { name: W136-HDR-IDN-CDE, start: 1,  length: 4 }
+      - { name: W136-HDR-DTE,     start: 5,  length: 10 }
+      - { name: W136-HDR-TME,     start: 15, length: 8 }
+      - { name: FILLER,           start: 23, length: 2378 }
+
+  per:                       # Posting Extract Record (T010)
+    match: "T010"
+    fields:
+      - { name: W136-PTG-RCD-IDN-CDE,          start: 1,    length: 4 }
+      - { name: W136-PTG-ITN-IDN-CDE,          start: 5,    length: 4 }
+      - { name: W136-PTG-ACT-RFE-NBR-TXT,      start: 9,    length: 20 }
+      - { name: W136-PTG-CLE-NBR,              start: 29,   length: 4 }
+      - { name: W136-PTG-TXN-SMY-IDN-NBR,      start: 33,   length: 9 }
+      - { name: W136-PTG-PDT-IDN-CDE,          start: 42,   length: 4 }
+      - { name: W136-PTG-ACT-TYP-CDE,          start: 46,   length: 4 }
+      - { name: W136-PTG-AGT-RFE-TXT,          start: 50,   length: 30 }
+      - { name: W136-PTG-ACT-OPE-BCH,          start: 80,   length: 4 }
+      - { name: W136-PTG-TXN-EXT-SLT-IND,      start: 84,   length: 1 }
+      - { name: W136-PTG-EXT-ACT-NBR,          start: 85,   length: 34, encrypt: true, required: true }
+      - { name: W136-PTG-GTG-TXN-SMY-NBR,      start: 119,  length: 9 }
+      - { name: W136-PTG-GTG-TXN-CLE-NBR,      start: 128,  length: 4 }
+      - { name: W136-PTG-TXN-DTE,              start: 132,  length: 10 }
+      - { name: W136-PTG-OGL-TXN-CRY-CDE,      start: 142,  length: 3 }
+      - { name: W136-PTG-OGL-TXN-AMT,          start: 145,  length: 17 }
+      - { name: W136-PTG-SCM-SLT-DTE,          start: 162,  length: 10 }
+      - { name: W136-PTG-ITN-DFT-CRY-CDE,      start: 172,  length: 3 }
+      - { name: W136-PTG-ITN-DFT-CRY-EXP,      start: 175,  length: 1 }
+      - { name: W136-PTG-ITN-DFT-AMT,          start: 176,  length: 17 }
+      - { name: W136-PTG-PTG-ACT-RFE-NBR,      start: 193,  length: 20 }
+      - { name: W136-PTG-PTG-DTE,              start: 213,  length: 10 }
+      - { name: W136-PTG-PTG-CRY-CDE,          start: 223,  length: 3 }
+      - { name: W136-PTG-PTG-CRY-EXP,          start: 226,  length: 1 }
+      - { name: W136-PTG-PTG-AMT,              start: 227,  length: 17 }
+      - { name: W136-PTG-PTG-CVT-RTE,          start: 244,  length: 9 }
+      - { name: W136-PTG-SLT-ACT-RFE-NBR,      start: 253,  length: 20 }
+      - { name: W136-PTG-SLT-CRY-CDE,          start: 273,  length: 3 }
+      - { name: W136-PTG-SLT-CRY-EXP,          start: 276,  length: 1 }
+      - { name: W136-PTG-SLT-AMT,              start: 277,  length: 17 }
+      - { name: W136-PTG-TXN-CDE,              start: 294,  length: 4 }
+      - { name: W136-PTG-ICE-RFE-NBR,          start: 298,  length: 16 }
+      - { name: W136-PTG-GTG-ICE-RFE-NBR,      start: 314,  length: 16 }
+      - { name: W136-PTG-PAN-TXT,              start: 330,  length: 28, encrypt: true }
+      - { name: W136-PTG-CRD-BLK-DTE,          start: 358,  length: 10 }
+      - { name: W136-PTG-DBT-CDT-CDE,          start: 368,  length: 4 }
+      - { name: W136-PTG-TXN-SRC-CDE,          start: 372,  length: 4 }
+      - { name: W136-PTG-ATH-CDE-TXT,          start: 376,  length: 6 }
+      - { name: W136-PTG-ATH-MCH-IND,          start: 382,  length: 1 }
+      - { name: W136-PTG-MCC-TXT,              start: 383,  length: 4 }
+      - { name: W136-PTG-TXN-ON-SMT-IND,       start: 387,  length: 1 }
+      - { name: W136-PTG-TXN-TME,              start: 388,  length: 8 }
+      - { name: W136-PTG-TXN-DES-TXT,          start: 396,  length: 43 }
+      - { name: W136-PTG-ADL-SLT-MCH-TXT,      start: 439,  length: 15 }
+      - { name: W136-PTG-PSV-DTA-CDE-TXT,      start: 454,  length: 12 }
+      - { name: W136-PTG-PCS-CDE-NBR,          start: 466,  length: 2 }
+      - { name: W136-PTG-CRD-ACR-TML-TXT,      start: 468,  length: 8 }
+      - { name: W136-PTG-CRD-ACR-IDN-TXT,      start: 476,  length: 15 }
+      - { name: W136-PTG-SCM-BLG-AMT,          start: 491,  length: 17 }
+      - { name: W136-PTG-SCM-BLG-CRY-CDE,      start: 508,  length: 3 }
+      - { name: W136-PTG-SCM-BLG-CRY-EXP,      start: 511,  length: 1 }
+      - { name: W136-PTG-CHQ-NBR,              start: 512,  length: 9 }
+      - { name: W136-PTG-APM-RTN-RSN-CDE,      start: 521,  length: 4 }
+      - { name: W136-PTG-SGLTXNLMT-ERR-FLG,    start: 525,  length: 1 }
+      - { name: W136-PTG-MTH-SDL-ERR-FLG,      start: 526,  length: 1 }
+      - { name: W136-PTG-MCC-BLK-ERR-FLG,      start: 527,  length: 1 }
+      - { name: W136-PTG-PMY-CDR-VER-MHD,      start: 528,  length: 4 }
+      - { name: W136-PTG-TXN-DMN-CDE,          start: 532,  length: 4 }
+      - { name: W136-ALT-PAN-TXT,              start: 536,  length: 28, encrypt: true }
+      - { name: W136-PTG-RPP-IDN-CDE,          start: 564,  length: 4 }
+      - { name: W136-OGL-AQR-SVF-AMT,          start: 568,  length: 17 }
+      - { name: W136-PTG-AQR-SVF-AMT,          start: 585,  length: 17 }
+      - { name: W136-SLT-AQR-SVF-AMT,          start: 602,  length: 17 }
+      - { name: W136-PTG-SCM-BLG-CVN-RTE,      start: 619,  length: 18 }
+      - { name: W136-OGL-AQR-FEF-AMT,          start: 637,  length: 17 }
+      - { name: W136-PTG-AQR-FEF-AMT,          start: 654,  length: 17 }
+      - { name: W136-SLT-AQR-FEF-AMT,          start: 671,  length: 17 }
+      - { name: W136-PTG-MSV-PTK-TYP-CDE,      start: 688,  length: 4 }
+      - { name: W136-PTG-MSV-PTK-TXT,          start: 692,  length: 28, encrypt: true }
+      - { name: W136-PTG-TKN-RQR-IDN-TXT,      start: 720,  length: 11 }
+      - { name: W136-PTG-DVE-TYP-CDE,          start: 731,  length: 4 }
+      - { name: W136-PTG-WLT-IDN-CDE,          start: 735,  length: 4 }
+      - { name: W136-PTG-ACY-FEE-1-CDE,        start: 739,  length: 4 }
+      - { name: W136-PTG-ACY-FEE-1-AMT,        start: 743,  length: 17 }
+      - { name: W136-PTG-ACY-FEE-2-CDE,        start: 760,  length: 4 }
+      - { name: W136-PTG-ACY-FEE-2-AMT,        start: 764,  length: 17 }
+      - { name: W136-PTG-ACY-FEE-3-CDE,        start: 781,  length: 4 }
+      - { name: W136-PTG-ACY-FEE-3-AMT,        start: 785,  length: 17 }
+      - { name: W136-PTG-ACY-FEE-4-CDE,        start: 802,  length: 4 }
+      - { name: W136-PTG-ACY-FEE-4-AMT,        start: 806,  length: 17 }
+      - { name: W136-PTG-ACY-FEE-5-CDE,        start: 823,  length: 4 }
+      - { name: W136-PTG-ACY-FEE-5-AMT,        start: 827,  length: 17 }
+      - { name: W136-PTG-ACY-FEE-6-CDE,        start: 844,  length: 4 }
+      - { name: W136-PTG-ACY-FEE-6-AMT,        start: 848,  length: 17 }
+      - { name: W136-PAS-TGH-DTA-TXT,          start: 865,  length: 100 }
+      - { name: W136-MTE-CRG-SEQ-NBR,          start: 965,  length: 4 }
+      - { name: W136-MTE-CRG-SEQ-CNT-NBR,      start: 969,  length: 4 }
+      - { name: W136-PTG-ACR-STR-ADR-TXT,      start: 973,  length: 48 }
+      - { name: W136-PTG-ACR-PSL-CDE-TXT,      start: 1021, length: 10 }
+      - { name: W136-PTG-ACR-CSR-SVE-PHE,      start: 1031, length: 16 }
+      - { name: W136-PTG-ACR-PHE-NBR-TXT,      start: 1047, length: 16 }
+      - { name: W136-PTG-ACR-URL-TXT,          start: 1063, length: 255 }
+      - { name: W136-PTG-PNR-IDN-TXT,          start: 1318, length: 6 }
+      - { name: W136-PTG-PMT-FAR-IDN-TXT,      start: 1324, length: 11 }
+      - { name: W136-PTG-SUB-MHT-IDN-TXT,      start: 1335, length: 15 }
+      - { name: W136-PTG-SVE-LCN-CTY-NME,      start: 1350, length: 13 }
+      - { name: W136-PTG-SVE-LCN-CNY-SUB,      start: 1363, length: 3 }
+      - { name: W136-PTG-SVE-LCN-CNY-TXT,      start: 1366, length: 3 }
+      - { name: W136-PTG-SVE-LCN-PSL-CDE-TXT,  start: 1369, length: 10 }
+      - { name: W136-PTG-ACR-TAX-IDN-TXT,      start: 1379, length: 21 }
+      - { name: W136-PTG-ACR-NME-TXT,          start: 1400, length: 25 }
+      - { name: W136-PTG-ACR-CTY-TXT,          start: 1425, length: 13 }
+      - { name: W136-PTG-ACR-RGN-TXT,          start: 1438, length: 3 }
+      - { name: W136-PTG-ACR-CNY-TXT,          start: 1441, length: 3 }
+      - { name: W136-PTG-SCM-UUI-TXT,          start: 1444, length: 36 }
+      - { name: W136-PTG-ITL-UUI-TXT,          start: 1480, length: 36 }
+      - { name: W136-PTG-EXT-UUI-1-TXT,        start: 1516, length: 36 }
+      - { name: W136-PTG-EXT-UUI-2-TXT,        start: 1552, length: 36 }
+      - { name: W136-PTG-AQG-ITN-IDN-TXT,      start: 1588, length: 11 }
+      - { name: W136-PTG-OGL-TXN-CRY-EXP,      start: 1599, length: 1 }
+      - { name: W136-PTG-FWD-ITN-IDN-TXT,      start: 1600, length: 11 }
+      - { name: W136-PTG-ATH-CDR-BLG-AMT,      start: 1611, length: 17 }
+      - { name: W136-PTG-ATH-CDR-BLG-CRY-CDE,  start: 1628, length: 3 }
+      - { name: W136-PTG-ATH-INL-OGL-TXN-AMT,  start: 1631, length: 17 }
+      - { name: W136-PTG-ATH-FAL-OGL-TXN-AMT,  start: 1648, length: 17 }
+      - { name: W136-PTG-ATH-OGL-TXN-CRY-CDE,  start: 1665, length: 3 }
+      - { name: W136-PTG-PTG-RUN-NBR,          start: 1668, length: 4 }
+      - { name: W136-PTG-SPE-ITM-DTE,          start: 1672, length: 10 }
+      - { name: W136-PTG-ACQ-RFE-DTA-TXT,      start: 1682, length: 23 }
+      - { name: W136-PTG-SCM-RCN-AMT,          start: 1705, length: 17 }
+      - { name: W136-PTG-SCM-RCN-CRY-CDE,      start: 1722, length: 3 }
+      - { name: W136-PTG-PTG-MHE-DTE,          start: 1725, length: 10 }
+      - { name: W136-PTG-PTG-MHE-TME,          start: 1735, length: 8 }
+      - { name: W136-PTG-CNP-TXN-TYP-CDE,      start: 1743, length: 4 }
+      - { name: W136-PTG-ECE-IND-CDE,          start: 1747, length: 4 }
+      - { name: W136-PTG-EXX-TXN-DES-TXT,      start: 1751, length: 200 }
+      - { name: W136-PTG-TXN-SYE-BUS-APP-CDE,  start: 1951, length: 4 }
+      - { name: W136-PTG-CIT-MIT-IND-CDE,      start: 1955, length: 4 }
+      - { name: W136-PTG-OGL-PCS-DEN-CDE,      start: 1959, length: 4 }
+      - { name: W136-PTG-USR-PCS-DEN-CDE,      start: 1963, length: 4 }
+      - { name: W136-PTG-MCD-ECE-IND-TXT,      start: 1967, length: 3 }
+      - { name: W136-PTG-SAF-POS-DTA-CDE,      start: 1970, length: 5 }
+      - { name: W136-PTG-SAF-POS-ENY-MDE,      start: 1975, length: 3 }
+      - { name: W136-PTG-CVC-RST-TXT,          start: 1978, length: 1 }
+      - { name: W136-PTG-CBK-ELG-IND-TXT,      start: 1979, length: 1 }
+      - { name: W136-PTG-ACR-GOG-COO-TXT,      start: 1980, length: 20 }
+      - { name: W136-PTG-SVE-LCN-GOG-COO-TXT,  start: 2000, length: 20 }
+      - { name: W136-PTG-TCL-FBK-IND,          start: 2020, length: 1 }
+      - { name: W136-PTG-AAV-TXT,              start: 2021, length: 32 }
+      - { name: W136-PTG-IPT-UID,              start: 2053, length: 8 }
+      - { name: W136-PTG-USR-IPT-DTE,          start: 2061, length: 10 }
+      - { name: W136-PTG-USR-IPT-TME,          start: 2071, length: 8 }
+      - { name: W136-PTG-SPV-APR-UID,          start: 2079, length: 8 }
+      - { name: W136-PTG-SPV-APR-DTE,          start: 2087, length: 10 }
+      - { name: W136-PTG-SPV-APR-TME,          start: 2097, length: 8 }
+      - { name: W136-PTG-DIL-CRY-TYP-CDE,      start: 2105, length: 1 }
+      - { name: W136-PTG-C-CRT-BAL-AMT,        start: 2106, length: 18 }
+      - { name: W136-PTG-C-AVE-BAL-AMT,        start: 2124, length: 18 }
+      - { name: W136-PTG-C-MSG-TYP-IDN-CDE,    start: 2142, length: 4 }
+      - { name: W136-PTG-C-NWK-IDN-TXT,        start: 2146, length: 6 }
+      - { name: W136-PTG-C-RTV-RFE-NBR-TXT,    start: 2152, length: 12 }
+      - { name: W136-PTG-C-ATH-RTV-RFE-NBR-TXT, start: 2164, length: 12 }
+      - { name: W136-PTG-C-CSB-TXN-AMT,        start: 2176, length: 17 }
+      - { name: W136-PTG-C-CSB-PTG-AMT,        start: 2193, length: 17 }
+      - { name: FILLER,                        start: 2210, length: 191 }
+
+  tft:                       # TFT record (discriminator T020)
+    match: "T020"
+    fields:
+      - { name: W136-TFT-RCD-IDN-CDE,          start: 1,    length: 4 }
+      - { name: W136-TFT-ITN-IDN-CDE,          start: 5,    length: 4 }
+      - { name: W136-TFT-ACT-RFE-NBR-TXT,      start: 9,    length: 20 }
+      - { name: W136-TFT-CLE-NBR,              start: 29,   length: 4 }
+      - { name: W136-TFT-TXN-SMY-IDN-NBR,      start: 33,   length: 9 }
+      - { name: W136-TFT-SND-NME-TXT,          start: 42,   length: 35, encrypt: true }
+      - { name: W136-TFT-SND-ADR-TXT,          start: 77,   length: 50, encrypt: true }
+      - { name: W136-TFT-SND-CTY-TXT,          start: 127,  length: 25 }
+      - { name: W136-TFT-SND-SAE-TXT,          start: 152,  length: 3 }
+      - { name: W136-TFT-SND-CNY-TXT,          start: 155,  length: 3 }
+      - { name: W136-TFT-SND-PSL-CDE-TXT,      start: 158,  length: 10 }
+      - { name: W136-TFT-SND-DOB-DTE,          start: 168,  length: 10, encrypt: true }
+      - { name: W136-TFT-SND-FST-NME-TXT,      start: 178,  length: 35, encrypt: true }
+      - { name: W136-TFT-SND-MID-NME-TXT,      start: 213,  length: 1,  encrypt: true }
+      - { name: W136-TFT-SND-PHE-NBR-TXT,      start: 214,  length: 20, encrypt: true }
+      - { name: W136-TFT-SND-ACT-NBR-TXT,      start: 234,  length: 20, encrypt: true }
+      - { name: W136-TFT-RNT-FST-NME-TXT,      start: 254,  length: 35, encrypt: true }
+      - { name: W136-TFT-RNT-MID-NME-TXT,      start: 289,  length: 1,  encrypt: true }
+      - { name: W136-TFT-RNT-FMY-NME-TXT,      start: 290,  length: 35, encrypt: true }
+      - { name: W136-TFT-RNT-ADR-TXT,          start: 325,  length: 50, encrypt: true }
+      - { name: W136-TFT-RNT-CTY-TXT,          start: 375,  length: 25 }
+      - { name: W136-TFT-RNT-SAE-TXT,          start: 400,  length: 3 }
+      - { name: W136-TFT-RNT-CNY-TXT,          start: 403,  length: 3 }
+      - { name: W136-TFT-RNT-PSL-CDE-TXT,      start: 406,  length: 10 }
+      - { name: W136-TFT-RNT-PHE-NBR-TXT,      start: 416,  length: 20, encrypt: true }
+      - { name: W136-TFT-RNT-DOB-DTE,          start: 436,  length: 10, encrypt: true }
+      - { name: W136-TFT-RNT-ACT-NBR-TXT,      start: 446,  length: 20, encrypt: true }
+      - { name: W136-TFT-PMT-RSN-TXT,          start: 466,  length: 12 }
+      - { name: W136-TFT-SND-IDN-TYP-CDE,      start: 478,  length: 4 }
+      - { name: W136-TFT-SND-IDN-VAL-TXT,      start: 482,  length: 35, encrypt: true }
+      - { name: W136-TFT-SND-IDN-ISG-CNY-TXT,  start: 517,  length: 3 }
+      - { name: W136-TFT-RNT-IDN-TYP-CDE,      start: 520,  length: 4 }
+      - { name: W136-TFT-RNT-IDN-VAL-TXT,      start: 524,  length: 35, encrypt: true }
+      - { name: W136-TFT-RNT-IDN-ISG-CNY-TXT,  start: 559,  length: 4 }
+      - { name: FILLER,                        start: 563,  length: 1838 }
+
+  ftr:                       # File Trailer Record
+    match: "TRAI"
+    skip: true               # control record: consumed for framing, never emitted upstream
+    fields:
+      - { name: W136-TLR-IDN-CDE, start: 1,  length: 4 }   # "TRAI"
+      - { name: FILLER-1,         start: 5,  length: 5 }
+      - { name: W136-TLR-PTG-NBR, start: 10, length: 17 }  # count of posting extract records
+      - { name: FILLER-2,         start: 27, length: 5 }
+      - { name: W136-TLR-ATH-NBR, start: 32, length: 17 }  # count of authorisation extract records
+      - { name: W136-TLR-LST-CDE, start: 49, length: 4 }   # "LAST"
+      - { name: FILLER-3,         start: 53, length: 2348 }
