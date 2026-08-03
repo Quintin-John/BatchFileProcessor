@@ -382,6 +382,14 @@ public sealed class FileIngestionPipeline
     private async ValueTask EmitBatchLineageAsync(
         FileRun run, IngestBatchMessage batch, LineageState state, string? reasonCode, CancellationToken cancellationToken)
     {
+        // Skip the whole per-record loop (and the BatchReference) when lineage is off — otherwise this is
+        // O(records) of pure no-op emits per batch. The per-record emits elsewhere are already gated inside
+        // RecordLineage, so this is the only pipeline-side lineage-only work that needs the guard.
+        if (!_lineage.Enabled)
+        {
+            return;
+        }
+
         var batchRef = new BatchReference(batch.BatchSeq, batch.MessageId);
         foreach (var record in batch.Records)
         {

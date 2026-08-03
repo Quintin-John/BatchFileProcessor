@@ -35,7 +35,7 @@ public sealed class FileIngestionPipelineTests
         public int PublisherConcurrency { get; set; } = 1;  // deterministic by default; fan-out tests raise it
         public int PublisherConfirmWindow { get; set; } = 64; // large enough not to gate; window test lowers it
 
-        public FileIngestionPipeline Build(int maxRecords = 2)
+        public FileIngestionPipeline Build(int maxRecords = 2, bool lineageEnabled = true)
         {
             var instrumentation = new ObservabilityInstrumentation("test-pipeline");
             return new FileIngestionPipeline(
@@ -46,7 +46,7 @@ public sealed class FileIngestionPipelineTests
                 new RejectSink(Publisher, "rejects"),
                 Checkpoints,
                 new IngestionMetrics(instrumentation),
-                new RecordLineage(Lineage, TimeProvider.System),
+                new RecordLineage(Lineage, TimeProvider.System, enabled: lineageEnabled),
                 new IngestionTracing(instrumentation),
                 new Heartbeat(TimeProvider.System),
                 new IngestionOptions(
@@ -370,6 +370,32 @@ public sealed class FileIngestionPipelineTests
         }
 
         Assert.Equal([LineageState.Skipped], States(events, recordSeq: 1)); // control record: only Skipped
+    }
+
+    [Fact]
+    public async Task Ingest_LineageDisabled_EmitsNoLineage_ButStillPublishes()
+    {
+        var harness = new Harness();
+        var bytes = Bytes(FileText); // 3 accepted + 1 rejected
+
+        var outcome = await harness.Build(maxRecords: 2, lineageEnabled: false)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+        harness.Lineage.Complete();
+
+        // The pipeline still publishes/rejects normally...
+        Assert.Equal(3, outcome.RecordsAccepted);
+        Assert.NotEmpty(harness.Publisher.Batches);
+        Assert.Single(harness.Publisher.Rejects);
+
+        // ...but produces zero lineage — proving ProcessAsync's emits AND the EmitBatchLineageAsync loops
+        // are fully gated when disabled (no per-record or per-batch lineage work leaks through).
+        var events = new List<LineageEvent>();
+        await foreach (var e in harness.Lineage.Reader.ReadAllAsync())
+        {
+            events.Add(e);
+        }
+
+        Assert.Empty(events);
     }
 
     private static List<LineageState> States(IEnumerable<LineageEvent> events, long recordSeq) =>

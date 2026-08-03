@@ -38,7 +38,7 @@ public sealed class ProfilePipelineFactoryTests
             keys,
             new DefaultPayloadProtector(new AesGcmCryptoProvider(), keys),
             new IngestionMetrics(instrumentation),
-            new RecordLineage(new ChannelLineageEmitter(100), TimeProvider.System),
+            new RecordLineage(new ChannelLineageEmitter(100), TimeProvider.System, enabled: true),
             new IngestionTracing(instrumentation),
             new Heartbeat(TimeProvider.System),
             new PipelineTuning(64, 1, 64));
@@ -77,7 +77,7 @@ public sealed class ProfilePipelineFactoryTests
         Assert.Throws<ArgumentNullException>(() => new ProfilePipelineFactory(
             null!, new NoOpCheckpointStore(), new AesGcmCryptoProvider(), keys,
             new DefaultPayloadProtector(new AesGcmCryptoProvider(), keys), new IngestionMetrics(instrumentation),
-            new RecordLineage(new ChannelLineageEmitter(100), TimeProvider.System), new IngestionTracing(instrumentation),
+            new RecordLineage(new ChannelLineageEmitter(100), TimeProvider.System, enabled: true), new IngestionTracing(instrumentation),
             new Heartbeat(TimeProvider.System), new PipelineTuning(64, 1, 64)));
     }
 

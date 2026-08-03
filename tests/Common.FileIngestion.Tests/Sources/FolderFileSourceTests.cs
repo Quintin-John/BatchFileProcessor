@@ -98,6 +98,30 @@ public sealed class FolderFileSourceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(Incoming, "dup.dat"))); // left for the orphan to clear
     }
 
+    [Theory]
+    [InlineData(false)] // FileNotFound (IOException) — arrival vanished between enumerate and probe
+    [InlineData(true)]  // UnauthorizedAccess — transient lock / permission
+    public void Claim_CompletionProbeThrows_SkipsThatFile_StillClaimsOthers_DoesNotFault(bool unauthorized)
+    {
+        // A probe failure on one arrival must skip only that file — never propagate out of Claim (which would
+        // fault the worker's BackgroundService and halt all ingestion). Already-claimed files must survive.
+        Exception probeError = unauthorized
+            ? new UnauthorizedAccessException("locked")
+            : new FileNotFoundException("gone");
+        var logger = new CapturingLogger<FolderFileSource>();
+        var source = SourceWith(logger, new ThrowingGuard("boom", probeError));
+        DropIncoming("a-good.dat"); // sorts first: claimed before the throwing file is reached
+        DropIncoming("z-boom.dat"); // probe throws on this one
+
+        var claimed = source.Claim(); // must not throw
+
+        Assert.Equal("a-good.dat", Assert.Single(claimed).Name);          // good file still claimed, not discarded
+        Assert.True(File.Exists(Path.Combine(Incoming, "z-boom.dat")));    // throwing file left for a later poll
+        Assert.Contains(
+            logger.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains("z-boom.dat", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void RecoverOrphans_ReturnsFilesLeftInProcessing()
     {
@@ -228,6 +252,13 @@ public sealed class FolderFileSourceTests : IDisposable
     private sealed class StubGuard(bool complete) : ICompletionGuard
     {
         public bool IsComplete(string path) => complete;
+    }
+
+    // Simulates a probe failure (file vanished/locked mid-poll) for paths matching a marker; complete otherwise.
+    private sealed class ThrowingGuard(string throwOnMarker, Exception error) : ICompletionGuard
+    {
+        public bool IsComplete(string path) =>
+            path.Contains(throwOnMarker, StringComparison.Ordinal) ? throw error : true;
     }
 
     private sealed class CapturingLogger<T> : ILogger<T>

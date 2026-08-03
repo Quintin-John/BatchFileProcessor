@@ -64,6 +64,39 @@ public sealed class RedisCheckpointStoreTests
     }
 
     [Fact]
+    public async Task Load_CancelledToken_ThrowsBeforeTouchingBackend()
+    {
+        var (store, backend) = Build();
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store.LoadAsync("src.dat", cts.Token));
+        Assert.Equal(0, backend.Calls); // failed fast; no Redis command issued
+    }
+
+    [Fact]
+    public async Task Save_CancelledToken_ThrowsBeforeTouchingBackend()
+    {
+        var (store, backend) = Build();
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store.SaveAsync(Sample(), cts.Token));
+        Assert.Equal(0, backend.Calls);
+    }
+
+    [Fact]
+    public async Task Clear_CancelledToken_ThrowsBeforeTouchingBackend()
+    {
+        var (store, backend) = Build();
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store.ClearAsync("src.dat", cts.Token));
+        Assert.Equal(0, backend.Calls);
+    }
+
+    [Fact]
     public void Constructor_NullBackend_Throws() =>
         Assert.Throws<ArgumentNullException>(() => new RedisCheckpointStore((IRedisWatermarkBackend)null!, Prefix));
 
@@ -75,17 +108,25 @@ public sealed class RedisCheckpointStoreTests
     {
         public Dictionary<string, string> Store { get; } = new(StringComparer.Ordinal);
 
-        public Task<string?> GetAsync(string key) =>
-            Task.FromResult(Store.TryGetValue(key, out var value) ? value : null);
+        /// <summary>Number of backend operations invoked — proves a cancelled call never reaches Redis.</summary>
+        public int Calls { get; private set; }
+
+        public Task<string?> GetAsync(string key)
+        {
+            Calls++;
+            return Task.FromResult(Store.TryGetValue(key, out var value) ? value : null);
+        }
 
         public Task SetAsync(string key, string value)
         {
+            Calls++;
             Store[key] = value;
             return Task.CompletedTask;
         }
 
         public Task DeleteAsync(string key)
         {
+            Calls++;
             Store.Remove(key);
             return Task.CompletedTask;
         }

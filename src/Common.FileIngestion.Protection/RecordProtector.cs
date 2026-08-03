@@ -39,14 +39,24 @@ public sealed class RecordProtector
         ArgumentException.ThrowIfNullOrWhiteSpace(fileId);
         ArgumentNullException.ThrowIfNull(record);
 
-        var protectedFields = new Dictionary<string, FieldValue>(record.Fields.Count, StringComparer.Ordinal);
+        // Copy-on-write: only materialise a new field map once a field's value actually changes (i.e. is
+        // encrypted). A record whose fields are all pass-through — a record type the layout marks no field
+        // to encrypt — returns unchanged, avoiding a per-record dictionary and IngestRecord allocation.
+        Dictionary<string, FieldValue>? protectedFields = null;
         foreach (var pair in record.Fields)
         {
             var context = new FieldProtectionContext(fileId, record.Locator.RecordSeq, pair.Key);
-            protectedFields[pair.Key] = _protector.Protect(context, pair.Value);
+            var protectedValue = _protector.Protect(context, pair.Value);
+            if (ReferenceEquals(protectedValue, pair.Value))
+            {
+                continue; // unchanged; the lazily-created copy (if any) already carries the original value
+            }
+
+            protectedFields ??= new Dictionary<string, FieldValue>(record.Fields, StringComparer.Ordinal);
+            protectedFields[pair.Key] = protectedValue;
         }
 
-        return new IngestRecord(record.Locator, protectedFields);
+        return protectedFields is null ? record : new IngestRecord(record.Locator, protectedFields);
     }
 
     /// <summary>

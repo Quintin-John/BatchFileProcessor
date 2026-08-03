@@ -37,6 +37,9 @@ public static class MessagingJson
         // offset or a base64 field literal as '+' rather than emitting +.
         options.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
         options.Converters.Add(new FieldValueJsonConverter());
+        // Emits the same record shape as the default serializer, but reuses a record's cached wire bytes when
+        // present so a record sized for the byte cap is not serialized again at publish.
+        options.Converters.Add(new IngestRecordJsonConverter());
     }
 
     private static JsonSerializerOptions CreateOptions()

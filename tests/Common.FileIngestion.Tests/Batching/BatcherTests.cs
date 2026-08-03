@@ -74,6 +74,49 @@ public sealed class BatcherTests
     }
 
     [Fact]
+    public void Add_ByteCap_MeasuresEscapedValuesExactly_MatchingWireSize()
+    {
+        // A value with characters the serializer must escape/encode (quotes, '+', '/', '=', non-ASCII). The
+        // internal counting measure must equal the real serialized length byte-for-byte, or the seal boundary
+        // below would be off — proving the measure matches the wire size including escaping.
+        var special = Record(1, "a+b/c=\"éü\"\\x");
+        var recordSize = JsonSerializer.SerializeToUtf8Bytes(special, MessagingJson.Options).Length;
+        var batcher = new Batcher(maxRecords: 1000, maxContentBytes: recordSize * 2 + 1, Provenance());
+
+        Assert.Null(batcher.Add(Record(1, "a+b/c=\"éü\"\\x")));  // 1 fits
+        Assert.Null(batcher.Add(Record(2, "a+b/c=\"éü\"\\x")));  // 2 fit (2*size <= cap)
+        var sealed3 = batcher.Add(Record(3, "a+b/c=\"éü\"\\x")); // 3rd exceeds -> seal prior two
+
+        Assert.NotNull(sealed3);
+        Assert.Equal(2, sealed3!.Count);
+    }
+
+    [Fact]
+    public void SealedBatch_RecordsCachedByBatcher_SerializeIdenticallyToUncached()
+    {
+        // The batcher caches each record's serialized bytes when sizing it; publishing must reuse them and
+        // produce a byte-identical batch to one whose records carry no cache (the fallback path).
+        var batcher = new Batcher(maxRecords: 3, maxContentBytes: 1_000_000, Provenance());
+        batcher.Add(Record(1, "alpha"));
+        batcher.Add(Record(2, "beta"));
+        var cachedBatch = batcher.Flush()!;
+
+        // An equivalent batch built directly, whose records were never measured (SerializedForm null).
+        var uncachedBatch = new IngestBatchMessage(
+            cachedBatch.MessageId, Provenance(), cachedBatch.BatchSeq,
+            new[] { Record(1, "alpha"), Record(2, "beta") });
+
+        var cachedJson = JsonSerializer.Serialize(cachedBatch, MessagingJson.Options);
+        var uncachedJson = JsonSerializer.Serialize(uncachedBatch, MessagingJson.Options);
+
+        Assert.Equal(uncachedJson, cachedJson); // reuse (raw) == fallback, byte-for-byte
+        // And it still round-trips back to equivalent records.
+        var back = JsonSerializer.Deserialize<IngestBatchMessage>(cachedJson, MessagingJson.Options)!;
+        Assert.Equal(2, back.Count);
+        Assert.Equal(1, back.Records[0].Locator.RecordSeq);
+    }
+
+    [Fact]
     public void Flush_Empty_ReturnsNull()
     {
         Assert.Null(new Batcher(2, 1000, Provenance()).Flush());

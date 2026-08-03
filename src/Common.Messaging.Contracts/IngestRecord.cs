@@ -17,6 +17,15 @@ public sealed class IngestRecord
     /// <summary>Mapped field values keyed by layout field name (ordinal). Read-only.</summary>
     public IReadOnlyDictionary<string, FieldValue> Fields { get; }
 
+    /// <summary>
+    /// Optional memo of this record's serialized wire bytes, set once by the producer that first serializes
+    /// the record (the batcher, when sizing it for the byte cap) and reused verbatim at publish so the record
+    /// is serialized only once. Internal and never itself written to the wire — <see cref="Serialization.IngestRecordJsonConverter"/>
+    /// emits it raw when present, or serialises the record normally when absent. The domain data
+    /// (<see cref="Locator"/>, <see cref="Fields"/>) is immutable; this is a set-once serialization memo.
+    /// </summary>
+    internal ReadOnlyMemory<byte>? SerializedForm { get; set; }
+
     /// <summary>Creates a validated ingest record.</summary>
     /// <param name="locator">Where the record sits in its source file; required.</param>
     /// <param name="fields">Field values by name; required. Copied defensively. Keys must be non-blank and values non-null.</param>

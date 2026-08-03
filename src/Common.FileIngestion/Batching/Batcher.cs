@@ -52,7 +52,7 @@ public sealed class Batcher
     {
         ArgumentNullException.ThrowIfNull(record);
 
-        var recordBytes = SerializedSize(record);
+        var recordBytes = MeasureAndCache(record);
 
         // Seal the in-progress batch before this record would push it past the byte cap, so a batch
         // never exceeds the transport limit; this record then opens the next batch.
@@ -86,6 +86,13 @@ public sealed class Batcher
         return batch;
     }
 
-    private static long SerializedSize(IngestRecord record) =>
-        JsonSerializer.SerializeToUtf8Bytes(record, MessagingJson.Options).Length;
+    // Serializes the record once, caches those bytes on the record (reused verbatim at publish so it is not
+    // serialized again), and returns their length for the byte-cap decision — the exact wire size, since the
+    // same MessagingJson options drive both this and the transport.
+    private static long MeasureAndCache(IngestRecord record)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(record, MessagingJson.Options);
+        record.SerializedForm = bytes;
+        return bytes.Length;
+    }
 }

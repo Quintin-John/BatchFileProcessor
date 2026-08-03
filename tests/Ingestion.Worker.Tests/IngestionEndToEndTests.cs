@@ -65,7 +65,7 @@ public sealed class IngestionEndToEndTests : IDisposable
             new RejectSink(_publisher, "rejects"),
             _checkpoints,
             new IngestionMetrics(instrumentation),
-            new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System),
+            new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System, enabled: true),
             new IngestionTracing(instrumentation),
             new Heartbeat(TimeProvider.System),
             new IngestionOptions(2, 100_000, 64, 1, 64),

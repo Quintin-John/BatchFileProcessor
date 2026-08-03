@@ -69,7 +69,12 @@ if (otlpEndpoint is not null)
 // Per-record lineage (§8): bounded channel emitter, drained off the hot path to a structured-log sink.
 services.AddSingleton(new ChannelLineageEmitter(RequiredConfig.Integer(ingestion, "LineageChannelCapacity")));
 services.AddSingleton<ILineageEmitter>(sp => sp.GetRequiredService<ChannelLineageEmitter>());
-services.AddSingleton<RecordLineage>();
+// Lineage emission is on by default (preserving the §8 trace); an operator opts out by setting the flag to
+// false. Absent/blank => on; a present-but-unparseable value fails closed at startup.
+var lineageRaw = ingestion["LineageEnabled"];
+var lineageEnabled = string.IsNullOrWhiteSpace(lineageRaw) || bool.Parse(lineageRaw);
+services.AddSingleton(sp => new RecordLineage(
+    sp.GetRequiredService<ILineageEmitter>(), sp.GetRequiredService<TimeProvider>(), lineageEnabled));
 services.AddSingleton<ILineageSink, StructuredLogLineageSink>();
 services.AddHostedService<LineageDrainService>();
 
