@@ -77,25 +77,30 @@ public sealed partial class FolderFileSource : IFileSource, IDisposable
         var claimed = new List<ClaimedFile>();
         foreach (var path in Directory.EnumerateFiles(_incoming).OrderBy(p => p, StringComparer.Ordinal))
         {
-            // Never claim a file the producer may still be writing; leave it for a later poll.
-            if (!_completionGuard.IsComplete(path))
-            {
-                continue;
-            }
-
             var name = Path.GetFileName(path);
             var destination = Path.Combine(_processing, name);
+
+            // The completion probe and the claim move are both filesystem operations on a file an uncontrolled
+            // producer may delete, rename, or lock between our enumeration and these calls. Any such failure
+            // must skip only this file — never fault the poll loop, which would crash the worker host and stall
+            // all ingestion until restart. So the whole per-file body is guarded (not just the move).
             try
             {
+                // Never claim a file the producer may still be writing; leave it for a later poll.
+                if (!_completionGuard.IsComplete(path))
+                {
+                    continue;
+                }
+
                 File.Move(path, destination); // atomic claim; throws if already claimed
+                claimed.Add(new ClaimedFile(name, destination));
             }
             catch (IOException ex)
             {
                 // A same-name file already in processing (an orphan not yet cleared) is expected in the
-                // recurring-file model — leave the arrival for a later poll. Any other IOException (disk
-                // full, cross-volume move, a producer still holding the source) is unexpected and must be
-                // visible rather than silently swallowed. Either way, skip this file so one bad arrival
-                // never stalls the batch.
+                // recurring-file model. Otherwise the arrival vanished/was locked mid-poll, or the move
+                // failed (disk full, cross-volume). Either way, skip this file so one bad arrival never
+                // stalls the batch.
                 if (File.Exists(destination))
                 {
                     LogClaimCollision(name);
@@ -104,11 +109,12 @@ public sealed partial class FolderFileSource : IFileSource, IDisposable
                 {
                     LogClaimFailed(ex, name);
                 }
-
-                continue;
             }
-
-            claimed.Add(new ClaimedFile(name, destination));
+            catch (UnauthorizedAccessException ex)
+            {
+                // Transient lock / permission (e.g. an AV scanner or the producer's own handle); retry next poll.
+                LogClaimFailed(ex, name);
+            }
         }
 
         return claimed;
