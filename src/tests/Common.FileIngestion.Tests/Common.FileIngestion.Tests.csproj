@@ -26,6 +26,9 @@
     <Content Include="..\..\..\docs\layouts\force-update-balance-v1.0.yaml" Link="Layouts\force-update-balance-v1.0.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\..\docs\layouts\e138-v1.0.yaml" Link="Layouts\e138-v1.0.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

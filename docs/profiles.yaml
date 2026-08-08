@@ -48,3 +48,22 @@ profiles:
     batch:
       maxRecords: 500
       maxContentBytes: 200000
+
+  - name: e138
+    incoming: /data/e138/incoming
+    processing: /data/e138/processing
+    done: /data/e138/done
+    failed: /data/e138/failed
+    # 60-field ACI outstanding-authorisation extract; header and footer rows are skipped, and the
+    # footer is verified by the marker its layout declares.
+    layout: /config/e138-v1.0.yaml
+    format: delimited
+    completion:
+      mode: stable-size
+      quietSeconds: 5
+      pollSeconds: 5
+    destination: e138-batches
+    rejectDestination: e138-rejects
+    batch:
+      maxRecords: 500
+      maxContentBytes: 200000

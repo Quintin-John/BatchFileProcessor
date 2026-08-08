@@ -1,0 +1,107 @@
+# =============================================================================
+# ACI E138 Outstanding Authorisation — layout v1.0
+# Transcribed from GBOS-BAT-BatchFeedImporter:
+#   BatchFeedImporter.Logic/Parsers/E138Parser.cs
+#   BatchFeedImporter.Model/Data/AddE138DetailsDataModel.cs
+#   BatchFeedImporter.Model/Constants.cs (lines 477-534)
+#
+# The pump does NOT interpret values — it slices each field and emits raw text.
+# This layout carries only what the DelimitedRecordParser needs:
+#   - delimiter, encoding, row structure (header/footer/data)
+#   - every field's NAME and INDEX (0-based)
+#   - optional per-field flags:
+#       encrypt: true   -> field is encrypted before publish (PCI-adjacent)
+#       required: true  -> record is rejected if this field is blank
+#       skip: true      -> field is present in the file but not emitted upstream
+# Field types, scale, and date/time formats are NOT here — downstream concern.
+# =============================================================================
+version: "1.0"
+delimiter: tab         # TAB character separates fields on every row
+encoding: ascii
+
+# Row structure. Rows are assigned to a type by position: the first `rows` rows are the
+# header, the last `rows` are the footer, and everything between is data.
+#
+# The footer additionally declares a `match`: the value one of its fields must carry for the
+# row to really be the footer. Position alone is optimistic — the last row of a truncated
+# file looks exactly like a footer — so the marker turns that into a checkable claim and the
+# file fails closed rather than silently discarding its final data row. The marker's column
+# is declared, never assumed to be the first.
+rowTypes:
+
+  header:
+    role: header
+    rows: 1
+    skip: true         # 2 fields (Type, ExtractDateTime); consumed for framing, never emitted
+
+  footer:
+    role: trailer
+    rows: 1
+    skip: true         # 2 fields (Type, Rec_Count); consumed for framing, never emitted
+    match: { index: 0, value: Footer }   # ACI footer row carries "Footer" in its Type column
+
+  data:
+    role: data         # spans every row the header and footer do not claim
+    # 60 fields; the count is derived from this list, never declared separately, so the two
+    # can never disagree. A row that does not split into exactly this many values is rejected.
+    fields:
+      - { name: OutstandingAuthorisationId,                  index: 0 }
+      - { name: CardExternalID,                              index: 1,  encrypt: true }   # AlternativePAN — card proxy linked to a physical card
+      - { name: RetrievalReferenceNumber,                    index: 2 }
+      - { name: AuthorisationDate,                           index: 3 }
+      - { name: AuthorisationTime,                           index: 4 }
+      - { name: StatusCode,                                  index: 5 }
+      - { name: DeleteStatusFlag,                            index: 6 }                   # "REVD" triggers reversal processing downstream
+      - { name: AdditionalSettlementMatchingCriteria,        index: 7 }
+      - { name: NetworkType,                                 index: 8 }
+      - { name: ProcessorTranCode,                           index: 9 }
+      - { name: MerchantCategoryCode,                        index: 10 }                  # drives IsCredit determination downstream
+      - { name: OriginalTransactionAmount,                   index: 11 }
+      - { name: TransactionAmount,                           index: 12, required: true }  # row rejected if blank
+      - { name: ApprovalCode,                                index: 13 }
+      - { name: ActionCode,                                  index: 14 }
+      - { name: ProcessingCode,                              index: 15 }
+      - { name: MessageType,                                 index: 16 }
+      - { name: ReversalMessageType,                         index: 17 }
+      - { name: LastUpdateDateAndTime,                       index: 18, required: true }  # row rejected if blank
+      - { name: BIN,                                         index: 19, required: true }  # row rejected if blank; used for routing
+      - { name: ACIProductID,                                index: 20, required: true }  # row rejected if blank; used for routing
+      - { name: TransactionDescription,                      index: 21 }
+      - { name: CashBackAmount,                              index: 22, required: true }  # row rejected if blank
+      - { name: POSEntryData,                                index: 23 }
+      - { name: TerminalID,                                  index: 24 }
+      - { name: UNUSED-25,                                   index: 25, skip: true }
+      - { name: UNUSED-26,                                   index: 26, skip: true }
+      - { name: MerchantID,                                  index: 27 }
+      - { name: AddressValidationResponse,                   index: 28 }
+      - { name: ATCValidationResult,                         index: 29 }
+      - { name: STIPReason,                                  index: 30 }
+      - { name: UNUSED-31,                                   index: 31, skip: true }
+      - { name: CardHolderVerificationMethod,                index: 32 }
+      - { name: TerminalVerificationResult,                  index: 33 }
+      - { name: AuthRiskScore,                               index: 34 }
+      - { name: UNUSED-35,                                   index: 35, skip: true }
+      - { name: CVV1VerificationResult,                      index: 36, encrypt: true }   # CVV1 check result — sensitive
+      - { name: CVV2VerificationResult,                      index: 37, encrypt: true }   # CVV2 check result — sensitive
+      - { name: UNUSED-38,                                   index: 38, skip: true }
+      - { name: UNUSED-39,                                   index: 39, skip: true }
+      - { name: ECIValue,                                    index: 40 }
+      - { name: PreAuthIndicator,                            index: 41 }
+      - { name: UNUSED-42,                                   index: 42, skip: true }
+      - { name: UNUSED-43,                                   index: 43, skip: true }
+      - { name: UNUSED-44,                                   index: 44, skip: true }
+      - { name: UNUSED-45,                                   index: 45, skip: true }
+      - { name: ACIAccountExternalID,                        index: 46, encrypt: true }   # account-level external ID
+      - { name: AcquirerCountryCode,                         index: 47 }
+      - { name: LocalTransactionAmountCurrencyCode,          index: 48 }
+      - { name: UNUSED-49,                                   index: 49, skip: true }
+      - { name: PinPVVCheckResult,                           index: 50, encrypt: true }   # PIN/PVV check result — sensitive
+      - { name: CurrencyCode,                                index: 51 }
+      - { name: CashbackCheckResultCode,                     index: 52 }
+      - { name: AuthFeeAmount,                               index: 53 }
+      - { name: UNUSED-54,                                   index: 54, skip: true }
+      - { name: UnrecognisedCardholderVerificationMethodCode, index: 55 }
+      - { name: CardNotPresentTransactionTypeCode,           index: 56 }
+      - { name: ReversalDate,                                index: 57 }                  # used downstream to generate reversal record
+      - { name: ReversalTime,                                index: 58 }                  # used downstream to generate reversal record
+      - { name: MaxPreAuthRetentionDays,                     index: 59 }

@@ -427,4 +427,43 @@ public sealed class DelimitedLayoutLoaderTests
             ["GDAccountKey"],
             layout.Data.Fields.Where(f => !f.Encrypt && !f.Required).Select(f => f.Name));
     }
+
+    [Fact]
+    public void LoadFromFile_RealE138Layout_IsAccepted()
+    {
+        // A second real spec, structurally unlike the first: it has a footer as well as a header, and the
+        // footer verifies itself with a declared marker.
+        var path = Path.Combine(AppContext.BaseDirectory, "Layouts", "e138-v1.0.yaml");
+
+        var layout = DelimitedLayoutLoader.LoadFromFile(path);
+
+        Assert.Equal("1.0", layout.Version);
+        Assert.Equal('\t', layout.Delimiter);
+
+        // Header and footer are both control rows, consumed for framing and never emitted.
+        Assert.Equal(1, layout.HeaderRows);
+        Assert.Equal(1, layout.TrailerRows);
+        Assert.True(layout.Header!.Skip);
+        Assert.True(layout.Trailer!.Skip);
+
+        // The footer's marker, and the column it sits in, both come from the layout.
+        Assert.Equal(0, layout.Trailer.Match!.Index);
+        Assert.Equal("Footer", layout.Trailer.Match.Value);
+
+        // 60 data fields covering every index exactly once.
+        Assert.Equal(60, layout.Data.Fields.Count);
+        Assert.Equal(Enumerable.Range(0, layout.Data.Fields.Count), layout.Data.Fields.Select(f => f.Index));
+
+        Assert.Equal(
+            ["CardExternalID", "CVV1VerificationResult", "CVV2VerificationResult", "ACIAccountExternalID", "PinPVVCheckResult"],
+            layout.Data.Fields.Where(f => f.Encrypt).Select(f => f.Name));
+        Assert.Equal(
+            ["TransactionAmount", "LastUpdateDateAndTime", "BIN", "ACIProductID", "CashBackAmount"],
+            layout.Data.Fields.Where(f => f.Required).Select(f => f.Name));
+
+        // The 12 UNUSED columns are counted for coverage but never emitted upstream.
+        var skipped = layout.Data.Fields.Where(f => f.Skip).ToList();
+        Assert.Equal(12, skipped.Count);
+        Assert.All(skipped, f => Assert.StartsWith("UNUSED-", f.Name, StringComparison.Ordinal));
+    }
 }
