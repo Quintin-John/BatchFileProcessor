@@ -1,5 +1,4 @@
 using Common.FileIngestion.Abstractions;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using Common.FileIngestion.Batching;
@@ -25,53 +24,33 @@ namespace Common.FileIngestion.Pipeline;
 public sealed class FileIngestionPipeline
 {
     private readonly IRecordReader _reader;
-    private readonly IRecordParser _parser;
-    private readonly RecordProtector _protector;
-    private readonly RejectSink _rejectSink;
+    private readonly RecordStage _recordStage;
     private readonly ConfirmedBatchPublisher _batchPublisher;
     private readonly ICheckpointStore _checkpointStore;
-    private readonly IngestionMetrics _metrics;
-    private readonly RecordLineage _lineage;
     private readonly IngestionTracing _tracing;
     private readonly IngestionOptions _options;
 
     /// <summary>Creates the pipeline from its collaborators.</summary>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    [SuppressMessage("Major Code Smell", "S107:Methods should not have too many parameters",
-        Justification = "Orchestrator coordinating distinct single-responsibility collaborators; grouping them " +
-                        "into a parameterless data bag would add no invariant (a wrapper smell) and hide the " +
-                        "explicit dependencies. Injected once at composition; not a public call surface.")]
     public FileIngestionPipeline(
         IRecordReader reader,
-        IRecordParser parser,
-        RecordProtector protector,
+        RecordStage recordStage,
         ConfirmedBatchPublisher batchPublisher,
-        RejectSink rejectSink,
         ICheckpointStore checkpointStore,
-        IngestionMetrics metrics,
-        RecordLineage lineage,
         IngestionTracing tracing,
         IngestionOptions options)
     {
         ArgumentNullException.ThrowIfNull(reader);
-        ArgumentNullException.ThrowIfNull(parser);
-        ArgumentNullException.ThrowIfNull(protector);
+        ArgumentNullException.ThrowIfNull(recordStage);
         ArgumentNullException.ThrowIfNull(batchPublisher);
-        ArgumentNullException.ThrowIfNull(rejectSink);
         ArgumentNullException.ThrowIfNull(checkpointStore);
-        ArgumentNullException.ThrowIfNull(metrics);
-        ArgumentNullException.ThrowIfNull(lineage);
         ArgumentNullException.ThrowIfNull(tracing);
         ArgumentNullException.ThrowIfNull(options);
 
         _reader = reader;
-        _parser = parser;
-        _protector = protector;
+        _recordStage = recordStage;
         _batchPublisher = batchPublisher;
-        _rejectSink = rejectSink;
         _checkpointStore = checkpointStore;
-        _metrics = metrics;
-        _lineage = lineage;
         _tracing = tracing;
         _options = options;
     }
@@ -108,7 +87,7 @@ public sealed class FileIngestionPipeline
         {
             var readPassFileId = await _reader.ReadAsync(
                 request.OpenStream(),
-                (framed, ct) => ProcessAsync(run, framed, channel.Writer, ct),
+                (framed, ct) => _recordStage.ProcessAsync(run, framed, channel.Writer, ct),
                 pipelineCts.Token).ConfigureAwait(false);
 
             if (!string.Equals(readPassFileId, fileId, StringComparison.Ordinal))
@@ -256,61 +235,5 @@ public sealed class FileIngestionPipeline
         return new FileRun(
             request.SourceKey, watermark?.ByteOffset ?? 0, provenance, batcher,
             new ConfirmedBatchTracker(firstBatchSeq), _options.PublisherConfirmWindow);
-    }
-
-    private async ValueTask ProcessAsync(
-        FileRun run, FramedRecord framed, ChannelWriter<IngestBatchMessage> writer, CancellationToken cancellationToken)
-    {
-        // The record's own extent, not a fixed stride: with variable-length framing every record differs.
-        _metrics.BytesRead(framed.ByteLength);
-
-        if (framed.ByteOffset < run.ResumeOffset)
-        {
-            return; // already confirmed by a prior run
-        }
-
-        var parseResult = _parser.Parse(framed);
-        var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, framed.ByteLength, parseResult.RecordType);
-
-        // A skipped control record such as a header or trailer is consumed for framing but never emitted
-        // and never rejected, so record it in the lineage for a complete trace and return.
-        if (parseResult.IsSkipped)
-        {
-            await _lineage.EmitAsync(run.Provenance, locator, LineageState.Skipped, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-            return;
-        }
-
-        await _lineage.EmitAsync(run.Provenance, locator, LineageState.Consumed, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-        if (parseResult.IsSuccess)
-        {
-            var protectedRecord = _protector.Protect(run.Provenance.FileId, parseResult.Record!);
-            _metrics.RecordParsed(protectedRecord.Locator.RecordType);
-            run.Accepted++;
-            await _lineage.EmitAsync(run.Provenance, locator, LineageState.Accepted, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-
-            var sealedBatch = run.Batcher.Add(protectedRecord);
-            if (sealedBatch is not null)
-            {
-                await run.Window.WaitAsync(cancellationToken).ConfigureAwait(false); // confirm-window slot (§3.1)
-                await writer.WriteAsync(sealedBatch, cancellationToken).ConfigureAwait(false); // backpressure
-            }
-
-            return;
-        }
-
-        // Encrypt the raw record before it reaches the reject queue: a line that failed to parse was never
-        // classified, so nothing rules out its carrying sensitive values, and it must not travel in clear.
-        var rawRecord = _protector.ProtectRaw(run.Provenance.FileId, framed.RecordSeq, parseResult.RawRecord!);
-        await _rejectSink.RejectAsync(run.Provenance, locator, rawRecord, parseResult.Reasons!, cancellationToken)
-            .ConfigureAwait(false);
-        _metrics.RecordRejected(parseResult.RecordType);
-        run.Rejected++;
-        await _lineage.EmitAsync(
-            run.Provenance, locator, LineageState.Rejected, reasonCode: parseResult.Reasons![0].Code,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 }

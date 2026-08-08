@@ -521,16 +521,17 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
 
         return new FileIngestionPipeline(
             reader,
-            parser,
-            new RecordProtector(
-                new DefaultFieldProtector(crypto, keys, LayoutProtectionPolicy.From(layout)),
-                new DefaultPayloadProtector(crypto, keys)),
+            new RecordStage(
+                parser,
+                new RecordProtector(
+                    new DefaultFieldProtector(crypto, keys, LayoutProtectionPolicy.From(layout)),
+                    new DefaultPayloadProtector(crypto, keys)),
+                new RejectSink(_publisher, "rejects"),
+                metrics,
+                lineage),
             new ConfirmedBatchPublisher(
                 _publisher, _checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
-            new RejectSink(_publisher, "rejects"),
             _checkpoints,
-            metrics,
-            lineage,
             tracing,
             new IngestionOptions(1, 200_000, 64, 1, 64));
     }

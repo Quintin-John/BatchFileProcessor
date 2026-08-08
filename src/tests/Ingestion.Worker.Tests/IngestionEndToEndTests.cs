@@ -84,14 +84,15 @@ public sealed class IngestionEndToEndTests : IDisposable
 
         return new FileIngestionPipeline(
             new StreamRecordReader(8, terminatorLength: 1, Encoding.ASCII),
-            new FakeParser(),
-            new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
+            new RecordStage(
+                new FakeParser(),
+                new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
+                new RejectSink(_publisher, "rejects"),
+                metrics,
+                lineage),
             new ConfirmedBatchPublisher(
                 _publisher, _checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
-            new RejectSink(_publisher, "rejects"),
             _checkpoints,
-            metrics,
-            lineage,
             tracing,
             new IngestionOptions(2, 100_000, 64, 1, 64));
     }

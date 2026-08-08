@@ -49,14 +49,15 @@ public sealed class FileIngestionPipelineTests
 
             return new FileIngestionPipeline(
                 Reader,
-                new FakeParser(),
-                new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
+                new RecordStage(
+                    new FakeParser(),
+                    new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
+                    new RejectSink(Publisher, "rejects"),
+                    metrics,
+                    lineage),
                 new ConfirmedBatchPublisher(
                     Publisher, Checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
-                new RejectSink(Publisher, "rejects"),
                 Checkpoints,
-                metrics,
-                lineage,
                 tracing,
                 new IngestionOptions(
                     maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity, PublisherConcurrency,

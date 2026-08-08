@@ -158,16 +158,17 @@ public sealed class LayoutSelectionTests : IDisposable
 
         return new FileIngestionPipeline(
             new StreamRecordReader(layout.RecordLength, terminatorLength: 1, Encoding.ASCII),
-            new FixedLengthRecordParser(layout),
-            new RecordProtector(
-                new DefaultFieldProtector(new AesGcmCryptoProvider(), keys, LayoutProtectionPolicy.From(layout)),
-                new DefaultPayloadProtector(new AesGcmCryptoProvider(), keys)),
+            new RecordStage(
+                new FixedLengthRecordParser(layout),
+                new RecordProtector(
+                    new DefaultFieldProtector(new AesGcmCryptoProvider(), keys, LayoutProtectionPolicy.From(layout)),
+                    new DefaultPayloadProtector(new AesGcmCryptoProvider(), keys)),
+                new RejectSink(_publisher, "rejects"),
+                metrics,
+                lineage),
             new ConfirmedBatchPublisher(
                 _publisher, _checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
-            new RejectSink(_publisher, "rejects"),
             _checkpoints,
-            metrics,
-            lineage,
             tracing,
             new IngestionOptions(100, 1_000_000, 64, 1, 64));
     }

@@ -98,11 +98,11 @@ internal sealed class ProfilePipelineFactory
             profile.Batch.MaxRecords, profile.Batch.MaxContentBytes,
             _tuning.BatchChannelCapacity, _tuning.PublisherConcurrency, _tuning.PublisherConfirmWindow);
 
+        var recordStage = new RecordStage(parser, protector, rejectSink, _metrics, _lineage);
         var batchPublisher = new ConfirmedBatchPublisher(
             _publisher, _checkpointStore, _metrics, _lineage, _tracing, _heartbeat, profile.Routing.Batches);
 
         return new FileIngestionPipeline(
-            reader, parser, protector, batchPublisher, rejectSink, _checkpointStore,
-            _metrics, _lineage, _tracing, options);
+            reader, recordStage, batchPublisher, _checkpointStore, _tracing, options);
     }
 }
