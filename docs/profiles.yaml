@@ -2,8 +2,12 @@
 # so files in different folders never contend for performance.
 #
 # This file is ROUTING ONLY — it never describes how records are parsed or mapped (that lives in each
-# profile's layout YAML, referenced by `layout`). It carries NO secrets or connection strings: broker and
-# checkpoint connection details are infra and live in appsettings / Helm / Key Vault.
+# profile's layout YAML). It carries NO secrets or connection strings: broker and checkpoint connection
+# details are infra and live in appsettings / Helm / Key Vault.
+#
+# A profile names the layouts its folder may receive: `layout` for one, `layouts` for several. Several are
+# allowed because one folder can receive more than one version of a format; each file is matched to exactly
+# one of them, and a file that matches none — or more than one — is quarantined rather than guessed at.
 #
 # Each profile is independent; add another entry to ingest a new folder/format with its own destinations.
 # Names and incoming directories must be unique across profiles.
@@ -14,8 +18,11 @@ profiles:
     processing: /data/g266/processing
     done: /data/g266/done
     failed: /data/g266/failed
-    # Parsing/mapping definition for this profile's records.
-    layout: /config/g266-v4.8.yaml
+    # Both versions arrive in this folder. Each file is matched to one of them by the format, using the
+    # record length each layout already declares — 1200 for 4.8, 2400 for 4.11.
+    layouts:
+      - /config/g266-v4.8.yaml
+      - /config/g266-v4.11.yaml
     # Framing format; selects the record-parser strategy. Only built formats are accepted (fail-closed).
     format: fixed-length
     # How a fully-written file is detected before it is claimed (producer is not controlled).
@@ -27,6 +34,43 @@ profiles:
     destination: g266-batches
     rejectDestination: g266-rejects
     # Per-batch limits for this profile.
+    batch:
+      maxRecords: 500
+      maxContentBytes: 200000
+
+  - name: force-update-balance
+    incoming: /data/fub/incoming
+    processing: /data/fub/processing
+    done: /data/fub/done
+    failed: /data/fub/failed
+    # Tab-delimited; the separator itself is declared in the layout, not here.
+    layout: /config/force-update-balance-v1.0.yaml
+    format: delimited
+    completion:
+      mode: stable-size
+      quietSeconds: 5
+      pollSeconds: 5
+    destination: fub-batches
+    rejectDestination: fub-rejects
+    batch:
+      maxRecords: 500
+      maxContentBytes: 200000
+
+  - name: e138
+    incoming: /data/e138/incoming
+    processing: /data/e138/processing
+    done: /data/e138/done
+    failed: /data/e138/failed
+    # 60-field ACI outstanding-authorisation extract; header and footer rows are skipped, and the
+    # footer is verified by the marker its layout declares.
+    layout: /config/e138-v1.0.yaml
+    format: delimited
+    completion:
+      mode: stable-size
+      quietSeconds: 5
+      pollSeconds: 5
+    destination: e138-batches
+    rejectDestination: e138-rejects
     batch:
       maxRecords: 500
       maxContentBytes: 200000

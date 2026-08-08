@@ -1,0 +1,520 @@
+using Common.FileIngestion.Layouts;
+
+namespace Common.FileIngestion.Tests.Layouts;
+
+public sealed class DelimitedLayoutLoaderTests
+{
+    private const string MinimalYaml = """
+        version: "1.0"
+        delimiter: ","
+        encoding: ascii
+        rowTypes:
+          data:
+            role: data
+            fields:
+              - { name: a, index: 0 }
+              - { name: b, index: 1 }
+        """;
+
+    [Fact]
+    public void Load_MinimalLayout_MapsEverything()
+    {
+        var layout = DelimitedLayoutLoader.Load(MinimalYaml);
+
+        Assert.Equal("1.0", layout.Version);
+        Assert.Equal(",", layout.Delimiter);
+        Assert.Equal("ascii", layout.Encoding);
+        Assert.Equal(RowRole.Data, Assert.Single(layout.DataRows).Role);
+        Assert.Equal(["a", "b"], Assert.Single(layout.DataRows).Fields.Select(f => f.Name));
+        Assert.Equal([0, 1], Assert.Single(layout.DataRows).Fields.Select(f => f.Index));
+    }
+
+    [Fact]
+    public void Load_HeaderAndTrailer_AreMappedWithRowCountsAndSkip()
+    {
+        const string yaml = """
+            version: "2.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              head:
+                role: header
+                rows: 2
+                skip: true
+              body:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: false
+                fields:
+                  - { name: recordCount, index: 0, required: true }
+            """;
+
+        var layout = DelimitedLayoutLoader.Load(yaml);
+
+        Assert.Equal("\t", layout.Delimiter);
+        Assert.Equal(2, layout.HeaderRows);
+        Assert.Equal(1, layout.TrailerRows);
+        Assert.True(layout.Header!.Skip);
+        Assert.Empty(layout.Header.Fields);
+
+        // A trailer with real values is mapped and emitted, not discarded.
+        Assert.False(layout.Trailer!.Skip);
+        Assert.Equal("recordCount", Assert.Single(layout.Trailer.Fields).Name);
+    }
+
+    [Fact]
+    public void Load_FieldFlags_AreCarriedThrough()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: "|"
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: plain,   index: 0 }
+                  - { name: secret,  index: 1, encrypt: true }
+                  - { name: must,    index: 2, required: true }
+                  - { name: ignored, index: 3, skip: true }
+            """;
+
+        var fields = Assert.Single(DelimitedLayoutLoader.Load(yaml).DataRows).Fields;
+
+        Assert.False(fields[0].Encrypt);
+        Assert.True(fields[1].Encrypt);
+        Assert.True(fields[2].Required);
+        Assert.True(fields[3].Skip);
+    }
+
+    [Theory]
+    [InlineData("tab", "\t")]
+    [InlineData("space", " ")]
+    [InlineData("\",\"", ",")]
+    [InlineData("\"|\"", "|")]
+    [InlineData("\";\"", ";")]
+    [InlineData("\"~\"", "~")]
+    [InlineData("\"\\\\x1F\"", "\u001F")]
+    [InlineData("\"~|~\"", "~|~")]      // more than one character is a delimiter like any other
+    [InlineData("\"||\"", "||")]
+    [InlineData("\"<SEP>\"", "<SEP>")]
+    public void Load_AnyDelimiter_IsAcceptedWithoutCodeChange(string token, string expected)
+    {
+        var yaml = $$"""
+            version: "1.0"
+            delimiter: {{token}}
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+            """;
+
+        Assert.Equal(expected, DelimitedLayoutLoader.Load(yaml).Delimiter);
+    }
+
+    [Theory]
+    [InlineData("cr", '\r')]
+    [InlineData("lf", '\n')]
+    [InlineData("\"\\\\x1E\"", (char)0x1E)]  // ASCII record separator
+    [InlineData("\"~\"", '~')]
+    public void Load_AnyRowTerminator_IsAcceptedWithoutCodeChange(string token, char expected)
+    {
+        var yaml = $$"""
+            version: "1.0"
+            delimiter: "|"
+            terminator: {{token}}
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+            """;
+
+        Assert.Equal(expected, DelimitedLayoutLoader.Load(yaml).RowTerminator);
+    }
+
+    [Fact]
+    public void Load_WithoutATerminator_DefaultsToLineFeed()
+    {
+        // Absent means the ordinary line ending; declaring it is always allowed and never required.
+        Assert.Equal('\n', DelimitedLayoutLoader.Load(MinimalYaml).RowTerminator);
+    }
+
+    [Fact]
+    public void Load_TerminatorEqualToTheDelimiter_Throws()
+    {
+        // A row could not be told from a field boundary inside it.
+        var yaml = MinimalYaml.Replace("encoding: ascii", "terminator: \",\"\nencoding: ascii", StringComparison.Ordinal);
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void Load_UnresolvableTerminator_Throws()
+    {
+        var yaml = MinimalYaml.Replace("encoding: ascii", "terminator: newline\nencoding: ascii", StringComparison.Ordinal);
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("row terminator", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_RoleIsCaseInsensitive()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              data:
+                role: DATA
+                fields:
+                  - { name: a, index: 0 }
+            """;
+
+        Assert.Equal(RowRole.Data, Assert.Single(DelimitedLayoutLoader.Load(yaml).DataRows).Role);
+    }
+
+    // ---------- fail-closed ----------
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Load_BlankYaml_Throws(string? yaml)
+    {
+        Assert.ThrowsAny<ArgumentException>(() => DelimitedLayoutLoader.Load(yaml!));
+    }
+
+    [Fact]
+    public void Load_MalformedYaml_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load("version: \"1.0\"\n  bad: [indent"));
+    }
+
+    [Fact]
+    public void Load_NoRowTypes_Throws()
+    {
+        var ex = Assert.Throws<FormatException>(
+            () => DelimitedLayoutLoader.Load("version: \"1.0\"\ndelimiter: \",\"\nencoding: ascii"));
+        Assert.Contains("at least one row type", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_MissingDelimiter_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("delimiter", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_MalformedDelimiterEscape_Throws()
+    {
+        // Any text is a valid delimiter, so a botched escape is the one delimiter mistake still detectable;
+        // it must not be read as literal backslash-and-letters.
+        var yaml = MinimalYaml.Replace(
+            "delimiter: \",\"", @"delimiter: ""\xZZ""", StringComparison.Ordinal);
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void Load_MissingRole_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              data:
+                fields:
+                  - { name: a, index: 0 }
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("must declare a role", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_UnknownRole_Throws()
+    {
+        var yaml = MinimalYaml.Replace("role: data", "role: footer", StringComparison.Ordinal);
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("unknown role", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_NonSkippedRowWithoutFields_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("must define fields", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_FieldWithoutName_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { index: 0 }
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("without a name", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_FieldIndexGap_Throws()
+    {
+        var yaml = MinimalYaml.Replace("{ name: b, index: 1 }", "{ name: b, index: 2 }", StringComparison.Ordinal);
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void Load_SkipCombinedWithRequired_Throws()
+    {
+        var yaml = MinimalYaml.Replace(
+            "{ name: b, index: 1 }", "{ name: b, index: 1, skip: true, required: true }", StringComparison.Ordinal);
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void Load_DataRowDeclaringRowCount_Throws()
+    {
+        var yaml = MinimalYaml.Replace("role: data", "role: data\n    rows: 1", StringComparison.Ordinal);
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void Load_HeaderWithoutRowCount_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              head:
+                role: header
+                skip: true
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+            """;
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    // ---------- row match ----------
+
+    [Fact]
+    public void Load_TrailerMatch_IsMapped()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { index: 2, value: Footer }
+            """;
+
+        var match = DelimitedLayoutLoader.Load(yaml).Trailer!.Match;
+
+        // The marker column is declared, never assumed to be the first field.
+        Assert.Equal(2, match!.Index);
+        Assert.Equal("Footer", match.Value);
+    }
+
+    [Fact]
+    public void Load_MatchWithoutIndex_DefaultsToTheFirstField()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { value: Footer }
+            """;
+
+        Assert.Equal(0, DelimitedLayoutLoader.Load(yaml).Trailer!.Match!.Index);
+    }
+
+    [Fact]
+    public void Load_MatchWithoutValue_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { index: 0 }
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("must declare the value", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_ABodyOfSeveralRowTypes_EachNamedByItsMarker()
+    {
+        // The capability stated from YAML alone: a feed whose body mixes record types is a layout edit.
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              debit:
+                role: data
+                match: { index: 0, value: DR }
+                fields:
+                  - { name: kind, index: 0 }
+                  - { name: amount, index: 1 }
+              credit:
+                role: data
+                match: { index: 0, value: CR }
+                fields:
+                  - { name: kind, index: 0 }
+                  - { name: amount, index: 1 }
+                  - { name: reference, index: 2 }
+            """;
+
+        var layout = DelimitedLayoutLoader.Load(yaml);
+
+        Assert.Equal(0, layout.DataMarkerIndex);
+        Assert.Equal(["debit", "credit"], layout.DataRows.Select(r => r.Name));
+        Assert.Equal("credit", layout.ResolveDataRow("CR,1,ref")!.Name);
+    }
+
+    [Fact]
+    public void Load_ABodyWhereOneRowTypeDeclaresNoMarker_MakesItTheCatchAll()
+    {
+        // Stated from YAML alone: what happens to a body row no marker names is declared, not decided here.
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              debit:
+                role: data
+                match: { index: 0, value: DR }
+                fields:
+                  - { name: kind, index: 0 }
+              rest:
+                role: data
+                skip: true
+            """;
+
+        var layout = DelimitedLayoutLoader.Load(yaml);
+
+        Assert.Equal("rest", layout.DataFallback!.Name);
+        Assert.Equal("debit", layout.ResolveDataRow("DR")!.Name);
+        Assert.Equal("rest", layout.ResolveDataRow("XX")!.Name);
+    }
+
+    [Fact]
+    public void Load_ABodyWithTwoUnmarkedRowTypes_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              first:
+                role: data
+                fields:
+                  - { name: kind, index: 0 }
+              second:
+                role: data
+                fields:
+                  - { name: kind, index: 0 }
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("at most one may stand for", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_MatchWithNegativeIndex_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { index: -1, value: Footer }
+            """;
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void LoadFromFile_BlankPath_Throws() =>
+        Assert.ThrowsAny<ArgumentException>(() => DelimitedLayoutLoader.LoadFromFile("  "));
+}

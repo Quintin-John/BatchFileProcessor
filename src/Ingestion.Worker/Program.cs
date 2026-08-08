@@ -8,7 +8,7 @@ using Common.FileIngestion.Sources;
 using Common.FileIngestion.Telemetry;
 using Common.Messaging.MassTransit;
 using Common.Observability;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 using Ingestion.Worker;
 using Ingestion.Worker.Health;
 using Ingestion.Worker.Profiles;
@@ -24,9 +24,10 @@ using StackExchange.Redis;
 
 // Composition root — wiring only (excluded from coverage). Fails fast on missing configuration.
 // One isolated worker + pipeline is built per operational profile and run concurrently, so files in
-// different folders never contend. profiles.yaml owns routing (folders/layout/format/completion/
-// destinations); appsettings owns shared infra (checkpoint, tuning, broker, observability); layout YAML
-// owns parsing/mapping. Secrets/connection strings live in appsettings/Key Vault, never in profiles.yaml.
+// different folders never contend. The profile set owns routing (folders/layout/format/completion/
+// destinations); host configuration owns shared infra (checkpoint, tuning, broker, observability); each
+// profile's layout owns parsing/mapping. Secrets and connection strings are infra configuration and a
+// secret store, never routing.
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
 var ingestion = builder.Configuration.GetSection("Ingestion");
@@ -34,15 +35,20 @@ var messaging = builder.Configuration.GetSection("Messaging");
 
 var profiles = ProfileLoader.LoadFromFile(RequiredConfig.Text(ingestion, "ProfilesPath"));
 
-// Load each profile's layout once, up front (fail-fast), and reuse it for pipeline wiring and log redaction.
+// Load every layout a profile declares once, up front (fail-fast), and reuse them for pipeline wiring and
+// log redaction. The profile's format loads them, so a fixed-length profile cannot be handed a delimited
+// layout or vice versa. A profile may declare several because one folder can receive more than one version
+// of a format; the dispatcher matches each file to one of them.
 var layoutsByProfile = profiles.Profiles.ToDictionary(
-    profile => profile.Name, profile => LayoutLoader.LoadFromFile(profile.LayoutPath), StringComparer.Ordinal);
+    profile => profile.Name,
+    profile => (IReadOnlyList<ILayout>)[.. profile.LayoutPaths.Select(profile.Format.LoadLayout)],
+    StringComparer.Ordinal);
 
 services.AddSingleton(TimeProvider.System);
 
 // Redact encrypt-flagged field values from every log (layout-driven; no hardcoded field names). Must run
 // after the host's default logging is registered, which WebApplication.CreateBuilder has already done.
-services.AddSensitiveKeyRedaction(SensitiveFieldNames.From(layoutsByProfile.Values));
+services.AddSensitiveKeyRedaction(SensitiveFieldNames.From(layoutsByProfile.Values.SelectMany(layouts => layouts)));
 
 // Field-level data protection, shared across profiles. Each profile's field protector is built per-layout
 // by the pipeline factory; the crypto primitives below are the shared building blocks. InMemory key
@@ -80,7 +86,7 @@ services.AddHostedService<LineageDrainService>();
 
 services.AddSingleton<Heartbeat>();
 
-// Shared pipeline tuning (infra), applied to every profile; per-batch limits are per-profile (profiles.yaml).
+// Shared pipeline tuning (infra), applied to every profile; per-batch limits are declared per profile.
 services.AddSingleton(new PipelineTuning(
     RequiredConfig.Integer(ingestion, "BatchChannelCapacity"),
     RequiredConfig.Integer(ingestion, "PublisherConcurrency"),
@@ -129,10 +135,13 @@ services.AddHealthChecks()
 // profile's pipeline. Checkpoint keys are namespaced by profile name inside the worker.
 foreach (var profile in profiles.Profiles)
 {
-    var layout = layoutsByProfile[profile.Name];
+    var layouts = layoutsByProfile[profile.Name];
     services.AddSingleton<IHostedService>(sp =>
     {
-        var pipeline = sp.GetRequiredService<ProfilePipelineFactory>().Create(profile, layout);
+        // One pipeline per candidate layout: a pipeline's reader, parser and field protection all come from
+        // one layout, so choosing a layout for a file chooses its pipeline.
+        var factory = sp.GetRequiredService<ProfilePipelineFactory>();
+        var candidates = layouts.Select(l => new LayoutPipeline(l, factory.Create(profile, l))).ToList();
         var completionGuard = new StableSizeCompletionGuard(profile.Completion.QuietPeriod, sp.GetRequiredService<TimeProvider>());
         var source = new FolderFileSource(
             profile.Folders.Incoming,
@@ -141,11 +150,11 @@ foreach (var profile in profiles.Profiles)
             profile.Folders.Failed,
             completionGuard,
             sp.GetRequiredService<ILogger<FolderFileSource>>());
-        var options = new WorkerOptions(profile.Name, layout.Version, profile.Completion.PollInterval);
+        var options = new WorkerOptions(profile.Name, profile.Completion.PollInterval);
 
         return new FolderIngestionWorker(
             source,
-            new PipelineIngestFileDispatcher(pipeline),
+            new PipelineIngestFileDispatcher(profile.Format, candidates),
             sp.GetRequiredService<ReadinessGate>(),
             options,
             sp.GetRequiredService<ILogger<FolderIngestionWorker>>(),

@@ -1,35 +1,14 @@
-# =============================================================================
-# G266 fixed-width layout — version 4.11 (ACI EPS-ISSUER / CMM)
-# Transcribed 2026-08-03 from the ACI mapping workbook, sheet "G266_4.11"
-# (compared against the existing 4.8.2 positions in that workbook).
-#
-# Same soft-coded model as g266-v4.8.yaml — the pump slices bytes and emits them raw:
-#   - record types (FHR / PER / TFT / FTR), each exactly 2400 bytes; discriminator at start 1, length 4
-#       HEAD -> fhr,  T010 -> per,  T020 -> tft,  TRAI -> ftr
-#     (In 4.11 the transaction rows use discriminators T010/T020, where 4.8 used TRAN/AUTH.)
-#   - every field's NAME, START (1-based), LENGTH — fields must tile each record with no gaps
-#   - optional per-field flags:
-#       encrypt: true   -> the field is encrypted before publish (PAN / account / PII)
-#       required: true  -> the record is rejected if this field is blank
-#
-# TRANSCRIPTION NOTE: New Start/End/Length were read from photographed spreadsheet cells and validated by
-# tiling each record to exactly 2400 (see the accompanying check). Field names transcribed from column C.
-#
-# ENCRYPTION NOTE (awaiting sign-off): carries 4.8 (EXT-ACT-NBR encrypt+required, PAN-TXT encrypt) and adds
-# encrypt on new PAN/token/account/PII fields. Every encrypted field is listed for the owner to approve.
-# Location-only PII (city/state/country/postal) is deliberately NOT encrypted; adjust before shipping.
-# =============================================================================
 version: "4.11"
 recordLength: 2400
 encoding: ascii
-terminator: 1          # unchanged from 4.8 (1 = LF); confirm the framing spec if 4.11 differs
+terminator: 1
 discriminator: { start: 1, length: 4 }
 
 recordTypes:
 
   fhr:                       # File Header Record
     match: "HEAD"
-    skip: true               # control record: consumed for framing, never emitted upstream
+    skip: true
     fields:
       - { name: W136-HDR-IDN-CDE, start: 1,  length: 4 }
       - { name: W136-HDR-DTE,     start: 5,  length: 10 }
@@ -236,7 +215,7 @@ recordTypes:
 
   ftr:                       # File Trailer Record
     match: "TRAI"
-    skip: true               # control record: consumed for framing, never emitted upstream
+    skip: true
     fields:
       - { name: W136-TLR-IDN-CDE, start: 1,  length: 4 }   # "TRAI"
       - { name: FILLER-1,         start: 5,  length: 5 }

@@ -38,10 +38,14 @@ public sealed class FixedLengthRecordParser : IRecordParser
     }
 
     /// <inheritdoc />
-    public RecordParseResult Parse(long recordSeq, long byteOffset, ReadOnlySpan<char> record)
+    public RecordParseResult Parse(FramedRecord framed)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(recordSeq, 1);
-        ArgumentOutOfRangeException.ThrowIfNegative(byteOffset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(framed.RecordSeq, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(framed.ByteOffset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(framed.ByteLength, 1);
+        ArgumentNullException.ThrowIfNull(framed.Content);
+
+        ReadOnlySpan<char> record = framed.Content;
 
         if (record.Length != _layout.RecordLength)
         {
@@ -98,7 +102,7 @@ public sealed class FixedLengthRecordParser : IRecordParser
             return RecordParseResult.Rejected(recordDefinition.Match, record.ToString(), reasons);
         }
 
-        var locator = new RecordLocator(recordSeq, byteOffset, recordDefinition.Match);
+        var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, framed.ByteLength, recordDefinition.Match);
         return RecordParseResult.Success(new IngestRecord(locator, fields));
     }
 }

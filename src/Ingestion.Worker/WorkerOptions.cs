@@ -9,26 +9,20 @@ public sealed record WorkerOptions
     /// <summary>Id of the profile applied to claimed files (message provenance).</summary>
     public string ProfileId { get; }
 
-    /// <summary>Layout version applied to claimed files (message provenance).</summary>
-    public string LayoutVersion { get; }
-
     /// <summary>Delay between polls of the incoming directory.</summary>
     public TimeSpan PollInterval { get; }
 
     /// <summary>Creates validated options.</summary>
     /// <param name="profileId">Profile id; required, non-blank.</param>
-    /// <param name="layoutVersion">Layout version; required, non-blank.</param>
     /// <param name="pollInterval">Poll delay; must be positive.</param>
     /// <exception cref="ArgumentException">A string argument is blank.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="pollInterval"/> is not positive.</exception>
-    public WorkerOptions(string profileId, string layoutVersion, TimeSpan pollInterval)
+    public WorkerOptions(string profileId, TimeSpan pollInterval)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(layoutVersion);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(pollInterval, TimeSpan.Zero);
 
         ProfileId = profileId;
-        LayoutVersion = layoutVersion;
         PollInterval = pollInterval;
     }
 }

@@ -11,7 +11,7 @@ namespace Common.FileIngestion.Reading;
 /// pass. Memory is O(1) in file size — records flow through a bounded read buffer, never the whole
 /// file. Handles records split across read segments and a final record with no trailing terminator.
 /// </summary>
-public sealed class StreamRecordReader
+public sealed class StreamRecordReader : IRecordReader
 {
     private readonly int _recordLength;
     private readonly int _terminatorLength;
@@ -44,18 +44,9 @@ public sealed class StreamRecordReader
     /// <summary>Record content length in bytes (excludes the terminator).</summary>
     public int RecordLength => _recordLength;
 
-    /// <summary>Bytes consumed per record including the terminator (record + terminator length).</summary>
-    public int Stride => _recordLength + _terminatorLength;
-
-    /// <summary>
-    /// Reads <paramref name="stream"/> to completion, invoking <paramref name="onRecord"/> for each
-    /// framed record, and returns the file's SHA-256 as an uppercase hex string (the FileId).
-    /// </summary>
-    /// <param name="stream">The source stream.</param>
-    /// <param name="onRecord">Async callback invoked per record (supports backpressure).</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="stream"/> or <paramref name="onRecord"/> is null.</exception>
-    /// <exception cref="InvalidDataException">The stream ends with an incomplete record.</exception>
+    /// <inheritdoc />
+    /// <remarks>Frames by a constant stride, so every record reports the same extent except a final record
+    /// with no trailing terminator, which reports its content length only.</remarks>
     public async Task<string> ReadAsync(
         Stream stream,
         Func<FramedRecord, CancellationToken, ValueTask> onRecord,
@@ -82,7 +73,7 @@ public sealed class StreamRecordReader
                 while (buffer.Length - consumed >= stride)
                 {
                     var content = TakeRecord(buffer.Slice(consumed, stride), hash, scratch);
-                    await onRecord(new FramedRecord(recordSeq, byteOffset, content), cancellationToken).ConfigureAwait(false);
+                    await onRecord(new FramedRecord(recordSeq, byteOffset, stride, content), cancellationToken).ConfigureAwait(false);
                     consumed += stride;
                     recordSeq++;
                     byteOffset += stride;
@@ -105,7 +96,10 @@ public sealed class StreamRecordReader
                     pipe.AdvanceTo(buffer.End);
                     if (finalContent is not null)
                     {
-                        await onRecord(new FramedRecord(recordSeq, byteOffset, finalContent), cancellationToken).ConfigureAwait(false);
+                        // A final record with no trailing terminator consumes only its content bytes, so its
+                        // extent is RecordLength, not Stride — a resume point must not run past end of file.
+                        await onRecord(new FramedRecord(recordSeq, byteOffset, _recordLength, finalContent), cancellationToken)
+                            .ConfigureAwait(false);
                     }
 
                     break;
@@ -116,8 +110,8 @@ public sealed class StreamRecordReader
         }
         finally
         {
-            // Zero on return: the scratch buffer held cleartext record bytes (PAN/PII) and goes back to a
-            // shared pool that any other component can rent.
+            // Zero on return: the scratch buffer held cleartext record bytes and goes back to a shared
+            // pool that any other component can rent.
             ArrayPool<byte>.Shared.Return(scratch, clearArray: true);
             await pipe.CompleteAsync().ConfigureAwait(false);
         }

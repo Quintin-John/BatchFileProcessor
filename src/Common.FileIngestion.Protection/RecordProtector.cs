@@ -1,12 +1,12 @@
 using Common.Messaging.Contracts;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 
 namespace Common.FileIngestion.Protection;
 
 /// <summary>
 /// Applies field-level data protection to a parsed record before it is published: each field is
-/// run through the <see cref="IFieldProtector"/> (encrypt or pass through per the classification
-/// policy), bound to its (file, record, field) context. Fail-closed — an unclassified field
+/// run through the <see cref="IFieldProtector"/> (encrypt or pass through per the policy), bound to its
+/// (file, record, field) context. Fail-closed — a field the policy does not cover
 /// propagates the protector's error rather than leaking.
 /// </summary>
 public sealed class RecordProtector

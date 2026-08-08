@@ -1,0 +1,30 @@
+version: "1.0"
+delimiter: tab
+encoding: ascii
+
+rowTypes:
+
+  header:
+    role: header
+    rows: 1
+    skip: true
+
+  data:
+    role: data
+    fields:
+      - { name: ACIProductID,                index: 0,  required: true }
+      - { name: AccountBalanceKey,           index: 1,  required: true }
+      - { name: GDAccountKey,                index: 2 }
+      - { name: ACIExternalID,               index: 3,  encrypt: true }
+      - { name: ACICardExternalID,           index: 4,  encrypt: true }
+      - { name: BIN,                         index: 5,  required: true }
+      - { name: AccountIdentifier,           index: 6,  encrypt: true, required: true }
+      - { name: ProgramCode,                 index: 7,  required: true }
+      - { name: ACIAvailableBalance,         index: 8,  required: true }
+      - { name: ACIAvailableBalanceAsOfDate, index: 9,  required: true }   # format: MM/dd/yyyy HH:mm:ss
+      - { name: ACICurrentBalance,           index: 10, required: true }
+      - { name: ACICurrentBalanceAsOfDate,   index: 11, required: true }   # format: MM/dd/yyyy HH:mm:ss
+      - { name: GDAvailableBalance,          index: 12, required: true }
+      - { name: GDAvailableBalanceAsOfDate,  index: 13, required: true }   # format: MM/dd/yyyy HH:mm:ss
+      - { name: GDCurrentBalance,            index: 14, required: true }
+      - { name: GDCurrentBalanceAsOfDate,    index: 15, required: true }   # format: MM/dd/yyyy HH:mm:ss

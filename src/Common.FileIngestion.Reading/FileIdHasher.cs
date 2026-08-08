@@ -31,7 +31,7 @@ public static class FileIdHasher
         }
         finally
         {
-            // The buffer held file content (potentially PAN/PII) and returns to a shared pool.
+            // The buffer held file content, which may be sensitive, and returns to a shared pool.
             ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
         }
 

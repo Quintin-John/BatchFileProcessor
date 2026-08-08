@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- TargetFramework, coverage gate, and common test packages come from src/tests/Directory.Build.props +
+       Directory.Packages.props. Only this project's coverage scope stays here. -->
+  <PropertyGroup>
+    <Include>[Common.Messaging.Contracts]*</Include>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Common.Messaging.Contracts\Common.Messaging.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

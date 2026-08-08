@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common.FileIngestion.Abstractions\Common.FileIngestion.Abstractions.csproj" />
+    <ProjectReference Include="..\Common.FileIngestion.Layouts\Common.FileIngestion.Layouts.csproj" />
   </ItemGroup>
 
 </Project>

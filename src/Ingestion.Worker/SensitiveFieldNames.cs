@@ -10,9 +10,9 @@ namespace Ingestion.Worker;
 internal static class SensitiveFieldNames
 {
     /// <summary>Returns the distinct names of all <c>encrypt</c>-flagged fields across the given layouts.</summary>
-    /// <param name="layouts">The loaded layouts; required, no null elements.</param>
+    /// <param name="layouts">The loaded layouts; required, no null elements. Any framing.</param>
     /// <exception cref="ArgumentNullException"><paramref name="layouts"/> or a contained layout is null.</exception>
-    public static IReadOnlySet<string> From(IEnumerable<Layout> layouts)
+    public static IReadOnlySet<string> From(IEnumerable<ILayout> layouts)
     {
         ArgumentNullException.ThrowIfNull(layouts);
 
@@ -20,14 +20,11 @@ internal static class SensitiveFieldNames
         foreach (var layout in layouts)
         {
             ArgumentNullException.ThrowIfNull(layout);
-            foreach (var record in layout.RecordTypes)
+            foreach (var field in layout.DeclaredFields)
             {
-                foreach (var field in record.Fields)
+                if (field.Encrypt)
                 {
-                    if (field.Encrypt)
-                    {
-                        names.Add(field.Name);
-                    }
+                    names.Add(field.Name);
                 }
             }
         }
