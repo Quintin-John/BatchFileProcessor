@@ -6,7 +6,7 @@ public sealed class DelimitedLayoutTests
 {
     private const string Version = "1.0";
     private const string Encoding = "ascii";
-    private const char Tab = '\t';
+    private const string Tab = "\t";
     private const char Terminator = '\n';
 
     private static DelimitedFieldDefinition Field(string name, int index) => new(name, index);
@@ -84,11 +84,40 @@ public sealed class DelimitedLayoutTests
     }
 
     [Theory]
-    [InlineData('\r')]
-    [InlineData('\n')]
-    public void Constructor_LineTerminatorDelimiter_Throws(char delimiter)
+    [InlineData("\r")]
+    [InlineData("\n")]
+    [InlineData("~\n~")]   // buried inside a longer delimiter, not just standing alone
+    public void Constructor_LineTerminatorInDelimiter_Throws(string delimiter)
     {
         Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, delimiter, '\n', Encoding, [Data()]));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Constructor_EmptyDelimiter_Throws(string? delimiter)
+    {
+        // An empty delimiter has no boundary to find, so every row would read as one field.
+        Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, delimiter!, '\n', Encoding, [Data()]));
+    }
+
+    [Theory]
+    [InlineData("~", '~')]        // the delimiter is the terminator
+    [InlineData("~|~", '|')]      // the terminator is buried inside a longer delimiter
+    public void Constructor_RowTerminatorInsideTheDelimiter_Throws(string delimiter, char rowTerminator)
+    {
+        // Framing would end the row part-way through a field boundary, so the two would disagree about
+        // where the row stops.
+        var ex = Assert.Throws<ArgumentException>(
+            () => new DelimitedLayout(Version, delimiter, rowTerminator, Encoding, [Data()]));
+        Assert.Contains("row terminator", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Constructor_MultiCharacterDelimiter_IsAccepted()
+    {
+        // A delimiter is text: nothing in the layout restricts a feed to single-character separators.
+        Assert.Equal("~|~", new DelimitedLayout(Version, "~|~", '\n', Encoding, [Data()]).Delimiter);
     }
 
     [Fact]

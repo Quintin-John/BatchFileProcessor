@@ -10,7 +10,7 @@ public sealed class DelimitedLineReaderTests
 {
     private const string Version = "1.0";
     private const string EncodingName = "ascii";
-    private const char Delimiter = ',';
+    private const string Delimiter = ",";
 
     private const string HeaderName = "head";
     private const string DataName = "body";

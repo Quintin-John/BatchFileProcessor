@@ -22,7 +22,7 @@ public sealed class DelimitedLayoutLoaderTests
         var layout = DelimitedLayoutLoader.Load(MinimalYaml);
 
         Assert.Equal("1.0", layout.Version);
-        Assert.Equal(',', layout.Delimiter);
+        Assert.Equal(",", layout.Delimiter);
         Assert.Equal("ascii", layout.Encoding);
         Assert.Equal(RowRole.Data, layout.Data.Role);
         Assert.Equal(["a", "b"], layout.Data.Fields.Select(f => f.Name));
@@ -55,7 +55,7 @@ public sealed class DelimitedLayoutLoaderTests
 
         var layout = DelimitedLayoutLoader.Load(yaml);
 
-        Assert.Equal('\t', layout.Delimiter);
+        Assert.Equal("\t", layout.Delimiter);
         Assert.Equal(2, layout.HeaderRows);
         Assert.Equal(1, layout.TrailerRows);
         Assert.True(layout.Header!.Skip);
@@ -92,14 +92,17 @@ public sealed class DelimitedLayoutLoaderTests
     }
 
     [Theory]
-    [InlineData("tab", '\t')]
-    [InlineData("space", ' ')]
-    [InlineData("\",\"", ',')]
-    [InlineData("\"|\"", '|')]
-    [InlineData("\";\"", ';')]
-    [InlineData("\"~\"", '~')]
-    [InlineData("\"\\\\x1F\"", (char)0x1F)]
-    public void Load_AnyDelimiter_IsAcceptedWithoutCodeChange(string token, char expected)
+    [InlineData("tab", "\t")]
+    [InlineData("space", " ")]
+    [InlineData("\",\"", ",")]
+    [InlineData("\"|\"", "|")]
+    [InlineData("\";\"", ";")]
+    [InlineData("\"~\"", "~")]
+    [InlineData("\"\\\\x1F\"", "\u001F")]
+    [InlineData("\"~|~\"", "~|~")]      // more than one character is a delimiter like any other
+    [InlineData("\"||\"", "||")]
+    [InlineData("\"<SEP>\"", "<SEP>")]
+    public void Load_AnyDelimiter_IsAcceptedWithoutCodeChange(string token, string expected)
     {
         var yaml = $$"""
             version: "1.0"
@@ -222,9 +225,12 @@ public sealed class DelimitedLayoutLoaderTests
     }
 
     [Fact]
-    public void Load_UnresolvableDelimiter_Throws()
+    public void Load_MalformedDelimiterEscape_Throws()
     {
-        var yaml = MinimalYaml.Replace("delimiter: \",\"", "delimiter: comma", StringComparison.Ordinal);
+        // Any text is a valid delimiter, so a botched escape is the one delimiter mistake still detectable;
+        // it must not be read as literal backslash-and-letters.
+        var yaml = MinimalYaml.Replace(
+            "delimiter: \",\"", @"delimiter: ""\xZZ""", StringComparison.Ordinal);
 
         Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
     }

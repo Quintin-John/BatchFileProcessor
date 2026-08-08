@@ -3,17 +3,18 @@ using System.Globalization;
 namespace Common.FileIngestion.Layouts;
 
 /// <summary>
-/// Resolves a layout's declared delimiter token to the single character that separates fields.
+/// Resolves a layout's declared separator tokens to the characters they stand for.
 /// <para>
-/// Deliberately open-ended: any character is expressible without a code change. A printable separator is
-/// written literally (<c>,</c>, <c>|</c>, <c>;</c>, <c>~</c>, …); anything else is written as a hex escape
-/// (<c>\t</c>, or <c>\x</c> / <c>\u</c> followed by hex digits, e.g. <c>\x1F</c> for the ASCII unit
-/// separator). Two aliases exist only for the separators that are invisible in a text editor and so cannot
-/// be reviewed literally — <c>tab</c> and <c>space</c>. Adding a delimiter is therefore a layout edit,
-/// never a change here.
+/// Deliberately open-ended: any separator is expressible without a code change. A printable one is written
+/// literally (<c>,</c>, <c>|</c>, <c>~|~</c>, …) — including sequences of more than one character; anything
+/// unprintable is written as a hex escape (<c>\t</c>, or <c>\x</c> / <c>\u</c> followed by hex digits, e.g.
+/// <c>\x1F</c> for the ASCII unit separator). A few aliases exist only for separators that are invisible in
+/// a text editor and so cannot be reviewed literally — <c>tab</c>, <c>space</c>, <c>lf</c>, <c>cr</c>. An
+/// alias is matched before the literal reading, so <c>tab</c> means the TAB character rather than those
+/// three letters.
 /// </para>
-/// Fail-closed: an unresolvable token, or one resolving to a line terminator (which would collide with row
-/// framing), is rejected rather than guessed at.
+/// Fail-closed where a mistake is still detectable: a malformed escape is rejected rather than silently
+/// read as literal text, and a separator that would collide with row framing is rejected outright.
 /// </summary>
 public static class DelimiterToken
 {
@@ -44,21 +45,48 @@ public static class DelimiterToken
             [@"\0"] = '\0',
         };
 
-    /// <summary>Resolves a declared field-delimiter token to its character.</summary>
+    /// <summary>
+    /// Resolves a declared field-delimiter token. The result may be more than one character: a feed
+    /// separated by <c>~|~</c> is as valid as one separated by a comma.
+    /// </summary>
     /// <param name="token">The token as written in the layout; required, non-empty.</param>
-    /// <exception cref="ArgumentException"><paramref name="token"/> is null or empty, does not resolve to exactly one character, or resolves to CR or LF.</exception>
-    public static char Resolve(string token)
+    /// <exception cref="ArgumentException"><paramref name="token"/> is null or empty, carries a malformed escape, or contains a line terminator.</exception>
+    public static string Resolve(string token)
     {
-        var resolved = ResolveOrThrow(token, "delimiter");
+        if (string.IsNullOrEmpty(token))
+        {
+            throw new ArgumentException("A delimiter must be declared.", nameof(token));
+        }
 
-        // A delimiter that is also a row terminator would make field splitting and row framing disagree.
-        if (resolved is '\r' or '\n')
+        // An alias or escape names one character; anything else is the separator's own text, which is what
+        // makes a multi-character delimiter expressible at all.
+        var resolved = ResolveCore(token) is { } single ? single.ToString() : LiteralOrThrow(token, "delimiter");
+
+        // A delimiter containing a line terminator would make field splitting and row framing disagree.
+        if (resolved.AsSpan().IndexOfAny('\r', '\n') >= 0)
         {
             throw new ArgumentException(
-                "A line terminator cannot be a field delimiter; it would collide with row framing.", nameof(token));
+                "A line terminator cannot appear in a field delimiter; it would collide with row framing.",
+                nameof(token));
         }
 
         return resolved;
+    }
+
+    // A token that begins like an escape but does not parse is a mistake, not a separator spelled oddly.
+    // Reading it literally would turn a typo into a four-character delimiter and every row would then fail
+    // its field count with nothing pointing at the cause.
+    private static string LiteralOrThrow(string token, string role)
+    {
+        if (token.StartsWith('\\'))
+        {
+            throw new ArgumentException(
+                $"Unrecognised {role} escape '{token}'. Use {HexEscapePrefix} or {UnicodeEscapePrefix} " +
+                "followed by up to four hex digits.",
+                nameof(token));
+        }
+
+        return token;
     }
 
     /// <summary>
@@ -70,7 +98,17 @@ public static class DelimiterToken
     /// <exception cref="ArgumentException"><paramref name="token"/> is null or empty, does not resolve to exactly one character, or resolves outside the single-byte range.</exception>
     public static char ResolveRowTerminator(string token)
     {
-        var resolved = ResolveOrThrow(token, "row terminator");
+        // Not ThrowIfNullOrWhiteSpace: a literal space is a legitimate separator.
+        if (string.IsNullOrEmpty(token))
+        {
+            throw new ArgumentException("A row terminator must be declared.", nameof(token));
+        }
+
+        var resolved = ResolveCore(token)
+            ?? throw new ArgumentException(
+                $"Unrecognised row terminator '{token}'. Write the character literally, as a hex escape " +
+                $"({HexEscapePrefix}1F), or as one of: {string.Join(", ", InvisibleAliases.Keys)}.",
+                nameof(token));
 
         if (resolved > MaxSingleByteCharacter)
         {
@@ -80,21 +118,6 @@ public static class DelimiterToken
         }
 
         return resolved;
-    }
-
-    private static char ResolveOrThrow(string token, string role)
-    {
-        // Not ThrowIfNullOrWhiteSpace: a literal space is a legitimate separator.
-        if (string.IsNullOrEmpty(token))
-        {
-            throw new ArgumentException($"A {role} must be declared.", nameof(token));
-        }
-
-        return ResolveCore(token)
-            ?? throw new ArgumentException(
-                $"Unrecognised {role} '{token}'. Write the character literally, as a hex escape " +
-                $"({HexEscapePrefix}1F), or as one of: {string.Join(", ", InvisibleAliases.Keys)}.",
-                nameof(token));
     }
 
     private static char? ResolveCore(string token)

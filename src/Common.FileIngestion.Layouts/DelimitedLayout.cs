@@ -21,8 +21,11 @@ public sealed class DelimitedLayout : ILayout
     /// <summary>Layout version identifier.</summary>
     public string Version { get; }
 
-    /// <summary>The single character separating fields within a row.</summary>
-    public char Delimiter { get; }
+    /// <summary>
+    /// The text separating fields within a row. Not restricted to one character: a feed separated by
+    /// <c>~|~</c> is as ordinary as one separated by a comma, and neither requires a code change.
+    /// </summary>
+    public string Delimiter { get; }
 
     /// <summary>
     /// The character a row ends with. Declared, not assumed: a feed framed on CR alone, or on an ASCII
@@ -58,15 +61,15 @@ public sealed class DelimitedLayout : ILayout
 
     /// <summary>Creates a validated layout. All structural invariants are enforced here.</summary>
     /// <param name="version">Version identifier; required, non-blank.</param>
-    /// <param name="delimiter">The resolved field delimiter; must not be a line terminator.</param>
-    /// <param name="rowTerminator">The resolved row terminator; must differ from the delimiter.</param>
+    /// <param name="delimiter">The resolved field delimiter; required, non-empty, and must contain neither a line terminator nor the row terminator.</param>
+    /// <param name="rowTerminator">The resolved row terminator; must not appear in the delimiter.</param>
     /// <param name="encoding">Encoding name; required, non-blank.</param>
     /// <param name="rowTypes">Row types; required, non-empty, unique names, exactly one data role, at most one header and one trailer.</param>
-    /// <exception cref="ArgumentException">Any string is blank, the delimiter is a line terminator, row types are empty, names collide, or the role composition is invalid.</exception>
+    /// <exception cref="ArgumentException">Any string is blank, the delimiter carries a line terminator or the row terminator, row types are empty, names collide, or the role composition is invalid.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="rowTypes"/> is null.</exception>
     public DelimitedLayout(
         string version,
-        char delimiter,
+        string delimiter,
         char rowTerminator,
         string encoding,
         IReadOnlyList<DelimitedRowDefinition> rowTypes)
@@ -75,17 +78,25 @@ public sealed class DelimitedLayout : ILayout
         ArgumentException.ThrowIfNullOrWhiteSpace(encoding);
         ArgumentNullException.ThrowIfNull(rowTypes);
 
-        if (delimiter is '\r' or '\n')
+        // An empty delimiter has no boundary to find, so every row would read as a single field.
+        if (string.IsNullOrEmpty(delimiter))
         {
-            throw new ArgumentException(
-                "A line terminator cannot be a field delimiter; it would collide with row framing.", nameof(delimiter));
+            throw new ArgumentException("A layout must declare a non-empty field delimiter.", nameof(delimiter));
         }
 
-        // The two separators must differ, or a row could not be told from the field boundary inside it.
-        if (delimiter == rowTerminator)
+        if (delimiter.AsSpan().IndexOfAny('\r', '\n') >= 0)
         {
             throw new ArgumentException(
-                "The field delimiter and the row terminator must differ.", nameof(rowTerminator));
+                "A line terminator cannot appear in a field delimiter; it would collide with row framing.",
+                nameof(delimiter));
+        }
+
+        // The row terminator cannot occur inside the delimiter, or framing would end a row part-way through a
+        // field boundary and the two would disagree about where the row stops.
+        if (delimiter.Contains(rowTerminator, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "The row terminator must not appear in the field delimiter.", nameof(rowTerminator));
         }
 
         if (rowTypes.Count == 0)

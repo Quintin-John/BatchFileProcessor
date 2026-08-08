@@ -4,9 +4,9 @@ namespace Common.FileIngestion.Tests.Layouts;
 
 public sealed class DelimitedFieldsTests
 {
-    private const char Delimiter = ',';
+    private const string Delimiter = ",";
 
-    private static List<string> ReadAll(string row, char delimiter = Delimiter)
+    private static List<string> ReadAll(string row, string delimiter = Delimiter)
     {
         var values = new List<string>();
         var fields = new DelimitedFields(row, delimiter);
@@ -57,12 +57,62 @@ public sealed class DelimitedFieldsTests
     }
 
     [Theory]
-    [InlineData('\t')]
-    [InlineData('|')]
-    [InlineData((char)0x1F)]
-    public void SplitsOnWhicheverDelimiterIsGiven(char delimiter)
+    [InlineData("\t")]
+    [InlineData("|")]
+    [InlineData("\u001F")]
+    [InlineData("~|~")]
+    [InlineData("||")]
+    [InlineData("<SEP>")]
+    public void SplitsOnWhicheverDelimiterIsGiven(string delimiter)
     {
+        // One character or several makes no difference to the rule; the delimiter is text.
         Assert.Equal(["a", "b"], ReadAll(string.Join(delimiter, "a", "b"), delimiter));
+    }
+
+    // ---------- a delimiter of more than one character ----------
+
+    [Fact]
+    public void AMultiCharacterDelimiterIsMatchedWhole_NotCharacterByCharacter()
+    {
+        // The failure this guards against: treating '~|~' as "any of ~ or |", which would read six fields
+        // out of a two-field row.
+        Assert.Equal(["a", "b"], ReadAll("a~|~b", "~|~"));
+    }
+
+    [Fact]
+    public void ACharacterOfAMultiCharacterDelimiterIsOrdinaryContentOnItsOwn()
+    {
+        // A lone '~' is not a boundary when the boundary is '~|~', so it stays inside the field's value.
+        Assert.Equal(["a~b", "c"], ReadAll("a~b~|~c", "~|~"));
+    }
+
+    [Fact]
+    public void MatchesDoNotOverlap_ReadingResumesPastTheWholeDelimiter()
+    {
+        // With '||' over 'a|||b' the second and third bars overlap a candidate match. Consuming the whole
+        // delimiter leaves '|b'; consuming one character would leave '|' as a phantom empty field.
+        Assert.Equal(["a", "|b"], ReadAll("a|||b", "||"));
+    }
+
+    [Fact]
+    public void APartialDelimiterAtTheEndIsContent_NotABoundary()
+    {
+        Assert.Equal(["a", "b~|"], ReadAll("a~|~b~|", "~|~"));
+    }
+
+    [Fact]
+    public void AdjacentMultiCharacterDelimitersYieldAnEmptyFieldBetweenThem()
+    {
+        Assert.Equal(["a", string.Empty, "b"], ReadAll("a~|~~|~b", "~|~"));
+    }
+
+    [Fact]
+    public void AnEmptyDelimiter_Throws()
+    {
+        // Guarded because an empty delimiter matches everywhere and scanning would never advance.
+        Assert.Throws<ArgumentException>(() => ReadAll("a,b", string.Empty));
+        Assert.Throws<ArgumentException>(() => DelimitedFields.Count("a,b", string.Empty));
+        Assert.Throws<ArgumentException>(() => DelimitedFields.TryReadAt("a,b", 0, string.Empty, out _));
     }
 
     // ---------- Count agrees with what reading actually yields ----------
@@ -79,6 +129,19 @@ public sealed class DelimitedFieldsTests
         // The parser rejects on Count and then reads that many fields. If the two ever disagreed it would
         // accept a row and then map it short, so they are asserted against each other rather than separately.
         Assert.Equal(ReadAll(row).Count, DelimitedFields.Count(row, Delimiter));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a")]
+    [InlineData("a~|~b~|~c")]
+    [InlineData("a~|~~|~b")]
+    [InlineData("a|||b")]
+    [InlineData("a~b~|~c~")]
+    public void Count_MatchesWhatIsRead_ForAMultiCharacterDelimiterToo(string row)
+    {
+        const string delimiter = "~|~";
+        Assert.Equal(ReadAll(row, delimiter).Count, DelimitedFields.Count(row, delimiter));
     }
 
     // ---------- reading a single field by position ----------
@@ -98,12 +161,22 @@ public sealed class DelimitedFieldsTests
     {
         // The reader locates a marker by position while the parser reads sequentially; a disagreement would
         // mean the marker is verified against a different column than the value that is mapped.
-        const string row = "a,,c,";
-        var sequential = ReadAll(row);
+        AssertPositionalReadingAgreesWithSequential("a,,c,", Delimiter);
+    }
+
+    [Fact]
+    public void TryReadAt_AgreesWithReadingSequentially_ForAMultiCharacterDelimiterToo()
+    {
+        AssertPositionalReadingAgreesWithSequential("a~b~|~~|~c~|~", "~|~");
+    }
+
+    private static void AssertPositionalReadingAgreesWithSequential(string row, string delimiter)
+    {
+        var sequential = ReadAll(row, delimiter);
 
         for (var index = 0; index < sequential.Count; index++)
         {
-            Assert.True(DelimitedFields.TryReadAt(row, index, Delimiter, out var value));
+            Assert.True(DelimitedFields.TryReadAt(row, index, delimiter, out var value));
             Assert.Equal(sequential[index], value.ToString());
         }
     }

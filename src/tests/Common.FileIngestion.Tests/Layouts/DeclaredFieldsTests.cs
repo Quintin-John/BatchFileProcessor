@@ -26,7 +26,7 @@ public sealed class DeclaredFieldsTests
         }),
     });
 
-    private static DelimitedLayout Delimited() => new(Version, ',', '\n', Encoding, new[]
+    private static DelimitedLayout Delimited() => new(Version, ",", '\n', Encoding, new[]
     {
         new DelimitedRowDefinition("head", RowRole.Header, 1, new[]
         {
@@ -71,7 +71,7 @@ public sealed class DeclaredFieldsTests
     public void DeclaredFields_OfASkippedRowType_ContributesNothing()
     {
         // A skipped type declares no fields, so it adds nothing to classify.
-        var layout = new DelimitedLayout(Version, ',', '\n', Encoding, new[]
+        var layout = new DelimitedLayout(Version, ",", '\n', Encoding, new[]
         {
             new DelimitedRowDefinition("head", RowRole.Header, 1, [], skip: true),
             new DelimitedRowDefinition("body", RowRole.Data, 0, [new DelimitedFieldDefinition("a", 0)]),

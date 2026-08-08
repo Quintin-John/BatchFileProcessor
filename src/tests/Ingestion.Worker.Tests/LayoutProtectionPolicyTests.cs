@@ -97,7 +97,7 @@ public sealed class LayoutProtectionPolicyTests
     {
         // Classification is framing-agnostic: the policy reads the shared ILayout surface, so a delimited
         // profile protects its fields without any delimited-specific branch here.
-        var layout = new DelimitedLayout("1.0", '\t', '\n', "ascii", new[]
+        var layout = new DelimitedLayout("1.0", "\t", '\n', "ascii", new[]
         {
             new DelimitedRowDefinition("body", RowRole.Data, 0, new[]
             {
@@ -119,7 +119,7 @@ public sealed class LayoutProtectionPolicyTests
     {
         // Same fail-closed rule as fixed-width: one name must not resolve to two classifications, or the
         // last one written would silently declassify the other.
-        var layout = new DelimitedLayout("1.0", '\t', '\n', "ascii", new[]
+        var layout = new DelimitedLayout("1.0", "\t", '\n', "ascii", new[]
         {
             new DelimitedRowDefinition("head", RowRole.Header, 1, new[]
             {

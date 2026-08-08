@@ -14,36 +14,59 @@ public sealed class DelimiterTokenTests
     public void Resolve_SingleLiteralCharacter_IsThatCharacter(string token)
     {
         // Any printable separator is written literally, so a new one needs no code change.
-        Assert.Equal(token[0], DelimiterToken.Resolve(token));
+        Assert.Equal(token, DelimiterToken.Resolve(token));
     }
 
     [Theory]
-    [InlineData("tab", '\t')]
-    [InlineData("TAB", '\t')]
-    [InlineData("space", ' ')]
-    public void Resolve_InvisibleAlias_IsResolved(string token, char expected)
+    [InlineData("~|~")]
+    [InlineData("||")]
+    [InlineData("::")]
+    [InlineData("<SEP>")]
+    public void Resolve_SeveralLiteralCharacters_IsThatText(string token)
+    {
+        // A delimiter is not restricted to one character. Anything the layout writes literally is the
+        // separator, however long, so a feed that separates on '~|~' needs no code change either.
+        Assert.Equal(token, DelimiterToken.Resolve(token));
+    }
+
+    [Theory]
+    [InlineData("tab")]
+    [InlineData("space")]
+    public void Resolve_AliasIsMatchedBeforeTheLiteralReading(string token)
+    {
+        // The one ambiguity multi-character delimiters introduce: a token that is also an alias resolves to
+        // the alias, never to its own letters. Pinned so the precedence cannot be reversed silently.
+        Assert.NotEqual(token, DelimiterToken.Resolve(token));
+        Assert.Single(DelimiterToken.Resolve(token));
+    }
+
+    [Theory]
+    [InlineData("tab", "\t")]
+    [InlineData("TAB", "\t")]
+    [InlineData("space", " ")]
+    public void Resolve_InvisibleAlias_IsResolved(string token, string expected)
     {
         // Aliases exist only for separators that cannot be reviewed by eye in a layout file.
         Assert.Equal(expected, DelimiterToken.Resolve(token));
     }
 
     [Theory]
-    [InlineData(@"\t", '\t')]
-    [InlineData(@"\\", '\\')]
-    [InlineData(@"\0", '\0')]
-    public void Resolve_SimpleEscape_IsResolved(string token, char expected)
+    [InlineData(@"\t", "\t")]
+    [InlineData(@"\\", "\\")]
+    [InlineData(@"\0", "\0")]
+    public void Resolve_SimpleEscape_IsResolved(string token, string expected)
     {
         Assert.Equal(expected, DelimiterToken.Resolve(token));
     }
 
     [Theory]
-    [InlineData(@"\x1F", (char)0x1F)]   // ASCII unit separator
-    [InlineData(@"\x1f", (char)0x1F)]   // case-insensitive digits
-    [InlineData(@"\X1F", (char)0x1F)]   // case-insensitive prefix
-    [InlineData(@"\u" + "001F", (char)0x1F)]   // the \u form resolves identically
-    [InlineData(@"\x7C", '|')]
-    [InlineData(@"\x01", (char)0x01)]
-    public void Resolve_HexEscape_IsResolved(string token, char expected)
+    [InlineData(@"\x1F", "\u001F")]   // ASCII unit separator
+    [InlineData(@"\x1f", "\u001F")]   // case-insensitive digits
+    [InlineData(@"\X1F", "\u001F")]   // case-insensitive prefix
+    [InlineData(@"\u" + "001F", "\u001F")]   // the \u form resolves identically
+    [InlineData(@"\x7C", "|")]
+    [InlineData(@"\x01", "\u0001")]
+    public void Resolve_HexEscape_IsResolved(string token, string expected)
     {
         // The general escape hatch: every character is expressible from the layout alone, so no delimiter
         // ever requires editing the resolver.
@@ -64,7 +87,7 @@ public sealed class DelimiterTokenTests
                 continue;
             }
 
-            Assert.Equal((char)code, DelimiterToken.Resolve(token));
+            Assert.Equal(((char)code).ToString(), DelimiterToken.Resolve(token));
         }
     }
 
@@ -77,15 +100,17 @@ public sealed class DelimiterTokenTests
     }
 
     [Theory]
-    [InlineData("comma")]        // not an alias: ',' is writable literally
-    [InlineData("||")]           // more than one character
     [InlineData(@"\q")]          // unknown escape
     [InlineData(@"\x")]          // hex prefix with no digits
     [InlineData(@"\xZZ")]        // non-hex digits
     [InlineData(@"\x12345")]     // too many digits to be one character
-    public void Resolve_Unrecognised_Throws(string token)
+    public void Resolve_MalformedEscape_Throws(string token)
     {
-        Assert.Throws<ArgumentException>(() => DelimiterToken.Resolve(token));
+        // Once any text is a valid delimiter, a botched escape is the only delimiter mistake still
+        // detectable — and it must not be read as literal backslash-and-letters, which would turn a typo
+        // into a working layout that rejects every row for the wrong reason.
+        var ex = Assert.Throws<ArgumentException>(() => DelimiterToken.Resolve(token));
+        Assert.Contains("escape", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -93,9 +118,11 @@ public sealed class DelimiterTokenTests
     [InlineData("\n")]
     [InlineData(@"\x0D")]
     [InlineData(@"\x0A")]
+    [InlineData("~\n~")]     // buried inside a multi-character delimiter, not just standing alone
+    [InlineData("|\r")]
     public void Resolve_LineTerminator_Throws(string token)
     {
-        // A delimiter that is also a row terminator would make field splitting and row framing disagree.
+        // A delimiter carrying a row terminator would make field splitting and row framing disagree.
         var ex = Assert.Throws<ArgumentException>(() => DelimiterToken.Resolve(token));
         Assert.Contains("row framing", ex.Message, StringComparison.Ordinal);
     }

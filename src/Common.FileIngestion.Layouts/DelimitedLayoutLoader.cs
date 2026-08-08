@@ -92,7 +92,7 @@ public static class DelimitedLayoutLoader
         }
     }
 
-    private static char ResolveDelimiter(string? token)
+    private static string ResolveDelimiter(string? token)
     {
         if (token is null)
         {

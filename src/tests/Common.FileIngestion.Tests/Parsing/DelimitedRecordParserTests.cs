@@ -9,12 +9,12 @@ public sealed class DelimitedRecordParserTests
 {
     private const string Version = "1.0";
     private const string EncodingName = "ascii";
-    private const char Comma = ',';
+    private const string Comma = ",";
     private const string HeaderName = "head";
     private const string DataName = "body";
 
     // Three fields; 'acct' is encrypted + required, 'pad' is skipped. A skipped header type sits alongside.
-    private static DelimitedLayout Layout(char delimiter = Comma) => new(Version, delimiter, '\n', EncodingName, new[]
+    private static DelimitedLayout Layout(string delimiter = Comma) => new(Version, delimiter, '\n', EncodingName, new[]
     {
         new DelimitedRowDefinition(HeaderName, RowRole.Header, 1, [], skip: true),
         new DelimitedRowDefinition(DataName, RowRole.Data, 0, new[]
@@ -25,7 +25,7 @@ public sealed class DelimitedRecordParserTests
         }),
     });
 
-    private static DelimitedRecordParser Parser(char delimiter = Comma) => new(Layout(delimiter));
+    private static DelimitedRecordParser Parser(string delimiter = Comma) => new(Layout(delimiter));
 
     // The reader is the authority on both the extent and the row type; this mirrors what it emits.
     private static FramedRecord Framed(string content, string rowType = DataName, long seq = 1, long offset = 0) =>
@@ -90,12 +90,14 @@ public sealed class DelimitedRecordParserTests
     }
 
     [Theory]
-    [InlineData('\t')]
-    [InlineData('|')]
-    [InlineData(';')]
-    [InlineData('~')]
-    [InlineData((char)0x1F)]
-    public void Parse_AnyDelimiter_SplitsTheSameWay(char delimiter)
+    [InlineData("\t")]
+    [InlineData("|")]
+    [InlineData(";")]
+    [InlineData("~")]
+    [InlineData("\u001F")]
+    [InlineData("~|~")]
+    [InlineData("||")]
+    public void Parse_AnyDelimiter_SplitsTheSameWay(string delimiter)
     {
         // The delimiter is layout data, so a new one needs no code change here either.
         var row = string.Join(delimiter, "DT", "ACCT1234", "XX");

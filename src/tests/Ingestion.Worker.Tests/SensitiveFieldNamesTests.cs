@@ -68,7 +68,7 @@ public sealed class SensitiveFieldNamesTests
             new FieldDefinition("pan", 3, 8, encrypt: true),
         }));
 
-        var delimited = new DelimitedLayout("1.0", '\t', '\n', "ascii", new[]
+        var delimited = new DelimitedLayout("1.0", "\t", '\n', "ascii", new[]
         {
             new DelimitedRowDefinition("body", RowRole.Data, 0, new[]
             {

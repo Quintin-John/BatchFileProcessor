@@ -49,7 +49,7 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
 
     // ---------- the layout under test ----------
 
-    private static DelimitedLayout Layout(char delimiter = ',', bool withTrailerMarker = true) =>
+    private static DelimitedLayout Layout(string delimiter = ",", bool withTrailerMarker = true) =>
         new("1.0", delimiter, '\n', "ascii", new[]
         {
             new DelimitedRowDefinition(HeaderRowType, RowRole.Header, 1, [], skip: true),
@@ -284,13 +284,15 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
     // ---------- framing ----------
 
     [Theory]
-    [InlineData('\t')]
-    [InlineData(',')]
-    [InlineData('|')]
-    [InlineData(';')]
-    [InlineData('~')]
-    [InlineData((char)0x1F)]
-    public async Task AnyDeclaredDelimiter_BehavesIdentically(char delimiter)
+    [InlineData(",")]
+    [InlineData("|")]
+    [InlineData(";")]
+    [InlineData("~")]
+    [InlineData("\u001F")]
+    [InlineData("~|~")]
+    [InlineData("||")]
+    [InlineData("<SEP>")]
+    public async Task AnyDeclaredDelimiter_BehavesIdentically(string delimiter)
     {
         var layout = Layout(delimiter);
         await WriteAsync(FileWith(layout, DataRow(layout), DataRow(layout)));

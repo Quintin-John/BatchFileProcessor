@@ -13,7 +13,7 @@ public sealed class RecordFormatTests
         new RecordDefinition("r", "M", new[] { new FieldDefinition("f", 1, 10) }),
     });
 
-    private static DelimitedLayout DelimitedLayout() => new("1.0", '\t', '\n', "ascii", new[]
+    private static DelimitedLayout DelimitedLayout() => new("1.0", "\t", '\n', "ascii", new[]
     {
         new DelimitedRowDefinition("body", RowRole.Data, 0, new[] { new DelimitedFieldDefinition("f", 0) }),
     });
