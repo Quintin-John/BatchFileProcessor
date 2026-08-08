@@ -190,32 +190,13 @@ public sealed class DelimitedLineReader : IRecordReader
             return;
         }
 
-        var actual = FieldAt(row.Content, expected.Index);
-        if (!string.Equals(actual, expected.Value, StringComparison.Ordinal))
+        var present = DelimitedFields.TryReadAt(row.Content, expected.Index, _layout.Delimiter, out var actual);
+        if (!present || !actual.SequenceEqual(expected.Value))
         {
             throw new InvalidDataException(
-                $"Row {row.RecordSeq} is positioned as '{rowType.Name}' but field {expected.Index} is " +
-                $"'{actual}', not '{expected.Value}'; the file does not match its layout.");
+                $"Row {row.RecordSeq} is positioned as '{rowType.Name}' but field {expected.Index} does not " +
+                $"carry '{expected.Value}'; the file does not match its layout.");
         }
-    }
-
-    // Reads one field without splitting the whole row: verifying a classification is not parsing it.
-    private string? FieldAt(string content, int index)
-    {
-        ReadOnlySpan<char> remaining = content;
-        for (var position = 0; position < index; position++)
-        {
-            var separator = remaining.IndexOf(_layout.Delimiter);
-            if (separator < 0)
-            {
-                return null; // the row has fewer fields than the marker's index
-            }
-
-            remaining = remaining[(separator + 1)..];
-        }
-
-        var end = remaining.IndexOf(_layout.Delimiter);
-        return (end < 0 ? remaining : remaining[..end]).ToString();
     }
 
     // Frames one terminated row out of the buffer, hashing every byte it consumes including the terminator.

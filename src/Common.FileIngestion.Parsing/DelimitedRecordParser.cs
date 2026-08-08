@@ -76,7 +76,7 @@ public sealed class DelimitedRecordParser : IRecordParser
 
         ReadOnlySpan<char> row = framed.Content;
         var expected = rowDefinition.Fields.Count;
-        var actual = CountFields(row, _layout.Delimiter);
+        var actual = DelimitedFields.Count(row, _layout.Delimiter);
         if (actual != expected)
         {
             var reason = new RejectReason(
@@ -88,11 +88,11 @@ public sealed class DelimitedRecordParser : IRecordParser
 
         var fields = new Dictionary<string, FieldValue>(expected, StringComparer.Ordinal);
         List<RejectReason>? reasons = null;
-        var remaining = row;
+        var values = new DelimitedFields(row, _layout.Delimiter);
 
         foreach (var field in rowDefinition.Fields)
         {
-            var value = TakeNext(ref remaining, _layout.Delimiter);
+            values.TryReadNext(out var value);
 
             // A skipped field is counted by the layout for row coverage but never emitted upstream. It
             // cannot be required (enforced by the layout), so there is nothing to validate here.
@@ -119,36 +119,5 @@ public sealed class DelimitedRecordParser : IRecordParser
 
         var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, framed.ByteLength, rowDefinition.Name);
         return RecordParseResult.Success(new IngestRecord(locator, fields));
-    }
-
-    // Counted before any substring is materialised, so a malformed row costs nothing to reject.
-    private static int CountFields(ReadOnlySpan<char> row, char delimiter)
-    {
-        var count = 1;
-        foreach (var character in row)
-        {
-            if (character == delimiter)
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    // Slices the next value off the row without allocating; only emitted fields become strings.
-    private static ReadOnlySpan<char> TakeNext(ref ReadOnlySpan<char> remaining, char delimiter)
-    {
-        var separator = remaining.IndexOf(delimiter);
-        if (separator < 0)
-        {
-            var last = remaining;
-            remaining = default;
-            return last;
-        }
-
-        var value = remaining[..separator];
-        remaining = remaining[(separator + 1)..];
-        return value;
     }
 }

@@ -290,7 +290,15 @@ public sealed class DelimitedLineReaderTests
 
         var ex = await Assert.ThrowsAsync<InvalidDataException>(
             () => ReadAsync(ReaderWithFooterMatch(0, "Footer"), data));
-        Assert.Contains("not 'Footer'", ex.Message, StringComparison.Ordinal);
+
+        // Names the expected marker and the row, which is what an operator needs to act.
+        Assert.Contains("Footer", ex.Message, StringComparison.Ordinal);
+
+        // But never the value it actually found. Exception text reaches logs unredacted — RedactingLogger
+        // scrubs structured state, not message strings — so a field value interpolated here would leak
+        // whatever that column holds, which for a mis-framed file is arbitrary record content.
+        Assert.DoesNotContain("b,2", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("'b'", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
