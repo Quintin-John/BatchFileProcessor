@@ -11,7 +11,7 @@ namespace Common.FileIngestion.Reading;
 /// pass. Memory is O(1) in file size — records flow through a bounded read buffer, never the whole
 /// file. Handles records split across read segments and a final record with no trailing terminator.
 /// </summary>
-public sealed class StreamRecordReader
+public sealed class StreamRecordReader : IRecordReader
 {
     private readonly int _recordLength;
     private readonly int _terminatorLength;
@@ -44,15 +44,9 @@ public sealed class StreamRecordReader
     /// <summary>Record content length in bytes (excludes the terminator).</summary>
     public int RecordLength => _recordLength;
 
-    /// <summary>
-    /// Reads <paramref name="stream"/> to completion, invoking <paramref name="onRecord"/> for each
-    /// framed record, and returns the file's SHA-256 as an uppercase hex string (the FileId).
-    /// </summary>
-    /// <param name="stream">The source stream.</param>
-    /// <param name="onRecord">Async callback invoked per record (supports backpressure).</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="stream"/> or <paramref name="onRecord"/> is null.</exception>
-    /// <exception cref="InvalidDataException">The stream ends with an incomplete record.</exception>
+    /// <inheritdoc />
+    /// <remarks>Frames by a constant stride, so every record reports the same extent except a final record
+    /// with no trailing terminator, which reports its content length only.</remarks>
     public async Task<string> ReadAsync(
         Stream stream,
         Func<FramedRecord, CancellationToken, ValueTask> onRecord,

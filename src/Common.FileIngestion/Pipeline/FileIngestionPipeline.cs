@@ -25,7 +25,7 @@ public sealed class FileIngestionPipeline
 {
     private const string PublishFailedReasonCode = "PUBLISH_FAILED";
 
-    private readonly StreamRecordReader _reader;
+    private readonly IRecordReader _reader;
     private readonly IRecordParser _parser;
     private readonly RecordProtector _protector;
     private readonly IMessagePublisher _publisher;
@@ -45,7 +45,7 @@ public sealed class FileIngestionPipeline
                         "into a parameterless data bag would add no invariant (a wrapper smell) and hide the " +
                         "explicit dependencies. Injected once at composition; not a public call surface.")]
     public FileIngestionPipeline(
-        StreamRecordReader reader,
+        IRecordReader reader,
         IRecordParser parser,
         RecordProtector protector,
         IMessagePublisher publisher,

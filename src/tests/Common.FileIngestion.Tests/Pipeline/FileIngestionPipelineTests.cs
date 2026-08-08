@@ -35,11 +35,16 @@ public sealed class FileIngestionPipelineTests
         public int PublisherConcurrency { get; set; } = 1;  // deterministic by default; fan-out tests raise it
         public int PublisherConfirmWindow { get; set; } = 64; // large enough not to gate; window test lowers it
 
+        // Framing strategy. Defaults to fixed-width; the variable-length test swaps in its own reader,
+        // which is the point of the IRecordReader seam.
+        public IRecordReader Reader { get; set; } =
+            new StreamRecordReader(RecordLength, terminatorLength: 1, Encoding.ASCII);
+
         public FileIngestionPipeline Build(int maxRecords = 2, bool lineageEnabled = true)
         {
             var instrumentation = new ObservabilityInstrumentation("test-pipeline");
             return new FileIngestionPipeline(
-                new StreamRecordReader(RecordLength, terminatorLength: 1, Encoding.ASCII),
+                Reader,
                 new FakeParser(),
                 new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
                 Publisher,
@@ -113,6 +118,40 @@ public sealed class FileIngestionPipelineTests
         Assert.Equal(2, outcome.RecordsAccepted);
         Assert.Equal(bytes.Length, harness.Checkpoints.Saved[^1].ByteOffset);
         Assert.True(harness.Checkpoints.Saved[^1].ByteOffset < bytes.Length + 1); // never past EOF
+    }
+
+    [Fact]
+    public void Constructor_NullReader_Throws()
+    {
+        // The reader is now injected as an abstraction; a missing one must fail at composition, not at the
+        // first record read.
+        Assert.Throws<ArgumentNullException>(() => new Harness { Reader = null! }.Build());
+    }
+
+    [Fact]
+    public async Task Ingest_WithVariableLengthFraming_AdvancesWatermarkByActualExtents()
+    {
+        // The seam under test: the pipeline is handed a reader whose records differ in size, and must still
+        // land every watermark exactly on a record boundary. A fixed-stride assumption would drift further
+        // out of alignment with each record.
+        var lines = new[] { "A", "BBBBBBBB", "CC", "DDDDD" };
+        var harness = new Harness { Reader = new VariableLengthReader(lines) };
+
+        var outcome = await harness.Build(maxRecords: 1).IngestAsync(
+            Request(() => new MemoryStream(Bytes(string.Concat(lines)))), CancellationToken.None);
+
+        Assert.Equal(lines.Length, outcome.RecordsAccepted);
+
+        // Each saved watermark must equal a running total of the line lengths — i.e. a real boundary.
+        var boundaries = new List<long>();
+        long running = 0;
+        foreach (var line in lines)
+        {
+            running += line.Length;
+            boundaries.Add(running);
+        }
+
+        Assert.Equal(boundaries, harness.Checkpoints.Saved.Select(w => w.ByteOffset));
     }
 
     [Fact]
@@ -563,6 +602,30 @@ public sealed class FileIngestionPipelineTests
             }
 
             return Task.CompletedTask;
+        }
+    }
+
+    // Frames a stream into records of deliberately unequal length, each reporting its own extent. Exists to
+    // prove the pipeline holds no fixed-stride assumption; the real delimited reader arrives in its own slice.
+    private sealed class VariableLengthReader(IReadOnlyList<string> lines) : IRecordReader
+    {
+        public async Task<string> ReadAsync(
+            Stream stream,
+            Func<FramedRecord, CancellationToken, ValueTask> onRecord,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(stream);
+            ArgumentNullException.ThrowIfNull(onRecord);
+
+            long offset = 0;
+            for (var i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                await onRecord(new FramedRecord(i + 1, offset, line.Length, line), cancellationToken);
+                offset += line.Length;
+            }
+
+            return await FileIdHasher.ComputeAsync(stream, cancellationToken);
         }
     }
 
