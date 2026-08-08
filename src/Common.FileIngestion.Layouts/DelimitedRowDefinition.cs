@@ -35,17 +35,30 @@ public sealed class DelimitedRowDefinition
     /// <summary>Ordered field definitions. Defensively copied; read-only; empty only for a skipped row type.</summary>
     public IReadOnlyList<DelimitedFieldDefinition> Fields { get; }
 
+    /// <summary>
+    /// An optional marker verifying that a row really is this type, or null when position alone is trusted.
+    /// Only a positional row type can declare one: on a data row it would be a content rule, which is
+    /// downstream's concern, not the engine's.
+    /// </summary>
+    public RowMatch? Match { get; }
+
     /// <summary>Creates a validated row definition.</summary>
     /// <param name="name">Row-type name; required, non-blank.</param>
     /// <param name="role">What the row type is.</param>
     /// <param name="rows">Rows spanned; at least 1 for header/trailer, exactly 0 for data.</param>
     /// <param name="fields">Ordered fields; required, no null elements, non-empty unless <paramref name="skip"/>. Copied defensively. Indexes must cover 0..n-1 with no gap, overlap, or duplicate name.</param>
     /// <param name="skip">Whether the row type is consumed but not emitted; defaults to false.</param>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is blank, <paramref name="fields"/> is empty when not skipped or contains a null, indexes do not cover 0..n-1, or a field name repeats.</exception>
+    /// <param name="match">Optional marker verifying a row really is this type; only valid on a positional role.</param>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is blank, <paramref name="fields"/> is empty when not skipped or contains a null, indexes do not cover 0..n-1, a field name repeats, or <paramref name="match"/> is declared on a data row type.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="rows"/> disagrees with <paramref name="role"/>, or <paramref name="role"/> is not a declared value.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="fields"/> is null.</exception>
     public DelimitedRowDefinition(
-        string name, RowRole role, int rows, IReadOnlyList<DelimitedFieldDefinition> fields, bool skip = false)
+        string name,
+        RowRole role,
+        int rows,
+        IReadOnlyList<DelimitedFieldDefinition> fields,
+        bool skip = false,
+        RowMatch? match = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(fields);
@@ -62,6 +75,15 @@ public sealed class DelimitedRowDefinition
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(rows), rows, "A data row type spans the remainder of the file and must not declare a row count.");
+            }
+
+            // A marker exists to verify a positional claim. Data rows make no positional claim, so a marker
+            // there would be a content rule — business validation, which this engine deliberately does not do.
+            if (match is not null)
+            {
+                throw new ArgumentException(
+                    "A data row type must not declare a match; verifying row content is a downstream concern.",
+                    nameof(match));
             }
         }
         else
@@ -91,6 +113,7 @@ public sealed class DelimitedRowDefinition
         Role = role;
         Rows = rows;
         Skip = skip;
+        Match = match;
         Fields = new ReadOnlyCollection<DelimitedFieldDefinition>(copy);
     }
 

@@ -159,7 +159,7 @@ public sealed class DelimitedLineReader : IRecordReader
         }
     }
 
-    private static ValueTask EmitAsync(
+    private ValueTask EmitAsync(
         FramedRecord row,
         DelimitedRowDefinition? rowType,
         Func<FramedRecord, CancellationToken, ValueTask> onRecord,
@@ -169,9 +169,50 @@ public sealed class DelimitedLineReader : IRecordReader
         // skipped is layout semantics, not framing, so the parser applies it — exactly as it does for a
         // skipped fixed-width record type. A null type means the layout declares no row type for this
         // position (a header or trailer type that is absent), which the row-count invariant already rules out.
-        return rowType is null
-            ? ValueTask.CompletedTask
-            : onRecord(row with { RowType = rowType.Name }, cancellationToken);
+        if (rowType is null)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        VerifyMatch(row, rowType);
+        return onRecord(row with { RowType = rowType.Name }, cancellationToken);
+    }
+
+    // Positional classification is a claim; a declared marker is what makes it checkable. Without this, the
+    // last row of a truncated file passes as the trailer and its data is silently discarded.
+    private void VerifyMatch(FramedRecord row, DelimitedRowDefinition rowType)
+    {
+        if (rowType.Match is not { } expected)
+        {
+            return;
+        }
+
+        var actual = FieldAt(row.Content, expected.Index);
+        if (!string.Equals(actual, expected.Value, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Row {row.RecordSeq} is positioned as '{rowType.Name}' but field {expected.Index} is " +
+                $"'{actual}', not '{expected.Value}'; the file does not match its layout.");
+        }
+    }
+
+    // Reads one field without splitting the whole row: verifying a classification is not parsing it.
+    private string? FieldAt(string content, int index)
+    {
+        ReadOnlySpan<char> remaining = content;
+        for (var position = 0; position < index; position++)
+        {
+            var separator = remaining.IndexOf(_layout.Delimiter);
+            if (separator < 0)
+            {
+                return null; // the row has fewer fields than the marker's index
+            }
+
+            remaining = remaining[(separator + 1)..];
+        }
+
+        var end = remaining.IndexOf(_layout.Delimiter);
+        return (end < 0 ? remaining : remaining[..end]).ToString();
     }
 
     // Frames one terminated row out of the buffer, hashing every byte it consumes including the terminator.

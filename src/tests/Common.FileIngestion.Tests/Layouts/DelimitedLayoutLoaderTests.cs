@@ -287,6 +287,109 @@ public sealed class DelimitedLayoutLoaderTests
         Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
     }
 
+    // ---------- row match ----------
+
+    [Fact]
+    public void Load_TrailerMatch_IsMapped()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { index: 2, value: Footer }
+            """;
+
+        var match = DelimitedLayoutLoader.Load(yaml).Trailer!.Match;
+
+        // The marker column is declared, never assumed to be the first field.
+        Assert.Equal(2, match!.Index);
+        Assert.Equal("Footer", match.Value);
+    }
+
+    [Fact]
+    public void Load_MatchWithoutIndex_DefaultsToTheFirstField()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { value: Footer }
+            """;
+
+        Assert.Equal(0, DelimitedLayoutLoader.Load(yaml).Trailer!.Match!.Index);
+    }
+
+    [Fact]
+    public void Load_MatchWithoutValue_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { index: 0 }
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("must declare the value", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_MatchOnADataRow_Throws()
+    {
+        var yaml = MinimalYaml.Replace("role: data", "role: data\n    match: { index: 0, value: X }", StringComparison.Ordinal);
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void Load_MatchWithNegativeIndex_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: tab
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+              foot:
+                role: trailer
+                rows: 1
+                skip: true
+                match: { index: -1, value: Footer }
+            """;
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
     [Fact]
     public void LoadFromFile_BlankPath_Throws() =>
         Assert.ThrowsAny<ArgumentException>(() => DelimitedLayoutLoader.LoadFromFile("  "));

@@ -130,11 +130,33 @@ public static class DelimitedLayoutLoader
 
         try
         {
-            return new DelimitedRowDefinition(name, role, dto.Rows, fields, dto.Skip);
+            return new DelimitedRowDefinition(name, role, dto.Rows, fields, dto.Skip, MapMatch(name, dto.Match));
         }
         catch (ArgumentException ex)
         {
             throw new FormatException($"Row type '{name}': {ex.Message}", ex);
+        }
+    }
+
+    private static RowMatch? MapMatch(string name, RowMatchDto? dto)
+    {
+        if (dto is null)
+        {
+            return null;
+        }
+
+        if (dto.Value is null)
+        {
+            throw new FormatException($"Row type '{name}': a match must declare the value to look for.");
+        }
+
+        try
+        {
+            return new RowMatch(dto.Index, dto.Value);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new FormatException($"Row type '{name}', match: {ex.Message}", ex);
         }
     }
 
@@ -172,7 +194,17 @@ public static class DelimitedLayoutLoader
 
         public bool Skip { get; set; }
 
+        public RowMatchDto? Match { get; set; }
+
         public List<FieldDto>? Fields { get; set; }
+    }
+
+    private sealed class RowMatchDto
+    {
+        // Absent means 0: the marker is in the first field, which is common but never assumed.
+        public int Index { get; set; }
+
+        public string? Value { get; set; }
     }
 
     private sealed class FieldDto

@@ -231,6 +231,78 @@ public sealed class DelimitedLineReaderTests
         Assert.Equal(HeaderName, records[0].RowType);
     }
 
+    // ---------- verified classification ----------
+
+    private static DelimitedLineReader ReaderWithFooterMatch(int markerIndex, string marker) =>
+        new(new DelimitedLayout(Version, Delimiter, EncodingName, new[]
+        {
+            new DelimitedRowDefinition(DataName, RowRole.Data, 0, Fields(2)),
+            new DelimitedRowDefinition(
+                TrailerName, RowRole.Trailer, 1, [], skip: true, new RowMatch(markerIndex, marker)),
+        }), Encoding.ASCII);
+
+    [Fact]
+    public async Task TrailerCarryingItsMarker_IsAccepted()
+    {
+        var data = Bytes("a,1\nb,2\nFooter,2\n");
+
+        var (records, _) = await ReadAsync(ReaderWithFooterMatch(0, "Footer"), data);
+
+        Assert.Equal([DataName, DataName, TrailerName], records.Select(r => r.RowType));
+    }
+
+    [Fact]
+    public async Task TruncatedFile_WhoseLastRowIsNotTheTrailer_Throws()
+    {
+        // The whole point of the marker: without it this data row would pass as the trailer and its values
+        // would be silently discarded.
+        var data = Bytes("a,1\nb,2\n");
+
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(
+            () => ReadAsync(ReaderWithFooterMatch(0, "Footer"), data));
+        Assert.Contains("not 'Footer'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MarkerIsReadFromItsDeclaredColumn_NotAssumedFirst()
+    {
+        var data = Bytes("a,1\nx,Footer\n");
+
+        var (records, _) = await ReadAsync(ReaderWithFooterMatch(1, "Footer"), data);
+
+        Assert.Equal([DataName, TrailerName], records.Select(r => r.RowType));
+
+        // The same file fails when the layout says the marker sits in the first column instead.
+        await Assert.ThrowsAsync<InvalidDataException>(() => ReadAsync(ReaderWithFooterMatch(0, "Footer"), data));
+    }
+
+    [Fact]
+    public async Task MarkerComparison_IsExact()
+    {
+        var data = Bytes("a,1\nfooter,2\n"); // wrong case
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => ReadAsync(ReaderWithFooterMatch(0, "Footer"), data));
+    }
+
+    [Fact]
+    public async Task RowShorterThanTheMarkerColumn_Throws()
+    {
+        var data = Bytes("a,1\nFooter\n"); // marker declared at index 1, row has only one field
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => ReadAsync(ReaderWithFooterMatch(1, "Footer"), data));
+    }
+
+    [Fact]
+    public async Task WithoutAMarker_PositionAloneStillClassifies()
+    {
+        // Unchanged behaviour when the layout declares no marker: the check is opt-in, per layout.
+        var data = Bytes("a,1\nb,2\n");
+
+        var (records, _) = await ReadAsync(Reader(trailerRows: 1), data);
+
+        Assert.Equal([DataName, TrailerName], records.Select(r => r.RowType));
+    }
+
     // ---------- fail-closed ----------
 
     [Fact]

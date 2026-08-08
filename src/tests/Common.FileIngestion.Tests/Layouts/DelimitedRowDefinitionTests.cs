@@ -184,6 +184,58 @@ public sealed class DelimitedRowDefinitionTests
         Assert.Contains("duplicate field name", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ---------- row match ----------
+
+    [Fact]
+    public void Match_WithValidArguments_SetsProperties()
+    {
+        var match = new RowMatch(3, "Footer");
+
+        Assert.Equal(3, match.Index);
+        Assert.Equal("Footer", match.Value);
+    }
+
+    [Fact]
+    public void Match_IndexZero_IsAllowed() => Assert.Equal(0, new RowMatch(0, "Footer").Index);
+
+    [Fact]
+    public void Match_NegativeIndex_Throws() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RowMatch(-1, "Footer"));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Match_BlankValue_Throws(string? value)
+    {
+        // A blank marker could not distinguish anything, so it would silently disable the check.
+        Assert.ThrowsAny<ArgumentException>(() => new RowMatch(0, value!));
+    }
+
+    [Theory]
+    [InlineData(RowRole.Header)]
+    [InlineData(RowRole.Trailer)]
+    public void Row_PositionalRoleWithMatch_IsAllowed(RowRole role)
+    {
+        var row = new DelimitedRowDefinition("r", role, 1, Fields(1), skip: true, new RowMatch(0, "Footer"));
+
+        Assert.Equal("Footer", row.Match!.Value);
+    }
+
+    [Fact]
+    public void Row_WithoutMatch_LeavesItNull() =>
+        Assert.Null(new DelimitedRowDefinition("r", RowRole.Trailer, 1, Fields(1)).Match);
+
+    [Fact]
+    public void Row_DataRoleWithMatch_Throws()
+    {
+        // A marker verifies a positional claim. Data rows make none, so a marker there would be a content
+        // rule — business validation this engine deliberately does not do.
+        var ex = Assert.Throws<ArgumentException>(
+            () => new DelimitedRowDefinition("r", RowRole.Data, 0, Fields(1), skip: false, new RowMatch(0, "X")));
+        Assert.Contains("downstream concern", ex.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Row_Fields_AreDefensivelyCopied()
     {
