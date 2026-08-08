@@ -412,46 +412,4 @@ public sealed class FileIngestionPipeline
                 .ConfigureAwait(false);
         }
     }
-
-    // Per-file run state. Immutable resume/provenance context plus running tallies. The reader mutates the
-    // batcher and Accepted/Rejected (single producer thread); concurrent publishers mutate Batches (via
-    // Interlocked) and advance the watermark through the tracker under WatermarkGate.
-    private sealed class FileRun : IDisposable
-    {
-        public FileRun(
-            string sourceKey, long resumeOffset, MessageProvenance provenance, Batcher batcher,
-            ConfirmedBatchTracker tracker, int confirmWindow)
-        {
-            SourceKey = sourceKey;
-            ResumeOffset = resumeOffset;
-            Provenance = provenance;
-            Batcher = batcher;
-            Tracker = tracker;
-            Window = new SemaphoreSlim(confirmWindow, confirmWindow);
-        }
-
-        public string SourceKey { get; }
-        public long ResumeOffset { get; }
-        public MessageProvenance Provenance { get; }
-        public Batcher Batcher { get; }
-        public ConfirmedBatchTracker Tracker { get; }
-
-        // Serialises watermark writes across publishers and enforces monotonic advance.
-        public SemaphoreSlim WatermarkGate { get; } = new(1, 1);
-        public long LastSavedBatchSeq { get; set; } = -1;
-
-        // Outstanding-confirms window: a slot per created batch, released when it joins the contiguous
-        // confirmed prefix — bounding batches-in-flight (and the tracker's held set) to the window size.
-        public SemaphoreSlim Window { get; }
-
-        public long Accepted;
-        public long Rejected;
-        public long Batches;
-
-        public void Dispose()
-        {
-            WatermarkGate.Dispose();
-            Window.Dispose();
-        }
-    }
 }
