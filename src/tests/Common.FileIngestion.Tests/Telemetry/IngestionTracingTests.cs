@@ -7,12 +7,15 @@ namespace Common.FileIngestion.Tests.Telemetry;
 
 public sealed class IngestionTracingTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 1200;
+
     private const string SourceName = "test-tracing";
 
     private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
 
     private static IngestBatchMessage Batch() =>
-        new("FILE1-3", Provenance(), 3, new[] { new IngestRecord(new RecordLocator(1, 0, "TRAN"),
+        new("FILE1-3", Provenance(), 3, new[] { new IngestRecord(new RecordLocator(1, 0, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue> { ["v"] = new ClearFieldValue("x") }) });
 
     private static ActivityListener Listen()

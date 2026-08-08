@@ -7,7 +7,10 @@ public sealed class RecordLineageTests
 {
     private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
 
-    private static RecordLocator Locator() => new(1, 0, "TRAN");
+    // Bytes one fixture record occupies, terminator included.
+    private const int RecordExtent = 1200;
+
+    private static RecordLocator Locator() => new(1, 0, RecordExtent, "TRAN");
 
     [Fact]
     public async Task EmitAsync_Enabled_EmitsEventWithIdentityAndState()

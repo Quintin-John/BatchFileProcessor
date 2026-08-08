@@ -5,10 +5,13 @@ namespace Ingestion.Worker.Tests;
 
 public sealed class LineageDrainServiceTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 10;
+
     private static readonly DateTimeOffset When = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private static LineageEvent Event(long seq) =>
-        new("run-1", "FILE1", new RecordLocator(seq, seq * 10, "TRAN"), LineageState.Consumed, When);
+        new("run-1", "FILE1", new RecordLocator(seq, seq * 10, RecordExtent, "TRAN"), LineageState.Consumed, When);
 
     [Fact]
     public async Task DrainsEmittedEventsToSink()

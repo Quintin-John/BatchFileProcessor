@@ -2,7 +2,12 @@ namespace Common.Messaging.Contracts.Tests;
 
 public sealed class IngestRecordTests
 {
-    private static RecordLocator Locator() => new(123401, 148081200, "TRAN");
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 1200;
+
+    private const long FixtureSeq = 123401;
+
+    private static RecordLocator Locator() => new(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN");
 
     private static Dictionary<string, FieldValue> SampleFields() => new()
     {
@@ -37,7 +42,7 @@ public sealed class IngestRecordTests
     [Fact]
     public void Constructor_AllowsEmptyFields()
     {
-        var record = new IngestRecord(new RecordLocator(1, 0, "FILLER"), new Dictionary<string, FieldValue>());
+        var record = new IngestRecord(new RecordLocator(1, 0, RecordExtent, "FILLER"), new Dictionary<string, FieldValue>());
 
         Assert.Empty(record.Fields);
     }

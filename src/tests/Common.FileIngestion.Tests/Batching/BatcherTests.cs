@@ -6,10 +6,13 @@ namespace Common.FileIngestion.Tests.Batching;
 
 public sealed class BatcherTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 10;
+
     private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
 
     private static IngestRecord Record(long seq, string value = "x") =>
-        new(new RecordLocator(seq, seq * 10, "TRAN"),
+        new(new RecordLocator(seq, seq * 10, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue> { ["v"] = new ClearFieldValue(value) });
 
     [Fact]

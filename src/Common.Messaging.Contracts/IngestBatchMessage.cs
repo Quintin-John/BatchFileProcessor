@@ -31,9 +31,13 @@ public sealed class IngestBatchMessage
     /// <summary>Highest record sequence in the batch. Derived from <see cref="Records"/>.</summary>
     public long LastRecordSeq { get; }
 
-    /// <summary>Highest record byte offset in the batch. Derived from <see cref="Records"/> (max, not
-    /// the last element) so it never depends on insertion order.</summary>
-    public long LastByteOffset { get; }
+    /// <summary>
+    /// Byte offset one past the furthest byte any record in this batch reaches — the resume point once the
+    /// batch is confirmed. Derived from <see cref="Records"/> as the max of each record's
+    /// <see cref="RecordLocator.EndByteOffset"/> (a max of extents, not the last element), so it never
+    /// depends on insertion order and stays correct when records vary in length.
+    /// </summary>
+    public long EndByteOffset { get; }
 
     /// <summary>Creates a validated batch message.</summary>
     /// <param name="messageId">Deterministic message id; required, non-blank.</param>
@@ -62,7 +66,7 @@ public sealed class IngestBatchMessage
         var copy = new List<IngestRecord>(records.Count);
         var first = long.MaxValue;
         var last = long.MinValue;
-        var lastOffset = long.MinValue;
+        var end = long.MinValue;
         foreach (var record in records)
         {
             if (record is null)
@@ -72,7 +76,7 @@ public sealed class IngestBatchMessage
 
             first = Math.Min(first, record.Locator.RecordSeq);
             last = Math.Max(last, record.Locator.RecordSeq);
-            lastOffset = Math.Max(lastOffset, record.Locator.ByteOffset);
+            end = Math.Max(end, record.Locator.EndByteOffset);
             copy.Add(record);
         }
 
@@ -82,6 +86,6 @@ public sealed class IngestBatchMessage
         Records = new ReadOnlyCollection<IngestRecord>(copy);
         FirstRecordSeq = first;
         LastRecordSeq = last;
-        LastByteOffset = lastOffset;
+        EndByteOffset = end;
     }
 }

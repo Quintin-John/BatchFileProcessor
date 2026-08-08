@@ -6,10 +6,13 @@ namespace Common.FileIngestion.Tests.Lineage;
 
 public sealed class StructuredLogLineageSinkTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 10;
+
     private static readonly DateTimeOffset When = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private static LineageEvent Event(LineageState state, string? reasonCode = null) =>
-        new("run-1", "FILE1", new RecordLocator(7, 70, "AUTH"), state, When, reasonCode: reasonCode);
+        new("run-1", "FILE1", new RecordLocator(7, 70, RecordExtent, "AUTH"), state, When, reasonCode: reasonCode);
 
     [Fact]
     public async Task ExportAsync_Rejected_LogsWarning_WithStateAndReasonCode()

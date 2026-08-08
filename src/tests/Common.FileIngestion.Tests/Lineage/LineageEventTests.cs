@@ -6,7 +6,12 @@ namespace Common.FileIngestion.Tests.Lineage;
 public sealed class LineageEventTests
 {
     private static readonly DateTimeOffset When = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-    private static RecordLocator Locator() => new(101, 121200, "TRAN");
+
+    // Bytes one fixture record occupies, terminator included; the offset is derived from it, not written out.
+    private const int RecordExtent = 1200;
+    private const long FixtureSeq = 101;
+
+    private static RecordLocator Locator() => new(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN");
 
     [Fact]
     public void Constructor_SetsProperties()

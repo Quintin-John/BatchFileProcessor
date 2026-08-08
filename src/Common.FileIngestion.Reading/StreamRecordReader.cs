@@ -44,9 +44,6 @@ public sealed class StreamRecordReader
     /// <summary>Record content length in bytes (excludes the terminator).</summary>
     public int RecordLength => _recordLength;
 
-    /// <summary>Bytes consumed per record including the terminator (record + terminator length).</summary>
-    public int Stride => _recordLength + _terminatorLength;
-
     /// <summary>
     /// Reads <paramref name="stream"/> to completion, invoking <paramref name="onRecord"/> for each
     /// framed record, and returns the file's SHA-256 as an uppercase hex string (the FileId).
@@ -82,7 +79,7 @@ public sealed class StreamRecordReader
                 while (buffer.Length - consumed >= stride)
                 {
                     var content = TakeRecord(buffer.Slice(consumed, stride), hash, scratch);
-                    await onRecord(new FramedRecord(recordSeq, byteOffset, content), cancellationToken).ConfigureAwait(false);
+                    await onRecord(new FramedRecord(recordSeq, byteOffset, stride, content), cancellationToken).ConfigureAwait(false);
                     consumed += stride;
                     recordSeq++;
                     byteOffset += stride;
@@ -105,7 +102,10 @@ public sealed class StreamRecordReader
                     pipe.AdvanceTo(buffer.End);
                     if (finalContent is not null)
                     {
-                        await onRecord(new FramedRecord(recordSeq, byteOffset, finalContent), cancellationToken).ConfigureAwait(false);
+                        // A final record with no trailing terminator consumes only its content bytes, so its
+                        // extent is RecordLength, not Stride — a resume point must not run past end of file.
+                        await onRecord(new FramedRecord(recordSeq, byteOffset, _recordLength, finalContent), cancellationToken)
+                            .ConfigureAwait(false);
                     }
 
                     break;

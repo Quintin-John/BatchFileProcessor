@@ -5,6 +5,9 @@ namespace Common.Messaging.Contracts.Tests;
 
 public sealed class SerializationTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 1200;
+
     private static readonly JsonSerializerOptions Options = MessagingJson.Options;
 
     private static string Serialize(FieldValue value) => JsonSerializer.Serialize(value, Options);
@@ -112,7 +115,7 @@ public sealed class SerializationTests
             ["memo"] = new ClearFieldValue(null),
             ["pan"] = new EncryptedFieldValue(Envelope()),
         };
-        var record = new IngestRecord(new RecordLocator(101, 121200, "TRAN"), fields);
+        var record = new IngestRecord(new RecordLocator(101, 121200, RecordExtent, "TRAN"), fields);
         var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
         return new IngestBatchMessage("file-abc-1234", provenance, 1234, new[] { record });
     }
@@ -149,7 +152,7 @@ public sealed class SerializationTests
         var original = new RejectMessage(
             "file-abc-101-reject",
             new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8"),
-            new RecordLocator(101, 121200, "TRAN"),
+            new RecordLocator(101, 121200, RecordExtent, "TRAN"),
             new ClearFieldValue("cmF3"),
             new[]
             {

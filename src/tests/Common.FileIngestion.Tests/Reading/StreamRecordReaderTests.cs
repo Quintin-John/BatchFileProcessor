@@ -7,6 +7,14 @@ namespace Common.FileIngestion.Tests.Reading;
 
 public sealed class StreamRecordReaderTests
 {
+    // Fixture framing. Every offset and extent below is derived from these, never written as a literal.
+    private const int RecordLength = 4;
+    private const int TerminatorLength = 1;
+    private const int Stride = RecordLength + TerminatorLength;
+
+    private static StreamRecordReader Reader(int terminatorLength = TerminatorLength) =>
+        new(RecordLength, terminatorLength, Encoding.ASCII);
+
     private static async Task<(List<FramedRecord> Records, string FileId)> ReadAsync(
         StreamRecordReader reader, byte[] data)
     {
@@ -27,13 +35,20 @@ public sealed class StreamRecordReaderTests
     {
         var data = Encoding.ASCII.GetBytes("AAAA\nBBBB\nCCCC\n");
 
-        var (records, fileId) = await ReadAsync(new StreamRecordReader(4, 1, Encoding.ASCII), data);
+        var (records, fileId) = await ReadAsync(Reader(), data);
 
         Assert.Equal(3, records.Count);
         Assert.Equal((1L, 0L, "AAAA"), (records[0].RecordSeq, records[0].ByteOffset, records[0].Content));
-        Assert.Equal((2L, 5L, "BBBB"), (records[1].RecordSeq, records[1].ByteOffset, records[1].Content));
-        Assert.Equal((3L, 10L, "CCCC"), (records[2].RecordSeq, records[2].ByteOffset, records[2].Content));
+        Assert.Equal((2L, (long)Stride, "BBBB"), (records[1].RecordSeq, records[1].ByteOffset, records[1].Content));
+        Assert.Equal((3L, (long)(2 * Stride), "CCCC"), (records[2].RecordSeq, records[2].ByteOffset, records[2].Content));
         Assert.Equal(Convert.ToHexString(SHA256.HashData(data)), fileId);
+
+        // Each record's extent must land exactly on the next record's offset, so a resume point never
+        // splits a record and the final extent reaches end of file.
+        Assert.All(records, r => Assert.Equal(Stride, r.ByteLength));
+        Assert.Equal(records[1].ByteOffset, records[0].ByteOffset + records[0].ByteLength);
+        Assert.Equal(records[2].ByteOffset, records[1].ByteOffset + records[1].ByteLength);
+        Assert.Equal(data.Length, records[^1].ByteOffset + records[^1].ByteLength);
     }
 
     [Fact]
@@ -41,10 +56,16 @@ public sealed class StreamRecordReaderTests
     {
         var data = Encoding.ASCII.GetBytes("AAAA\nBBBB");
 
-        var (records, _) = await ReadAsync(new StreamRecordReader(4, 1, Encoding.ASCII), data);
+        var (records, _) = await ReadAsync(Reader(), data);
 
         Assert.Equal(2, records.Count);
         Assert.Equal("BBBB", records[1].Content);
+
+        // The last record consumes no terminator, so its extent is RecordLength, not Stride — otherwise the
+        // resume point would be pushed past end of file.
+        Assert.Equal(Stride, records[0].ByteLength);
+        Assert.Equal(RecordLength, records[^1].ByteLength);
+        Assert.Equal(data.Length, records[^1].ByteOffset + records[^1].ByteLength);
     }
 
     [Fact]
@@ -52,11 +73,13 @@ public sealed class StreamRecordReaderTests
     {
         var data = Encoding.ASCII.GetBytes("AAAABBBB");
 
-        var (records, _) = await ReadAsync(new StreamRecordReader(4, 0, Encoding.ASCII), data);
+        var (records, _) = await ReadAsync(Reader(terminatorLength: 0), data);
 
         Assert.Equal(2, records.Count);
         Assert.Equal("AAAA", records[0].Content);
         Assert.Equal("BBBB", records[1].Content);
+        Assert.All(records, r => Assert.Equal(RecordLength, r.ByteLength));
+        Assert.Equal(data.Length, records[^1].ByteOffset + records[^1].ByteLength);
     }
 
     [Fact]
@@ -65,7 +88,7 @@ public sealed class StreamRecordReaderTests
         var data = Encoding.ASCII.GetBytes("AAAA\nBB"); // 2 trailing bytes, record length 4
 
         await Assert.ThrowsAsync<InvalidDataException>(
-            () => ReadAsync(new StreamRecordReader(4, 1, Encoding.ASCII), data));
+            () => ReadAsync(Reader(), data));
     }
 
     [Fact]
@@ -75,7 +98,7 @@ public sealed class StreamRecordReaderTests
         var records = new List<FramedRecord>();
 
         // Drip one byte per read so every record spans many pipe segments.
-        var fileId = await new StreamRecordReader(4, 1, Encoding.ASCII).ReadAsync(
+        var fileId = await Reader().ReadAsync(
             new DripStream(data, 1),
             (record, _) =>
             {
@@ -92,8 +115,8 @@ public sealed class StreamRecordReaderTests
     }
 
     [Theory]
-    [InlineData(0, 1)]
-    [InlineData(4, -1)]
+    [InlineData(0, TerminatorLength)]
+    [InlineData(RecordLength, -1)]
     public void Constructor_InvalidLengths_Throw(int recordLength, int terminatorLength)
     {
         Assert.Throws<ArgumentOutOfRangeException>(
@@ -103,28 +126,29 @@ public sealed class StreamRecordReaderTests
     [Fact]
     public void Constructor_NullEncoding_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new StreamRecordReader(4, 1, null!));
+        Assert.Throws<ArgumentNullException>(() => new StreamRecordReader(RecordLength, TerminatorLength, null!));
     }
 
     [Fact]
     public void Constructor_SingleByteEncoding_Accepted()
     {
-        var reader = new StreamRecordReader(4, 1, Encoding.Latin1); // single-byte: accepted
+        var reader = new StreamRecordReader(RecordLength, TerminatorLength, Encoding.Latin1); // single-byte: accepted
 
-        Assert.Equal(5, reader.Stride);
+        Assert.Equal(RecordLength, reader.RecordLength);
     }
 
     [Fact]
     public void Constructor_MultiByteEncoding_Throws()
     {
         // UTF-8 would decode N bytes into a differently-sized string, misaligning fixed-width fields.
-        Assert.Throws<ArgumentException>(() => new StreamRecordReader(4, 1, Encoding.UTF8));
+        Assert.Throws<ArgumentException>(
+            () => new StreamRecordReader(RecordLength, TerminatorLength, Encoding.UTF8));
     }
 
     [Fact]
     public async Task ReadAsync_NullArguments_Throw()
     {
-        var reader = new StreamRecordReader(4, 1, Encoding.ASCII);
+        var reader = Reader();
 
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => reader.ReadAsync(null!, (_, _) => ValueTask.CompletedTask, CancellationToken.None));
@@ -139,8 +163,8 @@ public sealed class StreamRecordReaderTests
         await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => new StreamRecordReader(4, 1, Encoding.ASCII)
-                .ReadAsync(new MemoryStream(Encoding.ASCII.GetBytes("AAAA\n")), (_, _) => ValueTask.CompletedTask, cts.Token));
+            () => Reader().ReadAsync(
+                new MemoryStream(Encoding.ASCII.GetBytes("AAAA\n")), (_, _) => ValueTask.CompletedTask, cts.Token));
     }
 
     private sealed class DripStream(byte[] data, int drip) : Stream

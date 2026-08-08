@@ -1,0 +1,50 @@
+# =============================================================================
+# Force Update Balance — layout v1.0
+# Transcribed from GBOS-BAT-BatchFeedImporter:
+#   BatchFeedImporter.Logic/Parsers/ForceUpdateBalanceFileParser.cs
+#   BatchFeedImporter.Logic/Services/ForceUpdateBalanceHandler.cs
+#   BatchFeedImporter.Model/Data/ForceUpdateBalanceDataModel.cs
+#   BatchFeedImporter.Model/Constants.cs (lines 442-457)
+#
+# The pump does NOT interpret values — it slices each field and emits raw text.
+# This layout carries only what the DelimitedRecordParser needs:
+#   - delimiter, encoding, row structure (header/data)
+#   - every field's NAME and INDEX (0-based)
+#   - optional per-field flags:
+#       encrypt: true   -> field is encrypted before publish (PCI-adjacent)
+#       required: true  -> record is rejected if this field is blank
+# Field types, date formats, and CPM API routing are NOT here — downstream concern.
+#
+# NOTE: Files are only considered for processing if created within the last 1 day
+# (FileLookBackDays = 1). This is an operational/scheduling concern, not a layout concern.
+#
+# NOTE: Date fields use format MM/dd/yyyy HH:mm:ss (invariant culture) in the source file.
+# =============================================================================
+version: "1.0"
+format: delimited
+delimiter: tab         # TAB (\t) character separates fields
+encoding: ascii
+
+# Row structure
+# Header: first line is silently skipped (ParseHeader returns null in the importer)
+# Data:   all remaining lines; exactly 16 tab-separated fields per record
+header: { rows: 1 }
+fieldCount: 16
+
+fields:
+  - { name: ACIProductID,                index: 0,  required: true }   # used for BIN+product routing
+  - { name: AccountBalanceKey,           index: 1,  required: true }   # DB update key; cast to long downstream
+  - { name: GDAccountKey,                index: 2 }
+  - { name: ACIExternalID,               index: 3,  encrypt: true }    # ACI account-level external identifier
+  - { name: ACICardExternalID,           index: 4,  encrypt: true }    # card-level external identifier — PCI-adjacent
+  - { name: BIN,                         index: 5,  required: true }   # used for BIN routing
+  - { name: AccountIdentifier,           index: 6,  encrypt: true, required: true }  # GUID; used as CPM API account key downstream
+  - { name: ProgramCode,                 index: 7,  required: true }   # used for CPM API call routing downstream
+  - { name: ACIAvailableBalance,         index: 8,  required: true }
+  - { name: ACIAvailableBalanceAsOfDate, index: 9,  required: true }   # format: MM/dd/yyyy HH:mm:ss
+  - { name: ACICurrentBalance,           index: 10, required: true }
+  - { name: ACICurrentBalanceAsOfDate,   index: 11, required: true }   # format: MM/dd/yyyy HH:mm:ss
+  - { name: GDAvailableBalance,          index: 12, required: true }
+  - { name: GDAvailableBalanceAsOfDate,  index: 13, required: true }   # format: MM/dd/yyyy HH:mm:ss
+  - { name: GDCurrentBalance,            index: 14, required: true }
+  - { name: GDCurrentBalanceAsOfDate,    index: 15, required: true }   # format: MM/dd/yyyy HH:mm:ss

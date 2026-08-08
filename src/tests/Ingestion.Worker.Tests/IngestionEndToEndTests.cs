@@ -74,9 +74,9 @@ public sealed class IngestionEndToEndTests : IDisposable
 
     private sealed class FakeParser : IRecordParser
     {
-        public RecordParseResult Parse(long recordSeq, long byteOffset, ReadOnlySpan<char> record)
+        public RecordParseResult Parse(FramedRecord framed)
         {
-            var content = record.ToString();
+            var content = framed.Content;
             if (content.StartsWith("REJ", StringComparison.Ordinal))
             {
                 return RecordParseResult.Rejected("REJ", content,
@@ -84,7 +84,7 @@ public sealed class IngestionEndToEndTests : IDisposable
             }
 
             return RecordParseResult.Success(new IngestRecord(
-                new RecordLocator(recordSeq, byteOffset, "DATA"),
+                new RecordLocator(framed.RecordSeq, framed.ByteOffset, framed.ByteLength, "DATA"),
                 new Dictionary<string, FieldValue> { ["v"] = new ClearFieldValue(content) }));
         }
     }

@@ -84,6 +84,38 @@ public sealed class FileIngestionPipelineTests
     }
 
     [Fact]
+    public async Task Ingest_AdvancesWatermarkByEachRecordsOwnExtent()
+    {
+        // Every record here is terminated, so each confirmed batch must land the watermark exactly on a
+        // record boundary — a multiple of Stride, never between two records.
+        var harness = new Harness();
+        var bytes = Bytes(FileText);
+
+        await harness.Build(maxRecords: 1).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        Assert.NotEmpty(harness.Checkpoints.Saved);
+        Assert.All(harness.Checkpoints.Saved, w => Assert.Equal(0, w.ByteOffset % Stride));
+        Assert.Equal(bytes.Length, harness.Checkpoints.Saved[^1].ByteOffset);
+    }
+
+    [Fact]
+    public async Task Ingest_FinalRecordWithoutTerminator_StopsWatermarkAtEndOfFile()
+    {
+        // Regression: the resume point used to be "record offset + a fixed stride", which overshot end of
+        // file for a final record carrying no terminator. It must be that record's own extent, so the
+        // watermark lands exactly on EOF.
+        var harness = new Harness();
+        var bytes = Bytes("DATA0001\nDATA0002"); // second record has no trailing terminator
+
+        var outcome = await harness.Build(maxRecords: 1).IngestAsync(
+            Request(() => new MemoryStream(bytes)), CancellationToken.None);
+
+        Assert.Equal(2, outcome.RecordsAccepted);
+        Assert.Equal(bytes.Length, harness.Checkpoints.Saved[^1].ByteOffset);
+        Assert.True(harness.Checkpoints.Saved[^1].ByteOffset < bytes.Length + 1); // never past EOF
+    }
+
+    [Fact]
     public async Task Ingest_WithTinyChannelCapacity_BackpressuresButCompletesCorrectly()
     {
         // Capacity 1 forces the reader to wait on the publisher for almost every batch; the bounded
@@ -430,9 +462,9 @@ public sealed class FileIngestionPipelineTests
 
     private sealed class FakeParser : IRecordParser
     {
-        public RecordParseResult Parse(long recordSeq, long byteOffset, ReadOnlySpan<char> record)
+        public RecordParseResult Parse(FramedRecord framed)
         {
-            var content = record.ToString();
+            var content = framed.Content;
             if (content.StartsWith("SKIP", StringComparison.Ordinal))
             {
                 return RecordParseResult.Skipped("SKIP");
@@ -444,8 +476,9 @@ public sealed class FileIngestionPipelineTests
                     [new RejectReason("v", "rule", "CODE", null, content)]);
             }
 
+            // Echo the framed extent so the pipeline's resume point is driven by the reader, as in production.
             var ingest = new IngestRecord(
-                new RecordLocator(recordSeq, byteOffset, "DATA"),
+                new RecordLocator(framed.RecordSeq, framed.ByteOffset, framed.ByteLength, "DATA"),
                 new Dictionary<string, FieldValue> { ["v"] = new ClearFieldValue(content) });
             return RecordParseResult.Success(ingest);
         }
@@ -539,6 +572,10 @@ public sealed class FileIngestionPipelineTests
 
         public bool FailOnSave { get; set; }
 
+        /// <summary>Every watermark written, in order — a successful run clears the store, so the advance
+        /// itself is only observable through this history.</summary>
+        public List<Watermark> Saved { get; } = [];
+
         public Task<Watermark?> LoadAsync(string sourceKey, CancellationToken cancellationToken) =>
             Task.FromResult(_watermarks.GetValueOrDefault(sourceKey));
 
@@ -550,6 +587,7 @@ public sealed class FileIngestionPipelineTests
             }
 
             _watermarks[watermark.SourceKey] = watermark;
+            Saved.Add(watermark);
             return Task.CompletedTask;
         }
 

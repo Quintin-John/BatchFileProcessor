@@ -7,6 +7,10 @@ namespace Common.Messaging.MassTransit.Tests;
 
 public sealed class MassTransitPublisherTests : IAsyncLifetime
 {
+    // Bytes one fixture record occupies, terminator included; the offset is derived from it.
+    private const int RecordExtent = 1200;
+    private const long FixtureSeq = 101;
+
     private const string BatchDestination = "batches";
     private const string RejectDestination = "rejects";
     private const string GuidCorrelation = "3f2504e04f8941d39a0c0305e82c3301"; // valid GUID (N format)
@@ -53,7 +57,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
     {
         var provenance = new MessageProvenance(correlationId, "file-abc", "g266.dat", "g266", "4.8");
         var record = new IngestRecord(
-            new RecordLocator(101, 121200, "TRAN"),
+            new RecordLocator(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(221.73m) });
         return new IngestBatchMessage("file-abc-1", provenance, 1, new[] { record });
     }
@@ -63,7 +67,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
         var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
         var reasons = new[] { new RejectReason("amount", "decimal", "NON_NUMERIC", "decimal", "12A4") };
         return new RejectMessage(
-            "file-abc-101-reject", provenance, new RecordLocator(101, 121200, "TRAN"),
+            "file-abc-101-reject", provenance, new RecordLocator(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN"),
             new ClearFieldValue("cmF3"), reasons);
     }
 

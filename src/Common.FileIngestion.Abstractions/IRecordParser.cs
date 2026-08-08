@@ -6,9 +6,7 @@ namespace Common.FileIngestion.Abstractions;
 /// </summary>
 public interface IRecordParser
 {
-    /// <summary>Parses a single record.</summary>
-    /// <param name="recordSeq">1-based record sequence within the file.</param>
-    /// <param name="byteOffset">Byte offset of the record within the file.</param>
-    /// <param name="record">The framed record text.</param>
-    RecordParseResult Parse(long recordSeq, long byteOffset, ReadOnlySpan<char> record);
+    /// <summary>Parses a single framed record.</summary>
+    /// <param name="framed">The framed record: its position, extent, and decoded content.</param>
+    RecordParseResult Parse(FramedRecord framed);
 }

@@ -7,6 +7,9 @@ namespace Common.Messaging.MassTransit.Tests;
 
 public sealed class MessagingResilienceTests : IAsyncLifetime
 {
+    // Bytes one fixture record occupies, terminator included; the offset is derived from it.
+    private const int RecordExtent = 1200;
+
     private ServiceProvider _provider = null!;
     private ITestHarness _harness = null!;
     private InvocationCounter _counter = null!;
@@ -57,7 +60,7 @@ public sealed class MessagingResilienceTests : IAsyncLifetime
     {
         var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
         var record = new IngestRecord(
-            new RecordLocator(1, 0, "TRAN"),
+            new RecordLocator(1, 0, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(1m) });
         return new IngestBatchMessage("file-abc-1", provenance, 1, new[] { record });
     }

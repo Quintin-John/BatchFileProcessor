@@ -250,22 +250,23 @@ public sealed class FileIngestionPipeline
         var batcher = new Batcher(_options.MaxRecordsPerBatch, _options.MaxContentBytesPerBatch, provenance, firstBatchSeq);
 
         return new FileRun(
-            request.SourceKey, watermark?.ByteOffset ?? 0, _reader.Stride, provenance, batcher,
+            request.SourceKey, watermark?.ByteOffset ?? 0, provenance, batcher,
             new ConfirmedBatchTracker(firstBatchSeq), _options.PublisherConfirmWindow);
     }
 
     private async ValueTask ProcessAsync(
         FileRun run, FramedRecord framed, ChannelWriter<IngestBatchMessage> writer, CancellationToken cancellationToken)
     {
-        _metrics.BytesRead(run.Stride);
+        // The record's own extent, not a fixed stride: with variable-length framing every record differs.
+        _metrics.BytesRead(framed.ByteLength);
 
         if (framed.ByteOffset < run.ResumeOffset)
         {
             return; // already confirmed by a prior run
         }
 
-        var parseResult = _parser.Parse(framed.RecordSeq, framed.ByteOffset, framed.Content);
-        var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, parseResult.RecordType);
+        var parseResult = _parser.Parse(framed);
+        var locator = new RecordLocator(framed.RecordSeq, framed.ByteOffset, framed.ByteLength, parseResult.RecordType);
 
         // A skipped control record such as a header or trailer is consumed for framing but never emitted
         // and never rejected, so record it in the lineage for a complete trace and return.
@@ -338,12 +339,12 @@ public sealed class FileIngestionPipeline
         await EmitBatchLineageAsync(run, batch, LineageState.Confirmed, reasonCode: null, cancellationToken)
             .ConfigureAwait(false);
 
-        // Resume position = one stride past the highest-offset record in the batch. LastByteOffset is the
-        // authoritative max (not Records[^1]). The watermark may only advance across the contiguous confirmed
+        // Resume position = the end of the furthest record in the batch. EndByteOffset is the authoritative
+        // max of the records' own extents (not Records[^1], and not offset + a fixed stride), so it is correct
+        // for variable-length framing too. The watermark may only advance across the contiguous confirmed
         // prefix: a batch confirmed beyond an unconfirmed gap is held by the tracker until the gap fills, so
         // a crash never resumes past an unconfirmed record.
-        var confirmedOffset = batch.LastByteOffset + run.Stride;
-        var result = run.Tracker.Confirm(new BatchPosition(batch.BatchSeq, confirmedOffset, batch.LastRecordSeq));
+        var result = run.Tracker.Confirm(new BatchPosition(batch.BatchSeq, batch.EndByteOffset, batch.LastRecordSeq));
         if (result.AdvancedTo is not null)
         {
             await SaveWatermarkAsync(run, result.AdvancedTo, cancellationToken).ConfigureAwait(false);
@@ -404,12 +405,11 @@ public sealed class FileIngestionPipeline
     private sealed class FileRun : IDisposable
     {
         public FileRun(
-            string sourceKey, long resumeOffset, int stride, MessageProvenance provenance, Batcher batcher,
+            string sourceKey, long resumeOffset, MessageProvenance provenance, Batcher batcher,
             ConfirmedBatchTracker tracker, int confirmWindow)
         {
             SourceKey = sourceKey;
             ResumeOffset = resumeOffset;
-            Stride = stride;
             Provenance = provenance;
             Batcher = batcher;
             Tracker = tracker;
@@ -418,7 +418,6 @@ public sealed class FileIngestionPipeline
 
         public string SourceKey { get; }
         public long ResumeOffset { get; }
-        public int Stride { get; }
         public MessageProvenance Provenance { get; }
         public Batcher Batcher { get; }
         public ConfirmedBatchTracker Tracker { get; }

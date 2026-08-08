@@ -5,6 +5,9 @@ namespace Common.FileIngestion.Tests.Rejecting;
 
 public sealed class RejectSinkTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 1200;
+
     private const string Destination = "rejects";
 
     private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
@@ -19,7 +22,7 @@ public sealed class RejectSinkTests
         var sink = new RejectSink(publisher, Destination);
 
         await sink.RejectAsync(
-            Provenance(), new RecordLocator(7, 8400, "TRAN"),
+            Provenance(), new RecordLocator(7, 8400, RecordExtent, "TRAN"),
             new ClearFieldValue("cmF3"), Reasons(), CancellationToken.None);
 
         var published = Assert.Single(publisher.Rejects);
@@ -35,7 +38,7 @@ public sealed class RejectSinkTests
         var sink = new RejectSink(new CapturingPublisher(), Destination);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => sink.RejectAsync(
-            Provenance(), new RecordLocator(1, 0, "TRAN"), new ClearFieldValue("x"), null!, CancellationToken.None));
+            Provenance(), new RecordLocator(1, 0, RecordExtent, "TRAN"), new ClearFieldValue("x"), null!, CancellationToken.None));
     }
 
     [Fact]

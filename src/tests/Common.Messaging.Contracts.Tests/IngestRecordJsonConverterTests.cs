@@ -5,10 +5,13 @@ namespace Common.Messaging.Contracts.Tests;
 
 public sealed class IngestRecordJsonConverterTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 10;
+
     private static readonly JsonSerializerOptions Options = MessagingJson.Options;
 
     private static IngestRecord Record() =>
-        new(new RecordLocator(7, 70, "TRAN"),
+        new(new RecordLocator(7, 70, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue>
             {
                 ["amount"] = new ClearFieldValue(221.73m),
@@ -33,17 +36,19 @@ public sealed class IngestRecordJsonConverterTests
     public void Write_NoCache_EmitsExactWireShape()
     {
         // Locks the exact wire shape the converter's fallback must reproduce (the shape consumers already
-        // receive): {locator:{recordSeq,byteOffset,recordType}, fields:{...}}, camelCase, in this order,
-        // with no extra properties. A drift here would break consumers and be invisible to cached-vs-uncached
-        // parity tests (which both use this converter), so it is pinned as an explicit string.
+        // receive): {locator:{recordSeq,byteOffset,byteLength,recordType}, fields:{...}}, camelCase, in this
+        // order, with no extra properties. A drift here would break consumers and be invisible to
+        // cached-vs-uncached parity tests (which both use this converter), so it is pinned as an explicit
+        // string. Note the absence of endByteOffset: it is derived and deliberately kept off the wire.
         var record = new IngestRecord(
-            new RecordLocator(7, 70, "TRAN"),
+            new RecordLocator(7, 70, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(221.73m) });
 
         var json = JsonSerializer.Serialize(record, Options);
 
         Assert.Equal(
-            "{\"locator\":{\"recordSeq\":7,\"byteOffset\":70,\"recordType\":\"TRAN\"},\"fields\":{\"amount\":221.73}}",
+            "{\"locator\":{\"recordSeq\":7,\"byteOffset\":70,\"byteLength\":10,\"recordType\":\"TRAN\"}," +
+            "\"fields\":{\"amount\":221.73}}",
             json);
     }
 
@@ -76,5 +81,27 @@ public sealed class IngestRecordJsonConverterTests
     [Fact]
     public void Read_MissingFields_Throws() =>
         Assert.Throws<JsonException>(
-            () => JsonSerializer.Deserialize<IngestRecord>("{\"locator\":{\"recordSeq\":1,\"byteOffset\":0,\"recordType\":\"T\"}}", Options));
+            () => JsonSerializer.Deserialize<IngestRecord>(
+                "{\"locator\":{\"recordSeq\":1,\"byteOffset\":0,\"byteLength\":1,\"recordType\":\"T\"}}", Options));
+
+    [Fact]
+    public void Read_LocatorMissingByteLength_FailsClosed()
+    {
+        // An older-shaped payload carries no extent. Defaulting it to 0 would produce a locator whose
+        // EndByteOffset equals its ByteOffset, silently stalling any resume derived from it — so reject it.
+        Assert.ThrowsAny<Exception>(
+            () => JsonSerializer.Deserialize<IngestRecord>(
+                "{\"locator\":{\"recordSeq\":1,\"byteOffset\":0,\"recordType\":\"T\"},\"fields\":{}}", Options));
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesByteLength()
+    {
+        var json = JsonSerializer.Serialize(Record(), Options);
+
+        var back = JsonSerializer.Deserialize<IngestRecord>(json, Options)!;
+
+        Assert.Equal(RecordExtent, back.Locator.ByteLength);
+        Assert.Equal(Record().Locator.EndByteOffset, back.Locator.EndByteOffset);
+    }
 }

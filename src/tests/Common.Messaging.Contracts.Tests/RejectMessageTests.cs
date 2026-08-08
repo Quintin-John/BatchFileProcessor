@@ -4,7 +4,11 @@ public sealed class RejectMessageTests
 {
     private static MessageProvenance Provenance() => new("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
 
-    private static RecordLocator Locator() => new(101, 121200, "TRAN");
+    // Bytes one fixture record occupies, terminator included; the offset is derived from it, not written out.
+    private const int RecordExtent = 1200;
+    private const long FixtureSeq = 101;
+
+    private static RecordLocator Locator() => new(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN");
 
     private static RejectReason Reason() => new("amount", "decimal", "NON_NUMERIC");
 

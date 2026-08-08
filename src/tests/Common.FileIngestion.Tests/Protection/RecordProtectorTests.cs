@@ -6,6 +6,9 @@ namespace Common.FileIngestion.Tests.Protection;
 
 public sealed class RecordProtectorTests
 {
+    // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
+    private const int RecordExtent = 1200;
+
     private static RecordProtector Protector() => new(new StubProtector(), new StubPayloadProtector());
 
     private static IngestRecord Record(params (string Name, FieldValue Value)[] fields)
@@ -16,7 +19,7 @@ public sealed class RecordProtectorTests
             dict[name] = value;
         }
 
-        return new IngestRecord(new RecordLocator(101, 0, "TRAN"), dict);
+        return new IngestRecord(new RecordLocator(101, 0, RecordExtent, "TRAN"), dict);
     }
 
     [Fact]

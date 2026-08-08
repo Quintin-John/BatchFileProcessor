@@ -7,6 +7,10 @@ namespace Common.Messaging.MassTransit.Tests;
 
 public sealed class MessagingIntegrationTests : IAsyncLifetime
 {
+    // Bytes one fixture record occupies, terminator included; the offset is derived from it.
+    private const int RecordExtent = 1200;
+    private const long FixtureSeq = 101;
+
     private ServiceProvider _provider = null!;
     private ITestHarness _harness = null!;
     private BatchCollector _collector = null!;
@@ -48,7 +52,7 @@ public sealed class MessagingIntegrationTests : IAsyncLifetime
                 new EncryptedValue("AES-256-GCM", "key-id", "v1", "bm9uY2U=", "Y2lwaGVy", "dGFn")),
         };
         var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
-        var record = new IngestRecord(new RecordLocator(101, 121200, "TRAN"), fields);
+        var record = new IngestRecord(new RecordLocator(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN"), fields);
         return new IngestBatchMessage("file-abc-1", provenance, 1, new[] { record });
     }
 
