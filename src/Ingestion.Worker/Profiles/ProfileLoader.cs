@@ -8,7 +8,7 @@ namespace Ingestion.Worker.Profiles;
 /// Loads the operational routing profiles from soft-coded YAML (folders → layout/format/completion/
 /// destinations). Generic and fail-closed: malformed YAML, an unknown format/completion token, or any
 /// invariant violation is rejected. Parsing/mapping of records is not here — that stays in each profile's
-/// layout YAML; this only routes.
+/// own layout; this only routes.
 /// </summary>
 internal static class ProfileLoader
 {

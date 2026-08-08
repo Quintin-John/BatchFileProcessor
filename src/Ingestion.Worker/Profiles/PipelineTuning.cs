@@ -2,8 +2,8 @@ namespace Ingestion.Worker.Profiles;
 
 /// <summary>
 /// Shared pipeline tuning applied to every profile: the ingest channel capacity, the number of concurrent
-/// publishers, and the outstanding-confirms window. Per-batch limits are per-profile (in the layout's
-/// profile); these are infra tuning from appsettings. All must be at least 1.
+/// publishers, and the outstanding-confirms window. Per-batch limits are declared per profile; these are
+/// infra tuning from host configuration. All must be at least 1.
 /// </summary>
 internal sealed record PipelineTuning
 {

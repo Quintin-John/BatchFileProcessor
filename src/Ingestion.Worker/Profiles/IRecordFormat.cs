@@ -5,8 +5,8 @@ using Common.FileIngestion.Layouts;
 namespace Ingestion.Worker.Profiles;
 
 /// <summary>
-/// Everything that differs between one file format and another, in one place: the token that selects it in
-/// <c>profiles.yaml</c>, how its layout is loaded, and which reader and parser it frames and maps with.
+/// Everything that differs between one file format and another, in one place: the token a profile selects
+/// it by, how its layout is loaded, and which reader and parser it frames and maps with.
 /// <para>
 /// Held together deliberately. Loading a layout and building the framing for it are two halves of one
 /// decision, so a format that could load a layout its own reader cannot frame is not expressible. Adding a
@@ -18,8 +18,8 @@ internal interface IRecordFormat
     /// <summary>The value written as a profile's <c>format</c>; matched case-insensitively.</summary>
     string Token { get; }
 
-    /// <summary>Loads this format's layout from a YAML file.</summary>
-    /// <param name="path">Path to the layout YAML; required, non-blank.</param>
+    /// <summary>Loads this format's layout definition.</summary>
+    /// <param name="path">Path to the layout definition; required, non-blank.</param>
     /// <exception cref="FormatException">The layout is malformed or violates an invariant.</exception>
     ILayout LoadLayout(string path);
 

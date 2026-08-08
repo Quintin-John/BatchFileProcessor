@@ -24,9 +24,10 @@ using StackExchange.Redis;
 
 // Composition root — wiring only (excluded from coverage). Fails fast on missing configuration.
 // One isolated worker + pipeline is built per operational profile and run concurrently, so files in
-// different folders never contend. profiles.yaml owns routing (folders/layout/format/completion/
-// destinations); appsettings owns shared infra (checkpoint, tuning, broker, observability); layout YAML
-// owns parsing/mapping. Secrets/connection strings live in appsettings/Key Vault, never in profiles.yaml.
+// different folders never contend. The profile set owns routing (folders/layout/format/completion/
+// destinations); host configuration owns shared infra (checkpoint, tuning, broker, observability); each
+// profile's layout owns parsing/mapping. Secrets and connection strings are infra configuration and a
+// secret store, never routing.
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
 var ingestion = builder.Configuration.GetSection("Ingestion");
@@ -81,7 +82,7 @@ services.AddHostedService<LineageDrainService>();
 
 services.AddSingleton<Heartbeat>();
 
-// Shared pipeline tuning (infra), applied to every profile; per-batch limits are per-profile (profiles.yaml).
+// Shared pipeline tuning (infra), applied to every profile; per-batch limits are declared per profile.
 services.AddSingleton(new PipelineTuning(
     RequiredConfig.Integer(ingestion, "BatchChannelCapacity"),
     RequiredConfig.Integer(ingestion, "PublisherConcurrency"),

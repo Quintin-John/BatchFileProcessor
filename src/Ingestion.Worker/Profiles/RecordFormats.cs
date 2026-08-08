@@ -1,7 +1,7 @@
 namespace Ingestion.Worker.Profiles;
 
 /// <summary>
-/// The formats this deployment can ingest, keyed by the token written in <c>profiles.yaml</c>. The single
+/// The formats this deployment can ingest, keyed by the token a profile selects one by. The single
 /// place a format is registered: adding one is a new <see cref="IRecordFormat"/> plus an entry here, and no
 /// existing type grows another branch. Fail-closed — a token with no registered format is rejected when the
 /// profiles are loaded, not when the first file arrives.
