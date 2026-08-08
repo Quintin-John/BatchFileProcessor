@@ -6,16 +6,16 @@ public sealed class ProfileLoaderTests
 {
     private const string ValidYaml = """
         profiles:
-          - name: g266
-            incoming: /data/g266/incoming
-            processing: /data/g266/processing
-            done: /data/g266/done
-            failed: /data/g266/failed
-            layout: /config/g266-v4.8.yaml
+          - name: feed-a
+            incoming: /data/feed/incoming
+            processing: /data/feed/processing
+            done: /data/feed/done
+            failed: /data/feed/failed
+            layout: /config/layout.yaml
             format: fixed-length
             completion: { mode: stable-size, quietSeconds: 5, pollSeconds: 2 }
-            destination: g266-batches
-            rejectDestination: g266-rejects
+            destination: batches-dest
+            rejectDestination: rejects-dest
             batch: { maxRecords: 500, maxContentBytes: 200000 }
         """;
 
@@ -24,18 +24,18 @@ public sealed class ProfileLoaderTests
     {
         var profile = Assert.Single(ProfileLoader.Load(ValidYaml).Profiles);
 
-        Assert.Equal("g266", profile.Name);
-        Assert.Equal("/data/g266/incoming", profile.Folders.Incoming);
-        Assert.Equal("/data/g266/processing", profile.Folders.Processing);
-        Assert.Equal("/data/g266/done", profile.Folders.Done);
-        Assert.Equal("/data/g266/failed", profile.Folders.Failed);
-        Assert.Equal("/config/g266-v4.8.yaml", profile.LayoutPath);
+        Assert.Equal("feed-a", profile.Name);
+        Assert.Equal("/data/feed/incoming", profile.Folders.Incoming);
+        Assert.Equal("/data/feed/processing", profile.Folders.Processing);
+        Assert.Equal("/data/feed/done", profile.Folders.Done);
+        Assert.Equal("/data/feed/failed", profile.Folders.Failed);
+        Assert.Equal("/config/layout.yaml", profile.LayoutPath);
         Assert.Equal("fixed-length", profile.Format.Token);
         Assert.Equal(CompletionMode.StableSize, profile.Completion.Mode);
         Assert.Equal(TimeSpan.FromSeconds(5), profile.Completion.QuietPeriod);
         Assert.Equal(TimeSpan.FromSeconds(2), profile.Completion.PollInterval);
-        Assert.Equal("g266-batches", profile.Routing.Batches);
-        Assert.Equal("g266-rejects", profile.Routing.Rejects);
+        Assert.Equal("batches-dest", profile.Routing.Batches);
+        Assert.Equal("rejects-dest", profile.Routing.Rejects);
         Assert.Equal(500, profile.Batch.MaxRecords);
         Assert.Equal(200000, profile.Batch.MaxContentBytes);
     }
@@ -116,7 +116,7 @@ public sealed class ProfileLoaderTests
 
     [Fact]
     public void Load_BlankRequiredField_Throws() =>
-        Assert.Throws<FormatException>(() => ProfileLoader.Load(ValidYaml.Replace("destination: g266-batches", "destination: \"\"", StringComparison.Ordinal)));
+        Assert.Throws<FormatException>(() => ProfileLoader.Load(ValidYaml.Replace("destination: batches-dest", "destination: \"\"", StringComparison.Ordinal)));
 
     [Fact]
     public void Load_NonPositiveBatchLimit_Throws() =>
@@ -128,14 +128,14 @@ public sealed class ProfileLoaderTests
 
     [Fact]
     public void Load_SameDirectoryForTwoRoles_Throws() =>
-        Assert.Throws<FormatException>(() => ProfileLoader.Load(ValidYaml.Replace("processing: /data/g266/processing", "processing: /data/g266/incoming", StringComparison.Ordinal)));
+        Assert.Throws<FormatException>(() => ProfileLoader.Load(ValidYaml.Replace("processing: /data/feed/processing", "processing: /data/feed/incoming", StringComparison.Ordinal)));
 
     [Fact]
     public void Load_MissingCompletion_Throws()
     {
         const string yaml = """
             profiles:
-              - name: g266
+              - name: feed-a
                 incoming: /in
                 processing: /proc
                 done: /done
@@ -155,7 +155,7 @@ public sealed class ProfileLoaderTests
     {
         const string yaml = """
             profiles:
-              - name: g266
+              - name: feed-a
                 incoming: /in
                 processing: /proc
                 done: /done

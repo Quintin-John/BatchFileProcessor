@@ -8,9 +8,9 @@ public sealed class WatermarkTests
     [Fact]
     public void Constructor_SetsProperties()
     {
-        var watermark = new Watermark("g266.dat", "FILEHASH", 1200, 5, 2);
+        var watermark = new Watermark("source.dat", "FILEHASH", 1200, 5, 2);
 
-        Assert.Equal("g266.dat", watermark.SourceKey);
+        Assert.Equal("source.dat", watermark.SourceKey);
         Assert.Equal("FILEHASH", watermark.FileId);
         Assert.Equal(1200, watermark.ByteOffset);
         Assert.Equal(5, watermark.LastRecordSeq);

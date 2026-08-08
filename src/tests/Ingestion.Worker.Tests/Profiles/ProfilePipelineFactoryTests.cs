@@ -13,13 +13,13 @@ namespace Ingestion.Worker.Tests.Profiles;
 
 public sealed class ProfilePipelineFactoryTests
 {
-    private static Layout Layout() => new("4.8", 10, "ascii", 1, 1, 2, new[]
+    private static Layout Layout() => new("1.0", 10, "ascii", 1, 1, 2, new[]
     {
         new RecordDefinition("r", "M", new[] { new FieldDefinition("f", 1, 10) }),
     });
 
     private static Profile Profile() => new(
-        "g266",
+        "feed-a",
         new ProfileFolders("/in", "/proc", "/done", "/failed"),
         "/cfg.yaml",
         new FixedLengthFormat(),

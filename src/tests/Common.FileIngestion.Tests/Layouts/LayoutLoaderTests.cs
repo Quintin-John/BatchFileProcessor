@@ -247,24 +247,4 @@ public sealed class LayoutLoaderTests
     [Fact]
     public void LoadFromFile_BlankPath_Throws() =>
         Assert.ThrowsAny<ArgumentException>(() => LayoutLoader.LoadFromFile("  "));
-
-    [Fact]
-    public void Load_RealG266V48Layout_ValidatesThroughGenericModel()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "Layouts", "g266-v4.8.yaml");
-
-        var layout = LayoutLoader.LoadFromFile(path);
-
-        Assert.Equal("4.8", layout.Version);
-        Assert.Equal(1200, layout.RecordLength);
-        Assert.Equal(1, layout.TerminatorLength); // framing now sourced from the layout, not appsettings
-        Assert.Equal(4, layout.RecordTypes.Count);
-        Assert.Equal("per", layout.ResolveByDiscriminator("TRAN")!.Name);
-        Assert.Equal("aer", layout.ResolveByDiscriminator("AUTH")!.Name);
-
-        // Header/trailer are control records: skipped (consumed for framing, not emitted); data records are not.
-        Assert.True(layout.ResolveByDiscriminator("HEAD")!.Skip);
-        Assert.True(layout.ResolveByDiscriminator("TRAI")!.Skip);
-        Assert.False(layout.ResolveByDiscriminator("TRAN")!.Skip);
-    }
 }

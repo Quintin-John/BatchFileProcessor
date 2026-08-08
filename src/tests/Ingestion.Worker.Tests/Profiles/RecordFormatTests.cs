@@ -115,23 +115,55 @@ public sealed class RecordFormatTests
 
     // ---------- loading ----------
 
+    private const string FixedWidthYaml = """
+        version: "1.0"
+        recordLength: 4
+        encoding: ascii
+        discriminator: { start: 1, length: 2 }
+        recordTypes:
+          r:
+            match: "MM"
+            fields: [ { name: f, start: 1, length: 4 } ]
+        """;
+
+    private const string DelimitedYaml = """
+        version: "1.0"
+        delimiter: ","
+        encoding: ascii
+        rowTypes:
+          r:
+            role: data
+            fields: [ { name: f, index: 0 } ]
+        """;
+
     [Fact]
-    public void EachFormat_LoadsItsOwnRealLayout()
+    public void EachFormat_LoadsItsOwnLayoutDialect_IntoItsOwnModel()
     {
         // Loading and framing come from the same object, which is what makes a format unable to hand its
-        // reader a layout the reader cannot frame.
-        var fixedWidth = new FixedLengthFormat()
-            .LoadLayout(Path.Combine(AppContext.BaseDirectory, "Layouts", "g266-v4.8.yaml"));
-        var delimited = new DelimitedFormat()
-            .LoadLayout(Path.Combine(AppContext.BaseDirectory, "Layouts", "force-update-balance-v1.0.yaml"));
+        // reader a layout the reader cannot frame. Both models satisfy the shared surface, so protection
+        // and redaction treat them identically.
+        Assert.IsType<Layout>(LoadThroughFormat(new FixedLengthFormat(), FixedWidthYaml));
+        Assert.IsType<DelimitedLayout>(LoadThroughFormat(new DelimitedFormat(), DelimitedYaml));
+    }
 
-        Assert.IsType<Layout>(fixedWidth);
-        Assert.IsType<DelimitedLayout>(delimited);
+    [Fact]
+    public void AFormat_RejectsTheOtherDialect_RatherThanMisreadingIt()
+    {
+        Assert.ThrowsAny<Exception>(() => LoadThroughFormat(new FixedLengthFormat(), DelimitedYaml));
+        Assert.ThrowsAny<Exception>(() => LoadThroughFormat(new DelimitedFormat(), FixedWidthYaml));
+    }
 
-        // Both satisfy the shared surface, so protection and redaction treat them identically.
-        Assert.Equal("4.8", fixedWidth.Version);
-        Assert.Equal("1.0", delimited.Version);
-        Assert.NotEmpty(fixedWidth.DeclaredFields);
-        Assert.NotEmpty(delimited.DeclaredFields);
+    private static ILayout LoadThroughFormat(IRecordFormat format, string yaml)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "layout-" + Guid.NewGuid().ToString("N") + ".yaml");
+        try
+        {
+            File.WriteAllText(path, yaml);
+            return format.LoadLayout(path);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 }

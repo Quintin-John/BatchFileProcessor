@@ -34,7 +34,7 @@ public sealed class IngestionEndToEndTests : IDisposable
         var dispatcher = new PipelineIngestFileDispatcher(BuildPipeline());
 
         await dispatcher.DispatchAsync(
-            new IngestFile("e2e.dat", "e2e.dat", _file, "run-1", "g266", "4.8"), CancellationToken.None);
+            new IngestFile("e2e.dat", "e2e.dat", _file, "run-1", "feed-a", "1.0"), CancellationToken.None);
 
         Assert.NotEmpty(_publisher.Batches);
         Assert.IsType<EncryptedFieldValue>(Assert.Single(_publisher.Rejects).RawRecord);

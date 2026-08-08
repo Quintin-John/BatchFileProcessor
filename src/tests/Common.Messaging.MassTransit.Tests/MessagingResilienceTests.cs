@@ -58,7 +58,7 @@ public sealed class MessagingResilienceTests : IAsyncLifetime
 
     private static IngestBatchMessage SampleBatch()
     {
-        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        var provenance = new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
         var record = new IngestRecord(
             new RecordLocator(1, 0, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(1m) });

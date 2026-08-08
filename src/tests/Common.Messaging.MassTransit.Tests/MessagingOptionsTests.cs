@@ -42,12 +42,12 @@ public sealed class MessagingOptionsTests
         {
             Transport = MessagingTransport.RabbitMq,
             ConnectionString = "amqp://x",
-            EndpointPrefix = "g266",
+            EndpointPrefix = "feed-a",
         };
 
         Assert.Equal(MessagingTransport.RabbitMq, options.Transport);
         Assert.Equal("amqp://x", options.ConnectionString);
-        Assert.Equal("g266", options.EndpointPrefix);
+        Assert.Equal("feed-a", options.EndpointPrefix);
     }
 
     [Fact]

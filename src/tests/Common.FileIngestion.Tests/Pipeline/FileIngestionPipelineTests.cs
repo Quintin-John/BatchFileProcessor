@@ -62,7 +62,7 @@ public sealed class FileIngestionPipelineTests
     }
 
     private static IngestRequest Request(Func<Stream> openStream) =>
-        new("g266.dat", "g266.dat", "run-1", "profile-1", "4.8", openStream);
+        new("source.dat", "source.dat", "run-1", "profile-1", "1.0", openStream);
 
     [Fact]
     public async Task Ingest_FullFile_AcceptsBatchesAndRejects_ThenClearsWatermark()
@@ -85,7 +85,7 @@ public sealed class FileIngestionPipelineTests
         Assert.Equal($"{outcome.FileId}-3-reject", reject.MessageId);
         Assert.IsType<EncryptedFieldValue>(reject.RawRecord); // raw record encrypted, never clear
 
-        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None));
+        Assert.Null(await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None));
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public sealed class FileIngestionPipelineTests
         Assert.Equal(3, outcome.RecordsAccepted);
         Assert.Equal(1, outcome.RecordsRejected);
         Assert.Equal(3, outcome.BatchesPublished); // maxRecords 1 -> one batch per accepted record
-        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None));
+        Assert.Null(await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None));
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class FileIngestionPipelineTests
         var bytes = Bytes(FileText);
         var fileId = await FileIdHasher.ComputeAsync(new MemoryStream(bytes), CancellationToken.None);
         // Prior run confirmed records 1-2 (offsets 0, 9) against THIS content; resume from offset 18, next seq 1.
-        await harness.Checkpoints.SaveAsync(new Watermark("g266.dat", fileId, 2 * Stride, 2, 0), CancellationToken.None);
+        await harness.Checkpoints.SaveAsync(new Watermark("source.dat", fileId, 2 * Stride, 2, 0), CancellationToken.None);
 
         var outcome = await harness.Build().IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
 
@@ -209,7 +209,7 @@ public sealed class FileIngestionPipelineTests
         var harness = new Harness();
         // A prior, DIFFERENT file reused the same name and left a watermark; its FileId cannot match.
         await harness.Checkpoints.SaveAsync(
-            new Watermark("g266.dat", "STALE-HASH-FROM-A-DIFFERENT-FILE", 2 * Stride, 2, 0), CancellationToken.None);
+            new Watermark("source.dat", "STALE-HASH-FROM-A-DIFFERENT-FILE", 2 * Stride, 2, 0), CancellationToken.None);
         var bytes = Bytes(FileText);
 
         var outcome = await harness.Build().IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
@@ -231,7 +231,7 @@ public sealed class FileIngestionPipelineTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => harness.Build(maxRecords: 2).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
 
-        var watermark = await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None);
+        var watermark = await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None);
         Assert.NotNull(watermark);                    // not cleared — the file did not complete
         Assert.Equal(0, watermark!.BatchSeq);          // advanced only across the broker-confirmed batch 0
         Assert.Equal(2 * Stride, watermark.ByteOffset); // one stride past batch 0's last record
@@ -259,7 +259,7 @@ public sealed class FileIngestionPipelineTests
         // batch 0 (run 1) is never re-published and the sequence continues at 1 → no duplication, no loss.
         Assert.Equal($"{outcome.FileId}-0", harness.Publisher.Batches[0].MessageId);
         Assert.Equal($"{outcome.FileId}-1", harness.Publisher.Batches[1].MessageId);
-        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None)); // completed, cleared
+        Assert.Null(await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None)); // completed, cleared
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public sealed class FileIngestionPipelineTests
         Assert.Equal(
             Enumerable.Range(0, 20).Select(i => (long)i),
             harness.Publisher.Batches.Select(b => b.BatchSeq).OrderBy(s => s));
-        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None)); // completed, cleared
+        Assert.Null(await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None)); // completed, cleared
     }
 
     [Fact]
@@ -317,7 +317,7 @@ public sealed class FileIngestionPipelineTests
 
         // Batches 4..19 may confirm out of order, but they sit beyond the gap at 3, so the contiguous
         // watermark can never reach or pass 3. It is null or somewhere in 0..2 — never a skipped record.
-        var watermark = await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None);
+        var watermark = await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None);
         Assert.True(watermark is null || watermark.BatchSeq < 3);
     }
 
@@ -331,7 +331,7 @@ public sealed class FileIngestionPipelineTests
         harness.Publisher.FailOnBatchSeq = 10;
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => harness.Build(maxRecords: 1).IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
-        var afterFault = await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None);
+        var afterFault = await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None);
         Assert.True(afterFault is null || afterFault.BatchSeq < 10);
 
         // Run 2: broker recovered; resume from the watermark and finish.
@@ -339,7 +339,7 @@ public sealed class FileIngestionPipelineTests
         var outcome = await harness.Build(maxRecords: 1)
             .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None);
 
-        Assert.Null(await harness.Checkpoints.LoadAsync("g266.dat", CancellationToken.None)); // completed, cleared
+        Assert.Null(await harness.Checkpoints.LoadAsync("source.dat", CancellationToken.None)); // completed, cleared
         // Every batch 0..19 is published across the two runs (no loss). Distinct absorbs the at-least-once
         // replay of the unconfirmed window — the safety net the resume design relies on.
         Assert.Equal(

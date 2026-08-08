@@ -51,7 +51,7 @@ public sealed class MessagingIntegrationTests : IAsyncLifetime
             ["pan"] = new EncryptedFieldValue(
                 new EncryptedValue("AES-256-GCM", "key-id", "v1", "bm9uY2U=", "Y2lwaGVy", "dGFn")),
         };
-        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        var provenance = new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
         var record = new IngestRecord(new RecordLocator(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN"), fields);
         return new IngestBatchMessage("file-abc-1", provenance, 1, new[] { record });
     }

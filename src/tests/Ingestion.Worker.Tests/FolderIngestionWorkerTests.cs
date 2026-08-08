@@ -11,7 +11,7 @@ namespace Ingestion.Worker.Tests;
 
 public sealed class FolderIngestionWorkerTests
 {
-    private static WorkerOptions Options() => new("g266", "4.8", TimeSpan.FromMilliseconds(10));
+    private static WorkerOptions Options() => new("feed-a", "1.0", TimeSpan.FromMilliseconds(10));
 
     private static FolderIngestionWorker Worker(
         IFileSource source, FakeDispatcher dispatcher, ReadinessGate gate, TimeProvider? clock = null) =>
@@ -76,8 +76,8 @@ public sealed class FolderIngestionWorkerTests
 
         await worker.ProcessAsync([new("ok.dat", "p/ok.dat")], CancellationToken.None);
 
-        // ProfileId ("g266") + "__" + file name, so same-named files under different profiles never collide.
-        Assert.Equal("g266__ok.dat", dispatcher.ObservedSourceKey);
+        // ProfileId ("feed-a") + "__" + file name, so same-named files under different profiles never collide.
+        Assert.Equal("feed-a__ok.dat", dispatcher.ObservedSourceKey);
     }
 
     [Fact]

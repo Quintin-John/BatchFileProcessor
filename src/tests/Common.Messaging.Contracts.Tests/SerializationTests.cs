@@ -116,7 +116,7 @@ public sealed class SerializationTests
             ["pan"] = new EncryptedFieldValue(Envelope()),
         };
         var record = new IngestRecord(new RecordLocator(101, 121200, RecordExtent, "TRAN"), fields);
-        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        var provenance = new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
         return new IngestBatchMessage("file-abc-1234", provenance, 1234, new[] { record });
     }
 
@@ -151,7 +151,7 @@ public sealed class SerializationTests
     {
         var original = new RejectMessage(
             "file-abc-101-reject",
-            new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8"),
+            new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0"),
             new RecordLocator(101, 121200, RecordExtent, "TRAN"),
             new ClearFieldValue("cmF3"),
             new[]
@@ -220,7 +220,7 @@ public sealed class SerializationTests
         // nested provenance
         Assert.Contains("\"provenance\":{", json, StringComparison.Ordinal);
         Assert.Contains("\"fileId\":\"file-abc\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"layoutVersion\":\"4.8\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"layoutVersion\":\"1.0\"", json, StringComparison.Ordinal);
         // nested locator
         Assert.Contains("\"locator\":{", json, StringComparison.Ordinal);
         Assert.Contains("\"recordSeq\":101", json, StringComparison.Ordinal);

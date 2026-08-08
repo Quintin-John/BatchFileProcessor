@@ -3,18 +3,18 @@ namespace Common.Messaging.Contracts.Tests;
 public sealed class MessageProvenanceTests
 {
     private static MessageProvenance CreateValid() =>
-        new("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        new("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
 
     [Fact]
     public void Constructor_WithValidArguments_SetsProperties()
     {
-        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        var provenance = new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
 
         Assert.Equal("run-xyz", provenance.CorrelationId);
         Assert.Equal("file-abc", provenance.FileId);
-        Assert.Equal("g266.dat", provenance.FileName);
-        Assert.Equal("g266", provenance.Profile);
-        Assert.Equal("4.8", provenance.LayoutVersion);
+        Assert.Equal("source.dat", provenance.FileName);
+        Assert.Equal("feed-a", provenance.Profile);
+        Assert.Equal("1.0", provenance.LayoutVersion);
     }
 
     [Theory]
@@ -35,6 +35,6 @@ public sealed class MessageProvenanceTests
     public void Equality_ByValue()
     {
         Assert.Equal(CreateValid(), CreateValid());
-        Assert.NotEqual(CreateValid(), new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.11"));
+        Assert.NotEqual(CreateValid(), new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "2.0"));
     }
 }

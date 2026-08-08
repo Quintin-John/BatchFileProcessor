@@ -10,7 +10,7 @@ public sealed class RejectSinkTests
 
     private const string Destination = "rejects";
 
-    private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
+    private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "feed-a", "1.0");
 
     private static RejectReason[] Reasons() =>
         [new RejectReason("amount", "decimal", "NON_NUMERIC", "decimal", "12A4")];

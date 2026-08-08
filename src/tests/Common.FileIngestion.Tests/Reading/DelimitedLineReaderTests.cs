@@ -337,8 +337,9 @@ public sealed class DelimitedLineReaderTests
     public void Constructor_Utf8Encoding_IsAccepted()
     {
         // UTF-8 continuation bytes all have the high bit set, so the terminator byte cannot occur inside a
-        // character — rows can be framed on bytes safely.
-        Assert.NotNull(new DelimitedLineReader(Layout(), Encoding.UTF8));
+        // character — rows can be framed on bytes safely. `new` cannot return null, so the behaviour under
+        // test is that construction does not throw.
+        Assert.Null(Record.Exception(() => new DelimitedLineReader(Layout(), Encoding.UTF8)));
     }
 
     [Fact]

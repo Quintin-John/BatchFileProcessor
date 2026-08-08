@@ -5,7 +5,7 @@ namespace Common.FileIngestion.Tests.Lineage;
 
 public sealed class RecordLineageTests
 {
-    private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
+    private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "feed-a", "1.0");
 
     // Bytes one fixture record occupies, terminator included.
     private const int RecordExtent = 1200;

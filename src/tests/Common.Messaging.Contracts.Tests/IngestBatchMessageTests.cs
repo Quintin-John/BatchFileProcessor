@@ -5,7 +5,7 @@ public sealed class IngestBatchMessageTests
     // Bytes one fixture record occupies, terminator included; offsets in this fixture advance by it.
     private const int RecordExtent = 1200;
 
-    private static MessageProvenance Provenance() => new("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+    private static MessageProvenance Provenance() => new("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
 
     private static IngestRecord Record(long seq) =>
         new(new RecordLocator(seq, seq * RecordExtent, RecordExtent, "TRAN"),

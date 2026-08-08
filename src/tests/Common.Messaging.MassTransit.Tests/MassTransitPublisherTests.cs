@@ -55,7 +55,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
 
     private static IngestBatchMessage BatchWithCorrelation(string correlationId)
     {
-        var provenance = new MessageProvenance(correlationId, "file-abc", "g266.dat", "g266", "4.8");
+        var provenance = new MessageProvenance(correlationId, "file-abc", "source.dat", "feed-a", "1.0");
         var record = new IngestRecord(
             new RecordLocator(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(221.73m) });
@@ -64,7 +64,7 @@ public sealed class MassTransitPublisherTests : IAsyncLifetime
 
     private static RejectMessage SampleReject()
     {
-        var provenance = new MessageProvenance("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+        var provenance = new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
         var reasons = new[] { new RejectReason("amount", "decimal", "NON_NUMERIC", "decimal", "12A4") };
         return new RejectMessage(
             "file-abc-101-reject", provenance, new RecordLocator(FixtureSeq, FixtureSeq * RecordExtent, RecordExtent, "TRAN"),

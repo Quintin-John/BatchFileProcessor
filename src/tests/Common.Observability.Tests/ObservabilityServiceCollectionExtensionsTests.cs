@@ -14,9 +14,11 @@ public sealed class ObservabilityServiceCollectionExtensionsTests
         services.AddObservability(new ObservabilityOptions { ServiceName = "svc", ServiceVersion = "1.0.0" });
         using var provider = services.BuildServiceProvider();
 
+        // GetRequiredService throws when a service is unregistered, so resolving without throwing is the
+        // assertion — Assert.NotNull on its result can never fail and would test nothing.
         Assert.Equal("svc", provider.GetRequiredService<ObservabilityInstrumentation>().Name);
-        Assert.NotNull(provider.GetRequiredService<TracerProvider>());
-        Assert.NotNull(provider.GetRequiredService<MeterProvider>());
+        Assert.Null(Record.Exception(() => provider.GetRequiredService<TracerProvider>()));
+        Assert.Null(Record.Exception(() => provider.GetRequiredService<MeterProvider>()));
     }
 
     [Fact]

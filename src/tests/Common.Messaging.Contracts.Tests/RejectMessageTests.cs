@@ -2,7 +2,7 @@ namespace Common.Messaging.Contracts.Tests;
 
 public sealed class RejectMessageTests
 {
-    private static MessageProvenance Provenance() => new("run-xyz", "file-abc", "g266.dat", "g266", "4.8");
+    private static MessageProvenance Provenance() => new("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
 
     // Bytes one fixture record occupies, terminator included; the offset is derived from it, not written out.
     private const int RecordExtent = 1200;

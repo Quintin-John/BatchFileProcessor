@@ -21,7 +21,9 @@ public sealed class MessagingServiceCollectionExtensionsTests
             .AddMessaging(RabbitMq(), Resilience(), configure => configure.AddConsumer<BatchConsumer>());
         using var provider = services.BuildServiceProvider();
 
-        Assert.NotNull(provider.GetRequiredService<IBus>());
+        // GetRequiredService throws when a service is unregistered, so resolving without throwing is the
+        // assertion — Assert.NotNull on its result can never fail and would test nothing.
+        Assert.Null(Record.Exception(() => provider.GetRequiredService<IBus>()));
         // The publisher is decorated with the transport-agnostic send-retry policy.
         Assert.IsType<RetryingMessagePublisher>(provider.GetRequiredService<IMessagePublisher>());
     }

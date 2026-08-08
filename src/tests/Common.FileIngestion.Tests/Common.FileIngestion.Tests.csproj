@@ -18,17 +18,5 @@
     <ProjectReference Include="..\..\..\src\Common.FileIngestion.Protection\Common.FileIngestion.Protection.csproj" />
   </ItemGroup>
 
-  <!-- Real production layouts, so tests prove the generic loaders accept the actual specs. -->
-  <ItemGroup>
-    <Content Include="..\..\..\docs\layouts\g266-v4.8.yaml" Link="Layouts\g266-v4.8.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\docs\layouts\force-update-balance-v1.0.yaml" Link="Layouts\force-update-balance-v1.0.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\docs\layouts\e138-v1.0.yaml" Link="Layouts\e138-v1.0.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 
 </Project>

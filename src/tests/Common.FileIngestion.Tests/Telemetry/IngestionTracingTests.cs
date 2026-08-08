@@ -12,7 +12,7 @@ public sealed class IngestionTracingTests
 
     private const string SourceName = "test-tracing";
 
-    private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "g266", "4.8");
+    private static MessageProvenance Provenance() => new("run", "FILE1", "f.dat", "feed-a", "1.0");
 
     private static IngestBatchMessage Batch() =>
         new("FILE1-3", Provenance(), 3, new[] { new IngestRecord(new RecordLocator(1, 0, RecordExtent, "TRAN"),
@@ -41,7 +41,7 @@ public sealed class IngestionTracingTests
         Assert.NotNull(activity);
         Assert.Equal("ingest.file", activity!.OperationName);
         Assert.Equal("FILE1", activity.GetTagItem(IngestionTelemetryTags.FileId));
-        Assert.Equal("g266", activity.GetTagItem(IngestionTelemetryTags.ProfileId));
+        Assert.Equal("feed-a", activity.GetTagItem(IngestionTelemetryTags.ProfileId));
     }
 
     [Fact]
