@@ -263,13 +263,47 @@ public sealed class DelimitedLayoutTests
     // ---------- what a body of several types must satisfy ----------
 
     [Fact]
-    public void SeveralBodyTypes_WhereOneDeclaresNoMarker_Throws()
+    public void AnUnmarkedBodyType_StandsForTheRowsTheMarkedOnesDoNotName()
     {
-        // Without a marker that type could never be identified, so the layout is unsatisfiable rather than
-        // merely unusual.
-        var ex = Assert.Throws<ArgumentException>(
-            () => Layout(Data("debit", "DR"), new DelimitedRowDefinition("plain", RowRole.Data, 0, Fields(3))));
-        Assert.Contains("must name itself with a marker", ex.Message, StringComparison.Ordinal);
+        // What becomes of a row no marker names is the layout's call, not the engine's: declaring a type
+        // without a marker is how a layout says "and everything else is this".
+        var rest = new DelimitedRowDefinition("rest", RowRole.Data, 0, Fields(3));
+        var layout = Layout(Data("debit", "DR"), rest);
+
+        Assert.Same(rest, layout.DataFallback);
+        Assert.Equal("debit", layout.ResolveDataRow("DR\tb\tc")!.Name);
+        Assert.Equal("rest", layout.ResolveDataRow("XX\tb\tc")!.Name);
+    }
+
+    [Fact]
+    public void WithNoUnmarkedBodyType_ARowNamingNoTypeResolvesToNull()
+    {
+        // The other half of the same choice: a layout declaring no catch-all is saying its body holds nothing
+        // else, so an unnamed row is a file that does not match its layout.
+        var layout = Layout(Data("debit", "DR"), Data("credit", "CR"));
+
+        Assert.Null(layout.DataFallback);
+        Assert.Null(layout.ResolveDataRow("XX\tb\tc"));
+    }
+
+    [Fact]
+    public void ARowTooShortToReachTheMarkerColumn_FallsToTheUnmarkedType()
+    {
+        var rest = new DelimitedRowDefinition("rest", RowRole.Data, 0, Fields(3));
+        var layout = Layout(Data("debit", "DR", markerIndex: 2), rest);
+
+        Assert.Same(rest, layout.ResolveDataRow("a\tb"));
+    }
+
+    [Fact]
+    public void TwoUnmarkedBodyTypes_Throw()
+    {
+        // Both would stand for the same rows, leaving no way to choose.
+        var ex = Assert.Throws<ArgumentException>(() => Layout(
+            Data("debit", "DR"),
+            new DelimitedRowDefinition("rest", RowRole.Data, 0, Fields(3)),
+            new DelimitedRowDefinition("other", RowRole.Data, 0, Fields(3))));
+        Assert.Contains("at most one may stand for", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

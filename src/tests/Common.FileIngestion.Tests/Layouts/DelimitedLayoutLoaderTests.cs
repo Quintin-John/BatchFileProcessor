@@ -445,8 +445,9 @@ public sealed class DelimitedLayoutLoaderTests
     }
 
     [Fact]
-    public void Load_ABodyOfSeveralRowTypes_WhereOneDeclaresNoMarker_Throws()
+    public void Load_ABodyWhereOneRowTypeDeclaresNoMarker_MakesItTheCatchAll()
     {
+        // Stated from YAML alone: what happens to a body row no marker names is declared, not decided here.
         const string yaml = """
             version: "1.0"
             delimiter: ","
@@ -457,14 +458,38 @@ public sealed class DelimitedLayoutLoaderTests
                 match: { index: 0, value: DR }
                 fields:
                   - { name: kind, index: 0 }
-              plain:
+              rest:
+                role: data
+                skip: true
+            """;
+
+        var layout = DelimitedLayoutLoader.Load(yaml);
+
+        Assert.Equal("rest", layout.DataFallback!.Name);
+        Assert.Equal("debit", layout.ResolveDataRow("DR")!.Name);
+        Assert.Equal("rest", layout.ResolveDataRow("XX")!.Name);
+    }
+
+    [Fact]
+    public void Load_ABodyWithTwoUnmarkedRowTypes_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              first:
+                role: data
+                fields:
+                  - { name: kind, index: 0 }
+              second:
                 role: data
                 fields:
                   - { name: kind, index: 0 }
             """;
 
         var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
-        Assert.Contains("must name itself with a marker", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("at most one may stand for", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

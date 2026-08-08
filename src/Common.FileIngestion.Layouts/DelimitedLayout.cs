@@ -53,12 +53,23 @@ public sealed class DelimitedLayout : ILayout
     public IReadOnlyList<DelimitedRowDefinition> DataRows { get; }
 
     /// <summary>
-    /// The field index carrying the marker that tells one body row type from another, or null when a single
-    /// data type spans the body and position alone identifies it. Shared by every data type, so a body row
-    /// resolves by reading one column rather than by trying each type in turn — which would make the answer
-    /// depend on declaration order.
+    /// The field index carrying the marker that tells one body row type from another, or null when no body
+    /// type is marked and a single type spans the body. Shared by every marked type, so a body row resolves
+    /// by reading one column rather than by trying each type in turn — which would make the answer depend on
+    /// declaration order.
     /// </summary>
     public int? DataMarkerIndex { get; }
+
+    /// <summary>
+    /// The body row type that declares no marker, or null when every one is marked.
+    /// <para>
+    /// It stands for whatever the marked types do not name, and declaring it is how a layout says what should
+    /// become of those rows: skipped and they are consumed silently, given fields and they are mapped like any
+    /// other row. A layout that declares none is saying its body holds nothing else, so a row naming no type
+    /// stops the read rather than being guessed at.
+    /// </para>
+    /// </summary>
+    public DelimitedRowDefinition? DataFallback { get; }
 
     /// <summary>The leading row type, or null when the file has no header.</summary>
     public DelimitedRowDefinition? Header { get; }
@@ -77,7 +88,7 @@ public sealed class DelimitedLayout : ILayout
     /// <param name="delimiter">The resolved field delimiter; required, non-empty, and must contain neither a line terminator nor the row terminator.</param>
     /// <param name="rowTerminator">The resolved row terminator; must not appear in the delimiter.</param>
     /// <param name="encoding">Encoding name; required, non-blank.</param>
-    /// <param name="rowTypes">Row types; required, non-empty, unique names, at least one data role, at most one header and one trailer. Several data roles are allowed when each declares a match, all in the same field and with distinct values.</param>
+    /// <param name="rowTypes">Row types; required, non-empty, unique names, at least one data role, at most one header and one trailer. Several data roles are allowed; those declaring a match must all use the same field with distinct values, and at most one may declare none.</param>
     /// <exception cref="ArgumentException">Any string is blank, the delimiter carries a line terminator or the row terminator, row types are empty, names collide, or the role composition is invalid.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="rowTypes"/> is null.</exception>
     public DelimitedLayout(
@@ -164,6 +175,7 @@ public sealed class DelimitedLayout : ILayout
         }
 
         DataRows = new ReadOnlyCollection<DelimitedRowDefinition>(dataRows);
+        DataFallback = ResolveDataFallback(dataRows);
         DataMarkerIndex = ResolveDataMarkerIndex(dataRows);
 
         Version = version;
@@ -199,58 +211,83 @@ public sealed class DelimitedLayout : ILayout
     /// <param name="row">The row's text, without its terminator.</param>
     public DelimitedRowDefinition? ResolveDataRow(ReadOnlySpan<char> row)
     {
-        // One body type identified by position: every body row is that type, and no column is read.
+        // No marked body type: one type spans the body and position alone identifies it.
         if (DataMarkerIndex is not { } index)
         {
-            return DataRows[0];
+            return DataFallback;
         }
 
-        if (!DelimitedFields.TryReadAt(row, index, Delimiter, out var marker))
+        if (DelimitedFields.TryReadAt(row, index, Delimiter, out var marker))
         {
-            return null;
-        }
-
-        // Scanned rather than hashed: markers are unique by construction, so the answer does not depend on
-        // order, and comparing spans keeps a per-row string allocation off the framing path.
-        foreach (var candidate in DataRows)
-        {
-            if (marker.SequenceEqual(candidate.Match!.Value))
+            // Scanned rather than hashed: markers are unique by construction, so the answer does not depend
+            // on order, and comparing spans keeps a per-row string allocation off the framing path.
+            foreach (var candidate in DataRows)
             {
-                return candidate;
+                if (candidate.Match is { } match && marker.SequenceEqual(match.Value))
+                {
+                    return candidate;
+                }
             }
         }
 
-        return null;
+        // Nothing named this row — including a row too short to reach the marker column at all. Whether that
+        // is a file the layout does not describe or simply a row it chooses not to name is the layout's call:
+        // it declares a catch-all or it does not.
+        return DataFallback;
     }
 
-    // A single body type needs no marker: position already identifies it. Several do, and all at the same
-    // column — markers spread across different columns would mean trying each type in turn, so which type a
-    // row resolved to would depend on the order they happened to be declared in.
-    private static int? ResolveDataMarkerIndex(List<DelimitedRowDefinition> dataRows)
+    // At most one body type may omit its marker. It then stands for every body row the marked types do not
+    // name, and what happens to those rows follows from how it is declared — skipped and they are consumed
+    // silently, given fields and they are mapped, and a row that does not fit those fields is rejected by the
+    // ordinary field-count rule. Two unmarked types would leave no way to choose between them.
+    private static DelimitedRowDefinition? ResolveDataFallback(List<DelimitedRowDefinition> dataRows)
     {
-        if (dataRows.Count == 1 && dataRows[0].Match is null)
+        DelimitedRowDefinition? fallback = null;
+        foreach (var row in dataRows)
         {
-            return null;
+            if (row.Match is not null)
+            {
+                continue;
+            }
+
+            if (fallback is not null)
+            {
+                throw new ArgumentException(
+                    $"Row types '{fallback.Name}' and '{row.Name}' both declare role 'data' without a match; " +
+                    "at most one may stand for the rows the others do not name.", nameof(dataRows));
+            }
+
+            fallback = row;
         }
 
-        int? index = null;
+        return fallback;
+    }
+
+    // Marked body types must all carry their marker in the same column: markers spread across different
+    // columns would mean trying each type in turn, so which type a row resolved to would depend on the order
+    // they happened to be declared in. Null when no body type is marked, which is the single-type case.
+    private static int? ResolveDataMarkerIndex(List<DelimitedRowDefinition> dataRows)
+    {
+        DelimitedRowDefinition? firstMarked = null;
         var markers = new HashSet<string>(dataRows.Count, StringComparer.Ordinal);
 
         foreach (var row in dataRows)
         {
-            var match = row.Match ?? throw new ArgumentException(
-                $"Row type '{row.Name}' declares role 'data' without a match; when a layout declares more " +
-                "than one data row type each must name itself with a marker.", nameof(dataRows));
+            if (row.Match is not { } match)
+            {
+                continue;
+            }
 
-            if (index is { } shared && match.Index != shared)
+            if (firstMarked is { } first && match.Index != first.Match!.Index)
             {
                 throw new ArgumentException(
-                    $"Row type '{row.Name}' carries its marker at field {match.Index} but '{dataRows[0].Name}' " +
-                    $"carries its own at field {shared}; every data row type must be identified by the same field.",
+                    $"Row type '{row.Name}' carries its marker at field {match.Index} but '{first.Name}' " +
+                    $"carries its own at field {first.Match.Index}; every marked data row type must be " +
+                    "identified by the same field.",
                     nameof(dataRows));
             }
 
-            index ??= match.Index;
+            firstMarked ??= row;
 
             if (!markers.Add(match.Value))
             {
@@ -260,6 +297,6 @@ public sealed class DelimitedLayout : ILayout
             }
         }
 
-        return index;
+        return firstMarked?.Match!.Index;
     }
 }

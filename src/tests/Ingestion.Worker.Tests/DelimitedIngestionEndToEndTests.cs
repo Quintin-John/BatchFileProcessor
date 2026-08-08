@@ -377,6 +377,59 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         Assert.DoesNotContain("XX", ex.Message, StringComparison.Ordinal);
     }
 
+    // The same layout plus a body type that declares no marker, so it stands for whatever the marked types
+    // do not name. `skip` decides whether those rows are consumed silently or mapped and published.
+    private static DelimitedLayout MixedBodyLayoutWithCatchAll(bool skip) =>
+        new("1.0", ",", '\n', "ascii", MixedBodyLayout().RowTypes.Append(
+            new DelimitedRowDefinition(
+                "rest", RowRole.Data, 0,
+                skip ? [] : [new DelimitedFieldDefinition("kind", 0), new DelimitedFieldDefinition("note", 1)],
+                skip)).ToList());
+
+    [Fact]
+    public async Task AnUnnamedBodyRow_IsConsumedSilently_WhenTheLayoutDeclaresASkippedCatchAll()
+    {
+        // Same file that fails closed above. The engine's behaviour changed because the layout did.
+        var layout = MixedBodyLayoutWithCatchAll(skip: true);
+        await WriteAsync(FileWith(layout, RowOf(layout, "debit"), "XX,1"));
+
+        await DispatchAsync(layout);
+
+        var record = Assert.Single(_publisher.Batches.SelectMany(b => b.Records));
+        Assert.Equal("debit", record.Locator.RecordType);
+        Assert.Empty(_publisher.Rejects);
+    }
+
+    [Fact]
+    public async Task AnUnnamedBodyRow_IsMappedAndPublished_WhenTheCatchAllDeclaresFields()
+    {
+        var layout = MixedBodyLayoutWithCatchAll(skip: false);
+        await WriteAsync(FileWith(layout, RowOf(layout, "debit"), "XX,1"));
+
+        await DispatchAsync(layout);
+
+        var records = _publisher.Batches.SelectMany(b => b.Records).OrderBy(r => r.Locator.RecordSeq).ToList();
+        Assert.Empty(_publisher.Rejects);
+        Assert.Equal(["debit", "rest"], records.Select(r => r.Locator.RecordType));
+        Assert.Equal(new ClearFieldValue("XX"), records[1].Fields["kind"]);
+        Assert.Equal(new ClearFieldValue("1"), records[1].Fields["note"]);
+    }
+
+    [Fact]
+    public async Task AnUnnamedBodyRow_ThatDoesNotFitTheCatchAll_IsRejected_NotThrown()
+    {
+        // Once a layout says these rows belong to a type, a row that does not fit that type's fields is
+        // ordinary bad data — quarantined per row, not a file-level fault.
+        var layout = MixedBodyLayoutWithCatchAll(skip: false);
+        await WriteAsync(FileWith(layout, RowOf(layout, "debit"), "XX,1,too,many"));
+
+        await DispatchAsync(layout);
+
+        var reject = Assert.Single(_publisher.Rejects);
+        Assert.Equal("rest", reject.Locator.RecordType);
+        Assert.Single(_publisher.Batches.SelectMany(b => b.Records));
+    }
+
     [Fact]
     public async Task ABlankBodyRow_NamesNoType_AndFailsClosed()
     {
