@@ -16,7 +16,7 @@ public sealed class ProfileModelTests
     private static Profile ValidProfile(string name = "p", string? incoming = null) =>
         new(name,
             incoming is null ? Folders() : new ProfileFolders(incoming, "/proc/" + name, "/done/" + name, "/failed/" + name),
-            "/cfg.yaml", RecordFormat.FixedLength, Completion(), Routing(), Batch());
+            "/cfg.yaml", new FixedLengthFormat(), Completion(), Routing(), Batch());
 
     // ---- ProfileFolders ----
 
@@ -112,40 +112,40 @@ public sealed class ProfileModelTests
         var p = ValidProfile();
 
         Assert.Equal("p", p.Name);
-        Assert.Equal(RecordFormat.FixedLength, p.Format);
+        Assert.IsType<FixedLengthFormat>(p.Format);
         Assert.Equal("dest", p.Routing.Batches);
         Assert.Equal(500, p.Batch.MaxRecords);
     }
 
     [Fact]
-    public void Profile_UndefinedFormat_Throws() =>
-        Assert.Throws<ArgumentException>(
-            () => new Profile("p", Folders(), "/cfg.yaml", (RecordFormat)99, Completion(), Routing(), Batch()));
+    public void Profile_NullFormat_Throws() =>
+        Assert.Throws<ArgumentNullException>(
+            () => new Profile("p", Folders(), "/cfg.yaml", null!, Completion(), Routing(), Batch()));
 
     [Fact]
     public void Profile_NullFolders_Throws() =>
         Assert.Throws<ArgumentNullException>(
-            () => new Profile("p", null!, "/cfg.yaml", RecordFormat.FixedLength, Completion(), Routing(), Batch()));
+            () => new Profile("p", null!, "/cfg.yaml", new FixedLengthFormat(), Completion(), Routing(), Batch()));
 
     [Fact]
     public void Profile_NullCompletion_Throws() =>
         Assert.Throws<ArgumentNullException>(
-            () => new Profile("p", Folders(), "/cfg.yaml", RecordFormat.FixedLength, null!, Routing(), Batch()));
+            () => new Profile("p", Folders(), "/cfg.yaml", new FixedLengthFormat(), null!, Routing(), Batch()));
 
     [Fact]
     public void Profile_NullRouting_Throws() =>
         Assert.Throws<ArgumentNullException>(
-            () => new Profile("p", Folders(), "/cfg.yaml", RecordFormat.FixedLength, Completion(), null!, Batch()));
+            () => new Profile("p", Folders(), "/cfg.yaml", new FixedLengthFormat(), Completion(), null!, Batch()));
 
     [Fact]
     public void Profile_NullBatch_Throws() =>
         Assert.Throws<ArgumentNullException>(
-            () => new Profile("p", Folders(), "/cfg.yaml", RecordFormat.FixedLength, Completion(), Routing(), null!));
+            () => new Profile("p", Folders(), "/cfg.yaml", new FixedLengthFormat(), Completion(), Routing(), null!));
 
     [Fact]
     public void Profile_BlankName_Throws() =>
         Assert.Throws<ArgumentException>(
-            () => new Profile(" ", Folders(), "/cfg.yaml", RecordFormat.FixedLength, Completion(), Routing(), Batch()));
+            () => new Profile(" ", Folders(), "/cfg.yaml", new FixedLengthFormat(), Completion(), Routing(), Batch()));
 
     // ---- ProfileSet ----
 

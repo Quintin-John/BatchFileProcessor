@@ -22,7 +22,7 @@ public sealed class ProfilePipelineFactoryTests
         "g266",
         new ProfileFolders("/in", "/proc", "/done", "/failed"),
         "/cfg.yaml",
-        RecordFormat.FixedLength,
+        new FixedLengthFormat(),
         new CompletionSettings(CompletionMode.StableSize, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(2)),
         new RoutingTargets("batches", "rejects"),
         new BatchLimits(500, 200_000));
@@ -61,12 +61,11 @@ public sealed class ProfilePipelineFactoryTests
         Assert.Throws<ArgumentNullException>(() => Factory().Create(Profile(), null!));
 
     [Fact]
-    public void CreateParser_FixedLength_ReturnsFixedLengthParser() =>
-        Assert.IsType<FixedLengthRecordParser>(ProfilePipelineFactory.CreateParser(RecordFormat.FixedLength, Layout()));
-
-    [Fact]
-    public void CreateParser_UnsupportedFormat_Throws() =>
-        Assert.Throws<InvalidOperationException>(() => ProfilePipelineFactory.CreateParser((RecordFormat)99, Layout()));
+    public void Create_UsesTheProfilesFormat_ToBuildFraming()
+    {
+        // The factory holds no format knowledge: whatever the profile's format produces is what gets wired.
+        Assert.NotNull(Factory().Create(Profile(), Layout()));
+    }
 
     [Fact]
     public void Constructor_NullPublisher_Throws()

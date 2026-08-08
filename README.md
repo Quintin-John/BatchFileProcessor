@@ -1,11 +1,12 @@
 # BatchFileProcessor
 
-A .NET 8 worker service that ingests large, sequential **fixed-width batch files** and publishes their
-records to upstream systems as confirmed messages. Parsing and field mapping are **entirely layout-driven**
-— swap the layout YAML and you have a new fixed-width format, with zero code changes. The engine is a
-generic **raw slicer**: it slices each field's bytes and ships them with their field name; it does not
-interpret values (types, scale, sign, dates are the consumer's concern), so it is domain-agnostic. An
-example layout is included at [`docs/layouts/g266-v4.8.yaml`](docs/layouts/g266-v4.8.yaml).
+A .NET 8 worker service that ingests large, sequential **batch files** — fixed-width or delimited (CSV, TSV,
+or any other separator) — and publishes their records to upstream systems as confirmed messages. Parsing and
+field mapping are **entirely layout-driven**: swap the layout YAML and you have a new format, with zero code
+changes. The engine is a generic **raw slicer**: it slices each field and ships it with its field name; it
+does not interpret values (types, scale, sign, dates are the consumer's concern), so it is domain-agnostic.
+Example layouts are included at [`docs/layouts/g266-v4.8.yaml`](docs/layouts/g266-v4.8.yaml) (fixed-width)
+and [`docs/layouts/force-update-balance-v1.0.yaml`](docs/layouts/force-update-balance-v1.0.yaml) (delimited).
 
 ## What it guarantees
 
@@ -40,7 +41,7 @@ example layout is included at [`docs/layouts/g266-v4.8.yaml`](docs/layouts/g266-
 flowchart LR
     A[Folder source<br/>incoming → processing] --> B[Completion guard<br/>stable-size]
     B --> C[SHA-256 pre-pass<br/>fix FileId]
-    C --> D[Stream framer<br/>fixed-width records]
+    C --> D[Stream framer<br/>fixed-width or delimited]
     D --> E[Raw slicer<br/>layout-driven]
     E -->|valid| F[Field protection<br/>encrypt per layout]
     E -->|invalid| G[Reject sink<br/>reject queue, confirmed]
@@ -83,17 +84,19 @@ Each `src` project has a matching mocked-unit-test project under `src/tests/`.
 
 | Layer | Owns | Example |
 |---|---|---|
-| **Layout YAML** | Parsing & mapping only (record types, fields, `encrypt`/`required`/`skip`) | [`docs/layouts/g266-v4.8.yaml`](docs/layouts/g266-v4.8.yaml) |
+| **Layout YAML** | Parsing & mapping only (record/row types, fields, delimiter, `encrypt`/`required`/`skip`) | [`g266-v4.8.yaml`](docs/layouts/g266-v4.8.yaml), [`force-update-balance-v1.0.yaml`](docs/layouts/force-update-balance-v1.0.yaml) |
 | **`profiles.yaml`** | Operational routing (folders → layout/format/completion/destinations/batch limits); one profile = one concurrent worker | [`docs/profiles.yaml`](docs/profiles.yaml) |
 | **`appsettings` / Helm / Key Vault** | Shared infra & **secrets** (broker + checkpoint connection strings, tuning, observability) | `src/Ingestion.Worker/appsettings.json` |
 
 Broker and checkpoint connection strings live in `appsettings`/Key Vault and **never** in `profiles.yaml`.
-Adding a folder/format is a `profiles.yaml` edit; a new fixed-width format is a layout YAML edit — both
-zero-code.
+Adding a folder is a `profiles.yaml` edit; a new format of either kind is a layout YAML edit — both
+zero-code. A delimited layout declares its own separator, so CSV, TSV, pipe- or any other separated file is
+configuration, not code: write the character literally, as a hex escape, or as the `tab`/`space` alias.
 
-**Currently supported:** fixed-length format, RabbitMQ transport, File/Redis checkpoint, stable-size
-completion. Delimited parsing and other transports (Kafka/Azure Service Bus) plug in at their existing
-seams when a concrete case arrives.
+**Currently supported:** `fixed-length` and `delimited` formats, RabbitMQ transport, File/Redis checkpoint,
+stable-size completion. RFC 4180 quoting is not implemented — a row that does not split into exactly the
+declared number of fields is rejected, so its absence can reject data but never mis-map it. Other transports
+(Kafka/Azure Service Bus) plug in at their existing seams when a concrete case arrives.
 
 ## Build, test, run
 

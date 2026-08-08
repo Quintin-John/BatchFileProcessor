@@ -12,11 +12,7 @@ namespace Ingestion.Worker.Profiles;
 /// </summary>
 internal static class ProfileLoader
 {
-    // Recognised YAML tokens and the model values they map to. Only tokens with a built implementation
-    // are listed, so an unknown token fails closed instead of silently defaulting.
-    private static readonly Dictionary<string, RecordFormat> FormatTokens =
-        new(StringComparer.OrdinalIgnoreCase) { ["fixed-length"] = RecordFormat.FixedLength };
-
+    // Format tokens come from the format registry, so this loader has no second list to keep in step with it.
     private static readonly Dictionary<string, CompletionMode> CompletionTokens =
         new(StringComparer.OrdinalIgnoreCase) { ["stable-size"] = CompletionMode.StableSize };
 
@@ -82,9 +78,11 @@ internal static class ProfileLoader
 
         var name = dto.Name ?? string.Empty;
 
-        if (dto.Format is null || !FormatTokens.TryGetValue(dto.Format, out var format))
+        var format = dto.Format is null ? null : RecordFormats.Resolve(dto.Format);
+        if (format is null)
         {
-            throw new FormatException($"Profile '{name}': unknown format '{dto.Format}'.");
+            throw new FormatException(
+                $"Profile '{name}': unknown format '{dto.Format}'; expected one of: {string.Join(", ", RecordFormats.Tokens)}.");
         }
 
         var completion = MapCompletion(name, dto.Completion);

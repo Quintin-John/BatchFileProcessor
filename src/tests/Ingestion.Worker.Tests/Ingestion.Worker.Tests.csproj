@@ -12,6 +12,16 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
+  <!-- Real production layouts, so format binding is proven to load the actual specs, not fixtures. -->
+  <ItemGroup>
+    <Content Include="..\..\..\docs\layouts\g266-v4.8.yaml" Link="Layouts\g266-v4.8.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\docs\layouts\force-update-balance-v1.0.yaml" Link="Layouts\force-update-balance-v1.0.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Ingestion.Worker\Ingestion.Worker.csproj" />
   </ItemGroup>

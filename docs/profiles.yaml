@@ -30,3 +30,21 @@ profiles:
     batch:
       maxRecords: 500
       maxContentBytes: 200000
+
+  - name: force-update-balance
+    incoming: /data/fub/incoming
+    processing: /data/fub/processing
+    done: /data/fub/done
+    failed: /data/fub/failed
+    # Tab-delimited; the separator itself is declared in the layout, not here.
+    layout: /config/force-update-balance-v1.0.yaml
+    format: delimited
+    completion:
+      mode: stable-size
+      quietSeconds: 5
+      pollSeconds: 5
+    destination: fub-batches
+    rejectDestination: fub-rejects
+    batch:
+      maxRecords: 500
+      maxContentBytes: 200000

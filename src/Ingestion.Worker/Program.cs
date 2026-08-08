@@ -35,8 +35,9 @@ var messaging = builder.Configuration.GetSection("Messaging");
 var profiles = ProfileLoader.LoadFromFile(RequiredConfig.Text(ingestion, "ProfilesPath"));
 
 // Load each profile's layout once, up front (fail-fast), and reuse it for pipeline wiring and log redaction.
+// The profile's format loads it, so a fixed-length profile cannot be handed a delimited layout or vice versa.
 var layoutsByProfile = profiles.Profiles.ToDictionary(
-    profile => profile.Name, profile => LayoutLoader.LoadFromFile(profile.LayoutPath), StringComparer.Ordinal);
+    profile => profile.Name, profile => profile.Format.LoadLayout(profile.LayoutPath), StringComparer.Ordinal);
 
 services.AddSingleton(TimeProvider.System);
 

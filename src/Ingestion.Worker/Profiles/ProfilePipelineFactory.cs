@@ -80,14 +80,14 @@ internal sealed class ProfilePipelineFactory
     /// <param name="profile">The profile to build for; required.</param>
     /// <param name="layout">The profile's loaded layout; required.</param>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    public FileIngestionPipeline Create(Profile profile, Layout layout)
+    public FileIngestionPipeline Create(Profile profile, ILayout layout)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(layout);
 
-        var encoding = Encoding.GetEncoding(layout.Encoding);
-        var reader = new StreamRecordReader(layout.RecordLength, layout.TerminatorLength, encoding);
-        var parser = CreateParser(profile.Format, layout);
+        // Reader and parser come from the profile's format as a pair, so framing and mapping cannot disagree
+        // about the file. Nothing here knows which format that is.
+        var (reader, parser) = profile.Format.CreateFraming(layout, Encoding.GetEncoding(layout.Encoding));
 
         // Field protection is derived from this profile's own layout, so each profile encrypts its own set.
         var fieldProtector = new DefaultFieldProtector(_crypto, _keys, LayoutProtectionPolicy.From(layout));
@@ -102,11 +102,4 @@ internal sealed class ProfilePipelineFactory
             reader, parser, protector, _publisher, rejectSink, _checkpointStore,
             _metrics, _lineage, _tracing, _heartbeat, options, profile.Routing.Batches);
     }
-
-    /// <summary>Selects the parser for a format; fail-closed on a format with no built parser.</summary>
-    internal static IRecordParser CreateParser(RecordFormat format, Layout layout) => format switch
-    {
-        RecordFormat.FixedLength => new FixedLengthRecordParser(layout),
-        _ => throw new InvalidOperationException($"No record parser is wired for format '{format}'."),
-    };
 }

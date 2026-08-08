@@ -30,7 +30,7 @@ public sealed class ProfileLoaderTests
         Assert.Equal("/data/g266/done", profile.Folders.Done);
         Assert.Equal("/data/g266/failed", profile.Folders.Failed);
         Assert.Equal("/config/g266-v4.8.yaml", profile.LayoutPath);
-        Assert.Equal(RecordFormat.FixedLength, profile.Format);
+        Assert.Equal("fixed-length", profile.Format.Token);
         Assert.Equal(CompletionMode.StableSize, profile.Completion.Mode);
         Assert.Equal(TimeSpan.FromSeconds(5), profile.Completion.QuietPeriod);
         Assert.Equal(TimeSpan.FromSeconds(2), profile.Completion.PollInterval);
@@ -92,8 +92,23 @@ public sealed class ProfileLoaderTests
         Assert.Throws<FormatException>(() => ProfileLoader.Load("profiles: {oops"));
 
     [Fact]
-    public void Load_UnknownFormat_Throws() =>
-        Assert.Throws<FormatException>(() => ProfileLoader.Load(ValidYaml.Replace("fixed-length", "delimited", StringComparison.Ordinal)));
+    public void Load_UnknownFormat_Throws()
+    {
+        var ex = Assert.Throws<FormatException>(
+            () => ProfileLoader.Load(ValidYaml.Replace("fixed-length", "punched-card", StringComparison.Ordinal)));
+
+        // The message lists what is registered, so a typo is diagnosable from the failure alone.
+        Assert.Contains("fixed-length", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("delimited", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_DelimitedFormat_IsAccepted()
+    {
+        var set = ProfileLoader.Load(ValidYaml.Replace("fixed-length", "delimited", StringComparison.Ordinal));
+
+        Assert.Equal("delimited", set.Profiles[0].Format.Token);
+    }
 
     [Fact]
     public void Load_UnknownCompletionMode_Throws() =>
