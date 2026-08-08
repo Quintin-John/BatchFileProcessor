@@ -501,8 +501,9 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
     private Task WriteAsync(string text) => File.WriteAllTextAsync(_file, text);
 
     private Task DispatchAsync(DelimitedLayout layout) =>
-        new PipelineIngestFileDispatcher(BuildPipeline(layout)).DispatchAsync(
-            new IngestFile("source", "source", _file, "run-1", "profile", layout.Version),
+        new PipelineIngestFileDispatcher(
+            new DelimitedFormat(), [new LayoutPipeline(layout, BuildPipeline(layout))]).DispatchAsync(
+            new IngestFile("source", "source", _file, "run-1", "profile"),
             CancellationToken.None);
 
     private FileIngestionPipeline BuildPipeline(DelimitedLayout layout)
@@ -550,24 +551,6 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         public Task ClearAsync(string sourceKey, CancellationToken cancellationToken)
         {
             _watermarks.Remove(sourceKey);
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class CapturingPublisher : IMessagePublisher
-    {
-        public List<IngestBatchMessage> Batches { get; } = [];
-        public List<RejectMessage> Rejects { get; } = [];
-
-        public Task PublishBatchAsync(IngestBatchMessage batch, string destination, CancellationToken cancellationToken)
-        {
-            Batches.Add(batch);
-            return Task.CompletedTask;
-        }
-
-        public Task PublishRejectAsync(RejectMessage reject, string destination, CancellationToken cancellationToken)
-        {
-            Rejects.Add(reject);
             return Task.CompletedTask;
         }
     }

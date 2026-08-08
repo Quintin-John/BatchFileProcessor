@@ -29,7 +29,7 @@ public sealed class ProfileLoaderTests
         Assert.Equal("/data/feed/processing", profile.Folders.Processing);
         Assert.Equal("/data/feed/done", profile.Folders.Done);
         Assert.Equal("/data/feed/failed", profile.Folders.Failed);
-        Assert.Equal("/config/layout.yaml", profile.LayoutPath);
+        Assert.Equal(["/config/layout.yaml"], profile.LayoutPaths);
         Assert.Equal("fixed-length", profile.Format.Token);
         Assert.Equal(CompletionMode.StableSize, profile.Completion.Mode);
         Assert.Equal(TimeSpan.FromSeconds(5), profile.Completion.QuietPeriod);

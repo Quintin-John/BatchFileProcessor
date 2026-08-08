@@ -3,12 +3,14 @@
 A .NET 8 worker service that ingests large, sequential **batch files** — fixed-width or delimited — and
 publishes their records to upstream systems as confirmed messages.
 
-The engine is a **generic raw slicer**. It reads a layout file and asks only four questions:
+The engine is a **generic raw slicer**. It reads the layouts a folder may receive and asks only five
+questions:
 
-1. How is this file framed — fixed-width records, or rows separated by a delimiter?
-2. What are the fields, and where does each one start?
-3. Can I slice each field out and hand back its text exactly as it appeared?
-4. Which fields does the layout say to encrypt, and which does it say to publish?
+1. Which of these layouts is this file — the one whose framing it is actually made of?
+2. How is it framed — fixed-width records, or rows separated by a delimiter?
+3. What are the fields, and where does each one start?
+4. Can I slice each field out and hand back its text exactly as it appeared?
+5. Which fields does the layout say to encrypt, and which does it say to publish?
 
 It answers nothing else. It does not know what any field *means*, does not interpret values (types, scale,
 sign, dates), and has no notion of any particular business domain. Every field name, every position, every
@@ -19,6 +21,10 @@ Layouts under [`docs/layouts/`](docs/layouts) are worked examples of the format,
 
 ## What it guarantees
 
+- **A file is read by the layout it belongs to, or by none.** A folder may receive several versions of a
+  format. Each file is matched to exactly one of the layouts its profile declares, using what those layouts
+  already say about their own framing — nothing extra is configured and no code knows the format. A file
+  matching none, or more than one, is quarantined rather than run through whichever was declared first.
 - **Nothing ships from a structurally broken file.** The whole file is framed in a first pass before a
   single record is published, so a wrong trailer marker, a short file, or a row the layout cannot classify
   stops the run with no partial publish behind it.
@@ -73,6 +79,18 @@ Layouts under [`docs/layouts/`](docs/layouts) are worked examples of the format,
   └─────────┬─────────┘
             │
             ▼
+  ┌──────────────────────────────────────────────────────────────────────────────────────┐
+  │ WHICH LAYOUT IS THIS FILE?   ask each layout the profile declares: could you frame it?│
+  │   · fixed-width answers from its own record length — is the file a whole number       │
+  │     of records?   (1200-byte records and 2400-byte records cannot both be right)      │
+  │   · exactly one must say yes                                                          │
+  └───────────────────┬──────────────────────────────────────┬───────────────────────────┘
+                      │ none, or more than one               │ exactly one
+                      ▼                                      │
+                  failed/                                    │  its version is what
+            (unattributable — never                          │  provenance will carry
+             guessed at, never read)                         │
+                                                             ▼
   ══════════════════════════════ PASS 1 — validate whole file ══════════════════════════════
   ┌──────────────────────────────────────────────────────────────────────────────────────┐
   │ stream the file → frame every record → classify every row → discard the content      │
@@ -151,6 +169,7 @@ Everything below is a YAML edit and never a code change.
 | | Fixed-width | Delimited |
 |---|---|---|
 | Framing | `recordLength`, `terminator` length | `delimiter`, `terminator` character |
+| Which file is which | record length: a file is a whole number of records | not yet distinguishable — a profile declares one delimited layout |
 | Separator | — | any text: a character, a hex escape (`\x1F`), several characters (`~\|~`), or the aliases `tab`/`space`/`lf`/`cr` |
 | Encoding | declared per layout (any the platform supplies, incl. code pages) | same |
 | Record/row types | identified by a discriminator at a byte position | header/trailer by position; body types by a marker column |
@@ -192,7 +211,7 @@ Each `src` project has a matching mocked-unit-test project under `src/tests/`.
 | Layer | Owns |
 |---|---|
 | **Layout YAML** | What a file *is*: framing, record/row types, fields, and the `encrypt`/`required`/`skip` flags |
-| **`profiles.yaml`** | Operational routing: folders → layout/format/completion/destinations/batch limits. One profile = one concurrent worker. See [`docs/profiles.yaml`](docs/profiles.yaml) |
+| **`profiles.yaml`** | Operational routing: folders → layouts/format/completion/destinations/batch limits. `layout` for one, `layouts` for several. One profile = one concurrent worker. See [`docs/profiles.yaml`](docs/profiles.yaml) |
 | **`appsettings` / Helm / Key Vault** | Shared infra & **secrets**: broker + checkpoint connection strings, tuning, observability |
 
 Broker and checkpoint connection strings live in `appsettings`/Key Vault and **never** in `profiles.yaml`.

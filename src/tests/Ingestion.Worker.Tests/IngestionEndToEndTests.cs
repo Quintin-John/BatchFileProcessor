@@ -3,6 +3,7 @@ using System.Text;
 using Common.FileIngestion.Checkpointing;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Lineage;
+using Common.FileIngestion.Layouts;
 using Common.FileIngestion.Parsing;
 using Common.FileIngestion.Pipeline;
 using Common.FileIngestion.Protection;
@@ -13,6 +14,7 @@ using Common.Observability;
 using Common.Security.DataProtection;
 using Common.Messaging.Contracts;
 using Ingestion.Worker.Messages;
+using Ingestion.Worker.Profiles;
 
 namespace Ingestion.Worker.Tests;
 
@@ -31,10 +33,10 @@ public sealed class IngestionEndToEndTests : IDisposable
     public async Task Dispatch_IngestFile_RunsPipeline_PublishesBatchesAndRejects()
     {
         await File.WriteAllTextAsync(_file, FileText);
-        var dispatcher = new PipelineIngestFileDispatcher(BuildPipeline());
+        var dispatcher = Dispatcher();
 
         await dispatcher.DispatchAsync(
-            new IngestFile("e2e.dat", "e2e.dat", _file, "run-1", "feed-a", "1.0"), CancellationToken.None);
+            new IngestFile("e2e.dat", "e2e.dat", _file, "run-1", "feed-a"), CancellationToken.None);
 
         Assert.NotEmpty(_publisher.Batches);
         Assert.IsType<EncryptedFieldValue>(Assert.Single(_publisher.Rejects).RawRecord);
@@ -43,16 +45,35 @@ public sealed class IngestionEndToEndTests : IDisposable
     }
 
     [Fact]
-    public void Constructor_NullPipeline_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new PipelineIngestFileDispatcher(null!));
+    public void Constructor_NullArgument_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => new PipelineIngestFileDispatcher(null!, [new LayoutPipeline(Layout(), BuildPipeline())]));
+        Assert.Throws<ArgumentNullException>(() => new PipelineIngestFileDispatcher(new FixedLengthFormat(), null!));
+    }
+
+    [Fact]
+    public void Constructor_NoLayouts_Throws() =>
+        Assert.Throws<ArgumentException>(() => new PipelineIngestFileDispatcher(new FixedLengthFormat(), []));
 
     [Fact]
     public async Task DispatchAsync_NullCommand_Throws()
     {
-        var dispatcher = new PipelineIngestFileDispatcher(BuildPipeline());
+        var dispatcher = Dispatcher();
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => dispatcher.DispatchAsync(null!, CancellationToken.None));
     }
+
+    // The fixture frames 8-byte records with a 1-byte terminator; the layout says so, and the dispatcher
+    // reads its version for provenance.
+    private static Layout Layout(string version = "1.0", int recordLength = 8) =>
+        new(version, recordLength, "ascii", 1, 1, 4, new[]
+        {
+            new RecordDefinition("r", "DATA", new[] { new FieldDefinition("f", 1, recordLength) }),
+        });
+
+    private PipelineIngestFileDispatcher Dispatcher() =>
+        new(new FixedLengthFormat(), [new LayoutPipeline(Layout(), BuildPipeline())]);
 
     private FileIngestionPipeline BuildPipeline()
     {
@@ -102,43 +123,5 @@ public sealed class IngestionEndToEndTests : IDisposable
             new(new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn"));
 
         public string Unprotect(FieldProtectionContext context, EncryptedFieldValue payload) => payload.Value.Ciphertext;
-    }
-
-    private sealed class CapturingPublisher : IMessagePublisher
-    {
-        public List<IngestBatchMessage> Batches { get; } = [];
-        public List<RejectMessage> Rejects { get; } = [];
-
-        public Task PublishBatchAsync(IngestBatchMessage batch, string destination, CancellationToken cancellationToken)
-        {
-            Batches.Add(batch);
-            return Task.CompletedTask;
-        }
-
-        public Task PublishRejectAsync(RejectMessage reject, string destination, CancellationToken cancellationToken)
-        {
-            Rejects.Add(reject);
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class InMemoryCheckpointStore : ICheckpointStore
-    {
-        private readonly Dictionary<string, Watermark> _watermarks = new(StringComparer.Ordinal);
-
-        public Task<Watermark?> LoadAsync(string sourceKey, CancellationToken cancellationToken) =>
-            Task.FromResult(_watermarks.GetValueOrDefault(sourceKey));
-
-        public Task SaveAsync(Watermark watermark, CancellationToken cancellationToken)
-        {
-            _watermarks[watermark.SourceKey] = watermark;
-            return Task.CompletedTask;
-        }
-
-        public Task ClearAsync(string sourceKey, CancellationToken cancellationToken)
-        {
-            _watermarks.Remove(sourceKey);
-            return Task.CompletedTask;
-        }
     }
 }

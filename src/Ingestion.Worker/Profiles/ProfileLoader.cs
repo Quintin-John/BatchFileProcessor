@@ -5,7 +5,7 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace Ingestion.Worker.Profiles;
 
 /// <summary>
-/// Loads the operational routing profiles from soft-coded YAML (folders → layout/format/completion/
+/// Loads the operational routing profiles from soft-coded YAML (folders → layouts/format/completion/
 /// destinations). Generic and fail-closed: malformed YAML, an unknown format/completion token, or any
 /// invariant violation is rejected. Parsing/mapping of records is not here — that stays in each profile's
 /// own layout; this only routes.
@@ -103,12 +103,44 @@ internal static class ProfileLoader
             var routing = new RoutingTargets(dto.Destination ?? string.Empty, dto.RejectDestination ?? string.Empty);
             var batch = new BatchLimits(dto.Batch.MaxRecords, dto.Batch.MaxContentBytes);
 
-            return new Profile(name, folders, dto.Layout ?? string.Empty, format, completion, routing, batch);
+            return new Profile(name, folders, MapLayouts(name, dto), format, completion, routing, batch);
         }
         catch (ArgumentException ex)
         {
             throw new FormatException($"Profile '{name}': {ex.Message}", ex);
         }
+    }
+
+    // A profile names the layouts a file in its folder might match. One folder can receive more than one
+    // version of a format, so 'layout' declares the single case and 'layouts' the several — each shape has
+    // exactly one spelling, so a profile cannot be read two ways.
+    private static List<string> MapLayouts(string name, ProfileDto dto)
+    {
+        if (dto.Layout is not null && dto.Layouts is not null)
+        {
+            throw new FormatException(
+                $"Profile '{name}': declares both 'layout' and 'layouts'; use 'layout' for one or 'layouts' for several.");
+        }
+
+        if (dto.Layout is not null)
+        {
+            return [dto.Layout];
+        }
+
+        if (dto.Layouts is null)
+        {
+            throw new FormatException(
+                $"Profile '{name}': a layout is required — 'layout' for one, 'layouts' for several.");
+        }
+
+        // A single-entry list would be a second way to say what 'layout' already says.
+        if (dto.Layouts.Count < 2)
+        {
+            throw new FormatException(
+                $"Profile '{name}': 'layouts' declares {dto.Layouts.Count}; use 'layout' when there is only one.");
+        }
+
+        return dto.Layouts;
     }
 
     private static CompletionSettings MapCompletion(string profileName, CompletionDto? dto)
@@ -153,6 +185,8 @@ internal static class ProfileLoader
         public string? Failed { get; set; }
 
         public string? Layout { get; set; }
+
+        public List<string>? Layouts { get; set; }
 
         public string? Format { get; set; }
 

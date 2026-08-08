@@ -21,7 +21,7 @@ public sealed class ProfilePipelineFactoryTests
     private static Profile Profile() => new(
         "feed-a",
         new ProfileFolders("/in", "/proc", "/done", "/failed"),
-        "/cfg.yaml",
+        ["/cfg.yaml"],
         new FixedLengthFormat(),
         new CompletionSettings(CompletionMode.StableSize, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(2)),
         new RoutingTargets("batches", "rejects"),

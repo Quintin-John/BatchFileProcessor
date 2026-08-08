@@ -11,7 +11,7 @@ namespace Ingestion.Worker.Tests;
 
 public sealed class FolderIngestionWorkerTests
 {
-    private static WorkerOptions Options() => new("feed-a", "1.0", TimeSpan.FromMilliseconds(10));
+    private static WorkerOptions Options() => new("feed-a", TimeSpan.FromMilliseconds(10));
 
     private static FolderIngestionWorker Worker(
         IFileSource source, FakeDispatcher dispatcher, ReadinessGate gate, TimeProvider? clock = null) =>

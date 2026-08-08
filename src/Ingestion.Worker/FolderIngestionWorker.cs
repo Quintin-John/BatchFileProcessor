@@ -96,8 +96,7 @@ internal sealed partial class FolderIngestionWorker : BackgroundService
                 file.Name,
                 file.ProcessingPath,
                 run.CorrelationId,
-                _options.ProfileId,
-                _options.LayoutVersion);
+                _options.ProfileId);
 
             await _dispatcher.DispatchAsync(command, cancellationToken).ConfigureAwait(false);
             _source.Complete(file);
