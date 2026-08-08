@@ -6,7 +6,6 @@ using Common.FileIngestion.Batching;
 using Common.FileIngestion.Health;
 using Common.FileIngestion.Lineage;
 using Common.FileIngestion.Protection;
-using Common.FileIngestion.Reading;
 using Common.FileIngestion.Rejecting;
 using Common.FileIngestion.Telemetry;
 using Common.Messaging.Contracts;
@@ -14,12 +13,14 @@ using Common.Messaging.Contracts;
 namespace Common.FileIngestion.Pipeline;
 
 /// <summary>
-/// Ingests one file end to end: hash → resume → stream-parse → protect → batch → confirmed publish →
-/// advance watermark, quarantining unparseable records. Ordering guarantees: the FileId is fixed by a
-/// pre-read hash pass so every message carries the same identity; the read pass recomputes it as an
-/// integrity guard; the watermark is only ever advanced <em>after</em> a batch is broker-confirmed
-/// (never ahead of durable delivery); and any publish/checkpoint failure faults the run (fail-closed)
-/// leaving the watermark to resume the contiguous confirmed prefix. Not thread-safe per call.
+/// Ingests one file end to end: validate → resume → stream-parse → protect → batch → confirmed publish →
+/// advance watermark, quarantining unparseable records. Ordering guarantees: a first pass frames the whole
+/// file into a discarding sink, which both fixes the FileId every message carries and forces every
+/// structural fault to surface <em>before</em> a single record is published, so a file the engine rejects
+/// never partly ships; the read pass recomputes the FileId as an integrity guard; the watermark is only ever
+/// advanced <em>after</em> a batch is broker-confirmed (never ahead of durable delivery); and any
+/// publish/checkpoint failure faults the run (fail-closed) leaving the watermark to resume the contiguous
+/// confirmed prefix. Not thread-safe per call.
 /// </summary>
 public sealed class FileIngestionPipeline
 {
@@ -228,11 +229,24 @@ public sealed class FileIngestionPipeline
         return cancellation;
     }
 
-    private static async Task<string> ComputeFileIdAsync(IngestRequest request, CancellationToken cancellationToken)
+    // The identity pass, which is also the structural one. Framing the whole file into a sink that discards
+    // every record does two jobs at once: it fixes the FileId, and because it runs exactly the framing the
+    // read pass runs, every structural fault the layout can raise — a trailer that fails its declared marker,
+    // fewer rows than the header and trailer require, a final record cut short — surfaces here, before a
+    // single record has been published. A file the engine is going to reject must never partly ship.
+    //
+    // The cost is one extra framing pass over a file that was already being read end to end for its hash.
+    // Faults that are genuinely unknowable up front — a broker failure part way through, or the file being
+    // rewritten between the two passes — can still publish before they surface; that is inherent to
+    // publishing incrementally and is what the resume watermark exists to recover from.
+    private async Task<string> ComputeFileIdAsync(IngestRequest request, CancellationToken cancellationToken)
     {
         await using var stream = request.OpenStream();
-        return await FileIdHasher.ComputeAsync(stream, cancellationToken).ConfigureAwait(false);
+        return await _reader.ReadAsync(stream, DiscardRecord, cancellationToken).ConfigureAwait(false);
     }
+
+    private static ValueTask DiscardRecord(FramedRecord framed, CancellationToken cancellationToken) =>
+        ValueTask.CompletedTask;
 
     private async Task<FileRun> BeginRunAsync(IngestRequest request, string fileId, CancellationToken cancellationToken)
     {

@@ -208,7 +208,7 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
     }
 
     [Fact]
-    public async Task TrailerCarryingTheWrongMarker_FailsClosed()
+    public async Task TrailerCarryingTheWrongMarker_FailsClosed_AndPublishesNothing()
     {
         var layout = Layout();
         var text = string.Join('\n', HeaderRow(layout), DataRow(layout), TrailerRow(layout, marker: "NOT-" + TrailerMarker)) + "\n";
@@ -217,20 +217,55 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         var ex = await Assert.ThrowsAsync<InvalidDataException>(() => DispatchAsync(layout));
         Assert.Contains(TrailerMarker, ex.Message, StringComparison.Ordinal);
 
-        // KNOWN OPEN DEFECT, pinned deliberately rather than asserted as correct: rows released before the
-        // marker check are already published when it throws, so a file reported as rejected has partly
-        // shipped. Assert.Empty here would fail today. Fixing it makes this line change, which is the point.
-        Assert.NotEmpty(_publisher.Batches);
+        AssertNothingShipped();
     }
 
     [Fact]
-    public async Task TruncatedFile_WhoseLastRowIsNotTheTrailer_FailsClosed()
+    public async Task TruncatedFile_WhoseLastRowIsNotTheTrailer_FailsClosed_AndPublishesNothing()
     {
         // Without the declared marker the final data row would pass as the trailer and be silently dropped.
         var layout = Layout();
         await WriteAsync(string.Join('\n', HeaderRow(layout), DataRow(layout), DataRow(layout)) + "\n");
 
         await Assert.ThrowsAsync<InvalidDataException>(() => DispatchAsync(layout));
+
+        AssertNothingShipped();
+    }
+
+    [Fact]
+    public async Task FileHoldingFewerRowsThanItsLayoutRequires_FailsClosed_AndPublishesNothing()
+    {
+        // The layout declares a header row and a trailer row, so a one-row file cannot satisfy it.
+        var layout = Layout();
+        await WriteAsync(HeaderRow(layout) + "\n");
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => DispatchAsync(layout));
+
+        AssertNothingShipped();
+    }
+
+    [Fact]
+    public async Task AStructuralFault_AfterManyGoodRows_StillPublishesNothing()
+    {
+        // The fault is at the end of the file and every row before it parses cleanly, so an implementation
+        // that only discovered the problem while emitting would already have shipped all of them.
+        var layout = Layout();
+        var rows = Enumerable.Range(0, 50).Select(_ => DataRow(layout)).ToArray();
+        var text = string.Join('\n', rows.Prepend(HeaderRow(layout)).Append(TrailerRow(layout, marker: "WRONG"))) + "\n";
+        await WriteAsync(text);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => DispatchAsync(layout));
+
+        AssertNothingShipped();
+    }
+
+    // A file the engine rejects must leave no trace downstream: no batch, no reject, and no watermark that
+    // would let a resumed run believe part of it had been confirmed.
+    private void AssertNothingShipped()
+    {
+        Assert.Empty(_publisher.Batches);
+        Assert.Empty(_publisher.Rejects);
+        Assert.Empty(_checkpoints.Saved);
     }
 
     [Fact]

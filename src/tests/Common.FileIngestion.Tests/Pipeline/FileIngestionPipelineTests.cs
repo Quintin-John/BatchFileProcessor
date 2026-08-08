@@ -121,6 +121,23 @@ public sealed class FileIngestionPipelineTests
     }
 
     [Fact]
+    public async Task StructurallyInvalidFile_FailsClosed_AndPublishesNothing()
+    {
+        // A file whose last record is cut short is malformed as a whole, not one bad record. The fault must
+        // surface before anything ships: the structural pass frames the file to completion before the read
+        // pass emits, so a file the engine rejects leaves no batch, no reject and no watermark behind.
+        var harness = new Harness();
+        var bytes = Bytes(FileText + "TRUNC"); // trailing bytes shorter than a whole record
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => harness.Build(maxRecords: 1)
+            .IngestAsync(Request(() => new MemoryStream(bytes)), CancellationToken.None));
+
+        Assert.Empty(harness.Publisher.Batches);
+        Assert.Empty(harness.Publisher.Rejects);
+        Assert.Empty(harness.Checkpoints.Saved);
+    }
+
+    [Fact]
     public void Constructor_NullReader_Throws()
     {
         // The reader is now injected as an abstraction; a missing one must fail at composition, not at the
