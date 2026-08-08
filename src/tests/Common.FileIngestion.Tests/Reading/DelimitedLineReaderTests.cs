@@ -19,7 +19,7 @@ public sealed class DelimitedLineReaderTests
     private static DelimitedFieldDefinition[] Fields(int count) =>
         Enumerable.Range(0, count).Select(i => new DelimitedFieldDefinition($"f{i}", i)).ToArray();
 
-    private static DelimitedLayout Layout(int headerRows = 0, int trailerRows = 0)
+    private static DelimitedLayout Layout(int headerRows = 0, int trailerRows = 0, char terminator = '\n')
     {
         var rows = new List<DelimitedRowDefinition>();
         if (headerRows > 0)
@@ -34,11 +34,11 @@ public sealed class DelimitedLineReaderTests
             rows.Add(new DelimitedRowDefinition(TrailerName, RowRole.Trailer, trailerRows, [], skip: true));
         }
 
-        return new DelimitedLayout(Version, Delimiter, EncodingName, rows);
+        return new DelimitedLayout(Version, Delimiter, terminator, EncodingName, rows);
     }
 
-    private static DelimitedLineReader Reader(int headerRows = 0, int trailerRows = 0) =>
-        new(Layout(headerRows, trailerRows), Encoding.ASCII);
+    private static DelimitedLineReader Reader(int headerRows = 0, int trailerRows = 0, char terminator = '\n') =>
+        new(Layout(headerRows, trailerRows, terminator), Encoding.ASCII);
 
     private static async Task<(List<FramedRecord> Records, string FileId)> ReadAsync(
         DelimitedLineReader reader, byte[] data, Stream? stream = null)
@@ -146,6 +146,36 @@ public sealed class DelimitedLineReaderTests
         Assert.Equal(Convert.ToHexString(SHA256.HashData([])), fileId);
     }
 
+    [Theory]
+    [InlineData('\r')]        // CR-only line endings
+    [InlineData((char)0x1E)]  // ASCII record separator
+    [InlineData('~')]         // an ordinary printable character, if that is what the feed uses
+    public async Task Frames_OnWhateverTerminatorTheLayoutDeclares(char terminator)
+    {
+        // Row framing is layout data, not an assumption. A feed that does not end rows with LF is as valid
+        // as one that does, and must not need a code change.
+        var data = Bytes(string.Join(terminator, "a,1", "bb,22", "ccc,333") + terminator);
+
+        var (records, fileId) = await ReadAsync(Reader(terminator: terminator), data);
+
+        Assert.Equal(["a,1", "bb,22", "ccc,333"], records.Select(r => r.Content));
+        AssertExtentsTile(records, data);
+        Assert.Equal(Convert.ToHexString(SHA256.HashData(data)), fileId);
+    }
+
+    [Fact]
+    public async Task WhenTheTerminatorIsNotLineFeed_ACarriageReturnIsData_NotPartOfTheEnding()
+    {
+        // CR is only half of a line ending when the ending is LF. Under any other terminator it is content,
+        // and stripping it would silently corrupt the first field.
+        var data = Bytes("a\r,1~b,2~");
+
+        var (records, _) = await ReadAsync(Reader(terminator: '~'), data);
+
+        Assert.Equal(["a\r,1", "b,2"], records.Select(r => r.Content));
+        AssertExtentsTile(records, data);
+    }
+
     // ---------- positional classification ----------
 
     [Fact]
@@ -234,7 +264,7 @@ public sealed class DelimitedLineReaderTests
     // ---------- verified classification ----------
 
     private static DelimitedLineReader ReaderWithFooterMatch(int markerIndex, string marker) =>
-        new(new DelimitedLayout(Version, Delimiter, EncodingName, new[]
+        new(new DelimitedLayout(Version, Delimiter, '\n', EncodingName, new[]
         {
             new DelimitedRowDefinition(DataName, RowRole.Data, 0, Fields(2)),
             new DelimitedRowDefinition(

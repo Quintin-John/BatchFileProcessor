@@ -46,6 +46,7 @@ public static class DelimitedLayoutLoader
         }
 
         var delimiter = ResolveDelimiter(dto.Delimiter);
+        var rowTerminator = ResolveRowTerminator(dto.Terminator);
 
         var rowTypes = new List<DelimitedRowDefinition>(dto.RowTypes.Count);
         foreach (var pair in dto.RowTypes)
@@ -55,7 +56,8 @@ public static class DelimitedLayoutLoader
 
         try
         {
-            return new DelimitedLayout(dto.Version ?? string.Empty, delimiter, dto.Encoding ?? string.Empty, rowTypes);
+            return new DelimitedLayout(
+                dto.Version ?? string.Empty, delimiter, rowTerminator, dto.Encoding ?? string.Empty, rowTypes);
         }
         catch (ArgumentException ex)
         {
@@ -69,6 +71,25 @@ public static class DelimitedLayoutLoader
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         return Load(File.ReadAllText(path));
+    }
+
+    // Absent means LF: the overwhelmingly common line ending, and the one a layout that says nothing about
+    // framing is describing. Declaring it explicitly is always allowed and never assumed.
+    private static char ResolveRowTerminator(string? token)
+    {
+        if (token is null)
+        {
+            return '\n';
+        }
+
+        try
+        {
+            return DelimiterToken.ResolveRowTerminator(token);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new FormatException($"Invalid row terminator: {ex.Message}", ex);
+        }
     }
 
     private static char ResolveDelimiter(string? token)
@@ -179,6 +200,9 @@ public static class DelimitedLayoutLoader
         public string? Version { get; set; }
 
         public string? Delimiter { get; set; }
+
+        // Absent means LF; see ResolveRowTerminator.
+        public string? Terminator { get; set; }
 
         public string? Encoding { get; set; }
 

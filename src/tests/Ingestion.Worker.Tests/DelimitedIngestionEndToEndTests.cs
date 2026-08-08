@@ -50,7 +50,7 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
     // ---------- the layout under test ----------
 
     private static DelimitedLayout Layout(char delimiter = ',', bool withTrailerMarker = true) =>
-        new("1.0", delimiter, "ascii", new[]
+        new("1.0", delimiter, '\n', "ascii", new[]
         {
             new DelimitedRowDefinition(HeaderRowType, RowRole.Header, 1, [], skip: true),
             new DelimitedRowDefinition(DataRowType, RowRole.Data, 0, new[]

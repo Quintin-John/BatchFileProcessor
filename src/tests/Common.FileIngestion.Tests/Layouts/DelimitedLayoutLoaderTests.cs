@@ -115,6 +115,53 @@ public sealed class DelimitedLayoutLoaderTests
         Assert.Equal(expected, DelimitedLayoutLoader.Load(yaml).Delimiter);
     }
 
+    [Theory]
+    [InlineData("cr", '\r')]
+    [InlineData("lf", '\n')]
+    [InlineData("\"\\\\x1E\"", (char)0x1E)]  // ASCII record separator
+    [InlineData("\"~\"", '~')]
+    public void Load_AnyRowTerminator_IsAcceptedWithoutCodeChange(string token, char expected)
+    {
+        var yaml = $$"""
+            version: "1.0"
+            delimiter: "|"
+            terminator: {{token}}
+            encoding: ascii
+            rowTypes:
+              data:
+                role: data
+                fields:
+                  - { name: a, index: 0 }
+            """;
+
+        Assert.Equal(expected, DelimitedLayoutLoader.Load(yaml).RowTerminator);
+    }
+
+    [Fact]
+    public void Load_WithoutATerminator_DefaultsToLineFeed()
+    {
+        // Absent means the ordinary line ending; declaring it is always allowed and never required.
+        Assert.Equal('\n', DelimitedLayoutLoader.Load(MinimalYaml).RowTerminator);
+    }
+
+    [Fact]
+    public void Load_TerminatorEqualToTheDelimiter_Throws()
+    {
+        // A row could not be told from a field boundary inside it.
+        var yaml = MinimalYaml.Replace("encoding: ascii", "terminator: \",\"\nencoding: ascii", StringComparison.Ordinal);
+
+        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+    }
+
+    [Fact]
+    public void Load_UnresolvableTerminator_Throws()
+    {
+        var yaml = MinimalYaml.Replace("encoding: ascii", "terminator: newline\nencoding: ascii", StringComparison.Ordinal);
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("row terminator", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void Load_RoleIsCaseInsensitive()
     {

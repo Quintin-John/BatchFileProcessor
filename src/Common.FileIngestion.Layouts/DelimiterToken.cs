@@ -20,6 +20,7 @@ public static class DelimiterToken
     private const string UnicodeEscapePrefix = @"\u";
     private const string HexEscapePrefix = @"\x";
     private const int MaxHexDigits = 4;
+    private const char MaxSingleByteCharacter = (char)0xFF;
 
     // Interchangeable spellings of the same hex escape; a new spelling is an entry here, not new logic.
     private static readonly string[] HexPrefixes = [UnicodeEscapePrefix, HexEscapePrefix];
@@ -27,7 +28,13 @@ public static class DelimiterToken
     // Only the separators that cannot be seen when reviewing a layout by eye. Every other character is
     // written literally or as a hex escape, so this table never needs to grow to support a new delimiter.
     private static readonly Dictionary<string, char> InvisibleAliases =
-        new(StringComparer.OrdinalIgnoreCase) { ["tab"] = '\t', ["space"] = ' ' };
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["tab"] = '\t',
+            ["space"] = ' ',
+            ["lf"] = '\n',
+            ["cr"] = '\r',
+        };
 
     private static readonly Dictionary<string, char> SimpleEscapes =
         new(StringComparer.Ordinal)
@@ -37,22 +44,12 @@ public static class DelimiterToken
             [@"\0"] = '\0',
         };
 
-    /// <summary>Resolves a declared delimiter token to its character.</summary>
+    /// <summary>Resolves a declared field-delimiter token to its character.</summary>
     /// <param name="token">The token as written in the layout; required, non-empty.</param>
     /// <exception cref="ArgumentException"><paramref name="token"/> is null or empty, does not resolve to exactly one character, or resolves to CR or LF.</exception>
     public static char Resolve(string token)
     {
-        // Not ThrowIfNullOrWhiteSpace: a literal space is a legitimate delimiter.
-        if (string.IsNullOrEmpty(token))
-        {
-            throw new ArgumentException("A delimiter must be declared.", nameof(token));
-        }
-
-        var resolved = ResolveCore(token)
-            ?? throw new ArgumentException(
-                $"Unrecognised delimiter '{token}'. Write the character literally, as a hex escape " +
-                $"({HexEscapePrefix}1F), or as one of: {string.Join(", ", InvisibleAliases.Keys)}.",
-                nameof(token));
+        var resolved = ResolveOrThrow(token, "delimiter");
 
         // A delimiter that is also a row terminator would make field splitting and row framing disagree.
         if (resolved is '\r' or '\n')
@@ -62,6 +59,42 @@ public static class DelimiterToken
         }
 
         return resolved;
+    }
+
+    /// <summary>
+    /// Resolves a declared row-terminator token to its character. Unlike a delimiter this may be a line
+    /// terminator — that is its usual value — but it must be a single byte in the layout's encoding, because
+    /// rows are framed by scanning bytes before anything is decoded.
+    /// </summary>
+    /// <param name="token">The token as written in the layout; required, non-empty.</param>
+    /// <exception cref="ArgumentException"><paramref name="token"/> is null or empty, does not resolve to exactly one character, or resolves outside the single-byte range.</exception>
+    public static char ResolveRowTerminator(string token)
+    {
+        var resolved = ResolveOrThrow(token, "row terminator");
+
+        if (resolved > MaxSingleByteCharacter)
+        {
+            throw new ArgumentException(
+                $"Row terminator '{token}' is not a single byte; rows are framed on bytes before decoding.",
+                nameof(token));
+        }
+
+        return resolved;
+    }
+
+    private static char ResolveOrThrow(string token, string role)
+    {
+        // Not ThrowIfNullOrWhiteSpace: a literal space is a legitimate separator.
+        if (string.IsNullOrEmpty(token))
+        {
+            throw new ArgumentException($"A {role} must be declared.", nameof(token));
+        }
+
+        return ResolveCore(token)
+            ?? throw new ArgumentException(
+                $"Unrecognised {role} '{token}'. Write the character literally, as a hex escape " +
+                $"({HexEscapePrefix}1F), or as one of: {string.Join(", ", InvisibleAliases.Keys)}.",
+                nameof(token));
     }
 
     private static char? ResolveCore(string token)

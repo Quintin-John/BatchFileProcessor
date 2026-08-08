@@ -14,7 +14,7 @@ public sealed class DelimitedRecordParserTests
     private const string DataName = "body";
 
     // Three fields; 'acct' is encrypted + required, 'pad' is skipped. A skipped header type sits alongside.
-    private static DelimitedLayout Layout(char delimiter = Comma) => new(Version, delimiter, EncodingName, new[]
+    private static DelimitedLayout Layout(char delimiter = Comma) => new(Version, delimiter, '\n', EncodingName, new[]
     {
         new DelimitedRowDefinition(HeaderName, RowRole.Header, 1, [], skip: true),
         new DelimitedRowDefinition(DataName, RowRole.Data, 0, new[]
@@ -111,7 +111,7 @@ public sealed class DelimitedRecordParserTests
     {
         // A trailer carrying a control total is emitted, not discarded — the layout decides, not the parser.
         const string trailerName = "foot";
-        var layout = new DelimitedLayout(Version, Comma, EncodingName, new[]
+        var layout = new DelimitedLayout(Version, Comma, '\n', EncodingName, new[]
         {
             new DelimitedRowDefinition(DataName, RowRole.Data, 0, [new DelimitedFieldDefinition("a", 0)]),
             new DelimitedRowDefinition(trailerName, RowRole.Trailer, 1, new[]

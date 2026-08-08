@@ -7,6 +7,7 @@ public sealed class DelimitedLayoutTests
     private const string Version = "1.0";
     private const string Encoding = "ascii";
     private const char Tab = '\t';
+    private const char Terminator = '\n';
 
     private static DelimitedFieldDefinition Field(string name, int index) => new(name, index);
 
@@ -23,7 +24,7 @@ public sealed class DelimitedLayoutTests
         new("trailer", RowRole.Trailer, rows, skip ? [] : Fields(2), skip);
 
     private static DelimitedLayout Layout(params DelimitedRowDefinition[] rows) =>
-        new(Version, Tab, Encoding, rows.Length == 0 ? [Data()] : rows);
+        new(Version, Tab, Terminator, Encoding, rows.Length == 0 ? [Data()] : rows);
 
     // ---------- construction ----------
 
@@ -70,7 +71,7 @@ public sealed class DelimitedLayoutTests
     [InlineData("  ")]
     public void Constructor_BlankVersion_Throws(string? version)
     {
-        Assert.ThrowsAny<ArgumentException>(() => new DelimitedLayout(version!, Tab, Encoding, [Data()]));
+        Assert.ThrowsAny<ArgumentException>(() => new DelimitedLayout(version!, Tab, '\n', Encoding, [Data()]));
     }
 
     [Theory]
@@ -79,7 +80,7 @@ public sealed class DelimitedLayoutTests
     [InlineData("  ")]
     public void Constructor_BlankEncoding_Throws(string? encoding)
     {
-        Assert.ThrowsAny<ArgumentException>(() => new DelimitedLayout(Version, Tab, encoding!, [Data()]));
+        Assert.ThrowsAny<ArgumentException>(() => new DelimitedLayout(Version, Tab, '\n', encoding!, [Data()]));
     }
 
     [Theory]
@@ -87,33 +88,33 @@ public sealed class DelimitedLayoutTests
     [InlineData('\n')]
     public void Constructor_LineTerminatorDelimiter_Throws(char delimiter)
     {
-        Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, delimiter, Encoding, [Data()]));
+        Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, delimiter, '\n', Encoding, [Data()]));
     }
 
     [Fact]
     public void Constructor_NullRowTypes_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DelimitedLayout(Version, Tab, Encoding, null!));
+        Assert.Throws<ArgumentNullException>(() => new DelimitedLayout(Version, Tab, '\n', Encoding, null!));
     }
 
     [Fact]
     public void Constructor_EmptyRowTypes_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, Encoding, []));
+        Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, '\n', Encoding, []));
     }
 
     [Fact]
     public void Constructor_NullRowTypeElement_Throws()
     {
         Assert.Throws<ArgumentNullException>(
-            () => new DelimitedLayout(Version, Tab, Encoding, new DelimitedRowDefinition[] { null! }));
+            () => new DelimitedLayout(Version, Tab, '\n', Encoding, new DelimitedRowDefinition[] { null! }));
     }
 
     [Fact]
     public void Constructor_WithoutDataRole_Throws()
     {
         // A layout with no body would emit nothing; that is a mis-transcription, not a valid file shape.
-        var ex = Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, Encoding, [Header()]));
+        var ex = Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, '\n', Encoding, [Header()]));
         Assert.Contains("role 'data'", ex.Message, StringComparison.Ordinal);
     }
 
@@ -131,7 +132,7 @@ public sealed class DelimitedLayoutTests
             ? new[] { First(), Second() }
             : [First(), Second(), Data()];
 
-        var ex = Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, Encoding, rows));
+        var ex = Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, '\n', Encoding, rows));
         Assert.Contains("ambiguous", ex.Message, StringComparison.Ordinal);
     }
 
@@ -144,7 +145,7 @@ public sealed class DelimitedLayoutTests
             new DelimitedRowDefinition("same", RowRole.Data, 0, Fields(2)),
         };
 
-        var ex = Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, Encoding, rows));
+        var ex = Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, '\n', Encoding, rows));
         Assert.Contains("Duplicate row type name", ex.Message, StringComparison.Ordinal);
     }
 
@@ -152,7 +153,7 @@ public sealed class DelimitedLayoutTests
     public void RowTypes_AreDefensivelyCopied()
     {
         var source = new List<DelimitedRowDefinition> { Data() };
-        var layout = new DelimitedLayout(Version, Tab, Encoding, source);
+        var layout = new DelimitedLayout(Version, Tab, '\n', Encoding, source);
 
         source.Add(Header());
 

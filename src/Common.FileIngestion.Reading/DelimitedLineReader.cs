@@ -25,6 +25,8 @@ public sealed class DelimitedLineReader : IRecordReader
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
 
+    private readonly byte _rowTerminator;
+
     private readonly DelimitedLayout _layout;
     private readonly Encoding _encoding;
 
@@ -51,6 +53,7 @@ public sealed class DelimitedLineReader : IRecordReader
 
         _layout = layout;
         _encoding = encoding;
+        _rowTerminator = (byte)layout.RowTerminator;
     }
 
     /// <inheritdoc />
@@ -219,7 +222,7 @@ public sealed class DelimitedLineReader : IRecordReader
     private bool TryReadRow(ref ReadOnlySequence<byte> buffer, IncrementalHash hash, out string content, out int byteLength)
     {
         var reader = new SequenceReader<byte>(buffer);
-        if (!reader.TryReadTo(out ReadOnlySequence<byte> line, LineFeed, advancePastDelimiter: true))
+        if (!reader.TryReadTo(out ReadOnlySequence<byte> line, _rowTerminator, advancePastDelimiter: true))
         {
             content = string.Empty;
             byteLength = 0;
@@ -229,8 +232,8 @@ public sealed class DelimitedLineReader : IRecordReader
         // Consumed = the line plus its terminator; content excludes the terminator, and the CR of a CRLF pair.
         byteLength = (int)(line.Length + 1);
         Hash(hash, line);
-        hash.AppendData([LineFeed]);
-        content = Decode(TrimCarriageReturn(line));
+        hash.AppendData([_rowTerminator]);
+        content = Decode(TrimPairedCarriageReturn(line));
 
         buffer = buffer.Slice(reader.Position);
         return true;
@@ -239,12 +242,15 @@ public sealed class DelimitedLineReader : IRecordReader
     private (string Content, int Length) ReadTail(ReadOnlySequence<byte> buffer, IncrementalHash hash)
     {
         Hash(hash, buffer);
-        return (Decode(TrimCarriageReturn(buffer)), (int)buffer.Length);
+        return (Decode(TrimPairedCarriageReturn(buffer)), (int)buffer.Length);
     }
 
-    private static ReadOnlySequence<byte> TrimCarriageReturn(ReadOnlySequence<byte> line)
+    // CRLF is a two-byte line ending whose second byte is the terminator, so when the declared terminator is
+    // LF a trailing CR is part of the ending rather than data. A layout framing on anything else says so, and
+    // nothing is stripped.
+    private ReadOnlySequence<byte> TrimPairedCarriageReturn(ReadOnlySequence<byte> line)
     {
-        if (line.IsEmpty)
+        if (_rowTerminator != LineFeed || line.IsEmpty)
         {
             return line;
         }

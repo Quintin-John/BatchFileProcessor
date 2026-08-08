@@ -24,6 +24,12 @@ public sealed class DelimitedLayout : ILayout
     /// <summary>The single character separating fields within a row.</summary>
     public char Delimiter { get; }
 
+    /// <summary>
+    /// The character a row ends with. Declared, not assumed: a feed framed on CR alone, or on an ASCII
+    /// record separator, is as valid as one framed on LF and must not require a code change.
+    /// </summary>
+    public char RowTerminator { get; }
+
     /// <summary>Character encoding name (single-byte).</summary>
     public string Encoding { get; }
 
@@ -53,6 +59,7 @@ public sealed class DelimitedLayout : ILayout
     /// <summary>Creates a validated layout. All structural invariants are enforced here.</summary>
     /// <param name="version">Version identifier; required, non-blank.</param>
     /// <param name="delimiter">The resolved field delimiter; must not be a line terminator.</param>
+    /// <param name="rowTerminator">The resolved row terminator; must differ from the delimiter.</param>
     /// <param name="encoding">Encoding name; required, non-blank.</param>
     /// <param name="rowTypes">Row types; required, non-empty, unique names, exactly one data role, at most one header and one trailer.</param>
     /// <exception cref="ArgumentException">Any string is blank, the delimiter is a line terminator, row types are empty, names collide, or the role composition is invalid.</exception>
@@ -60,6 +67,7 @@ public sealed class DelimitedLayout : ILayout
     public DelimitedLayout(
         string version,
         char delimiter,
+        char rowTerminator,
         string encoding,
         IReadOnlyList<DelimitedRowDefinition> rowTypes)
     {
@@ -71,6 +79,13 @@ public sealed class DelimitedLayout : ILayout
         {
             throw new ArgumentException(
                 "A line terminator cannot be a field delimiter; it would collide with row framing.", nameof(delimiter));
+        }
+
+        // The two separators must differ, or a row could not be told from the field boundary inside it.
+        if (delimiter == rowTerminator)
+        {
+            throw new ArgumentException(
+                "The field delimiter and the row terminator must differ.", nameof(rowTerminator));
         }
 
         if (rowTypes.Count == 0)
@@ -123,6 +138,7 @@ public sealed class DelimitedLayout : ILayout
 
         Version = version;
         Delimiter = delimiter;
+        RowTerminator = rowTerminator;
         Encoding = encoding;
         Header = header;
         Trailer = trailer;
