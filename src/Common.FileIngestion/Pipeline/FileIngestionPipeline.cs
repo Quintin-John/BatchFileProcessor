@@ -24,20 +24,16 @@ namespace Common.FileIngestion.Pipeline;
 /// </summary>
 public sealed class FileIngestionPipeline
 {
-    private const string PublishFailedReasonCode = "PUBLISH_FAILED";
-
     private readonly IRecordReader _reader;
     private readonly IRecordParser _parser;
     private readonly RecordProtector _protector;
-    private readonly IMessagePublisher _publisher;
     private readonly RejectSink _rejectSink;
+    private readonly ConfirmedBatchPublisher _batchPublisher;
     private readonly ICheckpointStore _checkpointStore;
     private readonly IngestionMetrics _metrics;
     private readonly RecordLineage _lineage;
     private readonly IngestionTracing _tracing;
-    private readonly Heartbeat _heartbeat;
     private readonly IngestionOptions _options;
-    private readonly string _batchDestination;
 
     /// <summary>Creates the pipeline from its collaborators.</summary>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
@@ -49,41 +45,35 @@ public sealed class FileIngestionPipeline
         IRecordReader reader,
         IRecordParser parser,
         RecordProtector protector,
-        IMessagePublisher publisher,
+        ConfirmedBatchPublisher batchPublisher,
         RejectSink rejectSink,
         ICheckpointStore checkpointStore,
         IngestionMetrics metrics,
         RecordLineage lineage,
         IngestionTracing tracing,
-        Heartbeat heartbeat,
-        IngestionOptions options,
-        string batchDestination)
+        IngestionOptions options)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(parser);
         ArgumentNullException.ThrowIfNull(protector);
-        ArgumentNullException.ThrowIfNull(publisher);
+        ArgumentNullException.ThrowIfNull(batchPublisher);
         ArgumentNullException.ThrowIfNull(rejectSink);
         ArgumentNullException.ThrowIfNull(checkpointStore);
         ArgumentNullException.ThrowIfNull(metrics);
         ArgumentNullException.ThrowIfNull(lineage);
         ArgumentNullException.ThrowIfNull(tracing);
-        ArgumentNullException.ThrowIfNull(heartbeat);
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentException.ThrowIfNullOrWhiteSpace(batchDestination);
 
         _reader = reader;
         _parser = parser;
         _protector = protector;
-        _publisher = publisher;
+        _batchPublisher = batchPublisher;
         _rejectSink = rejectSink;
         _checkpointStore = checkpointStore;
         _metrics = metrics;
         _lineage = lineage;
         _tracing = tracing;
-        _heartbeat = heartbeat;
         _options = options;
-        _batchDestination = batchDestination;
     }
 
     /// <summary>Ingests one file, resuming from its watermark if a prior run was interrupted.</summary>
@@ -180,7 +170,7 @@ public sealed class FileIngestionPipeline
         {
             await foreach (var batch in reader.ReadAllAsync(pipelineCts.Token).ConfigureAwait(false))
             {
-                await PublishBatchAsync(run, batch, pipelineCts.Token).ConfigureAwait(false);
+                await _batchPublisher.PublishAsync(run, batch, pipelineCts.Token).ConfigureAwait(false);
             }
         }
 #pragma warning disable CA1031 // any publisher fault must unblock the producer, then propagate
@@ -322,94 +312,5 @@ public sealed class FileIngestionPipeline
         await _lineage.EmitAsync(
             run.Provenance, locator, LineageState.Rejected, reasonCode: parseResult.Reasons![0].Code,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task PublishBatchAsync(FileRun run, IngestBatchMessage batch, CancellationToken cancellationToken)
-    {
-        // Batch span active during publish → the transport injects traceparent into the message headers.
-        using var batchSpan = _tracing.StartBatchActivity(batch);
-
-        await EmitBatchLineageAsync(run, batch, LineageState.Batched, reasonCode: null, cancellationToken)
-            .ConfigureAwait(false);
-
-        try
-        {
-            await _publisher.PublishBatchAsync(batch, _batchDestination, cancellationToken).ConfigureAwait(false);
-        }
-#pragma warning disable CA1031 // record terminal lineage for the batch's records, then rethrow (fail-closed)
-        catch (Exception)
-        {
-            await EmitBatchLineageAsync(run, batch, LineageState.Failed, PublishFailedReasonCode, cancellationToken)
-                .ConfigureAwait(false);
-            throw;
-        }
-#pragma warning restore CA1031
-
-        _metrics.BatchPublished();
-        _heartbeat.Beat();
-        Interlocked.Increment(ref run.Batches); // publishers run concurrently
-        // With publisher confirms, publish completing IS broker confirmation, so Published collapses into
-        // Confirmed — the lineage reflects how the record actually moved.
-        await EmitBatchLineageAsync(run, batch, LineageState.Confirmed, reasonCode: null, cancellationToken)
-            .ConfigureAwait(false);
-
-        // Resume position = the end of the furthest record in the batch. EndByteOffset is the authoritative
-        // max of the records' own extents (not Records[^1], and not offset + a fixed stride), so it is correct
-        // for variable-length framing too. The watermark may only advance across the contiguous confirmed
-        // prefix: a batch confirmed beyond an unconfirmed gap is held by the tracker until the gap fills, so
-        // a crash never resumes past an unconfirmed record.
-        var result = run.Tracker.Confirm(new BatchPosition(batch.BatchSeq, batch.EndByteOffset, batch.LastRecordSeq));
-        if (result.AdvancedTo is not null)
-        {
-            await SaveWatermarkAsync(run, result.AdvancedTo, cancellationToken).ConfigureAwait(false);
-        }
-
-        if (result.AdvancedCount > 0)
-        {
-            run.Window.Release(result.AdvancedCount); // free the confirm-window slots that became contiguous
-        }
-    }
-
-    private async Task SaveWatermarkAsync(FileRun run, BatchPosition position, CancellationToken cancellationToken)
-    {
-        // Serialise watermark writes across publishers and enforce monotonic advance: concurrent confirms
-        // can present advances out of order, and the watermark must never move backward.
-        await run.WatermarkGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            if (position.BatchSeq <= run.LastSavedBatchSeq)
-            {
-                return; // a newer watermark was already persisted
-            }
-
-            run.LastSavedBatchSeq = position.BatchSeq;
-            await _checkpointStore.SaveAsync(
-                new Watermark(
-                    run.SourceKey, run.Provenance.FileId, position.ByteOffset, position.LastRecordSeq, position.BatchSeq),
-                cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            run.WatermarkGate.Release();
-        }
-    }
-
-    private async ValueTask EmitBatchLineageAsync(
-        FileRun run, IngestBatchMessage batch, LineageState state, string? reasonCode, CancellationToken cancellationToken)
-    {
-        // Skip the whole per-record loop (and the BatchReference) when lineage is off — otherwise this is
-        // O(records) of pure no-op emits per batch. The per-record emits elsewhere are already gated inside
-        // RecordLineage, so this is the only pipeline-side lineage-only work that needs the guard.
-        if (!_lineage.Enabled)
-        {
-            return;
-        }
-
-        var batchRef = new BatchReference(batch.BatchSeq, batch.MessageId);
-        foreach (var record in batch.Records)
-        {
-            await _lineage.EmitAsync(run.Provenance, record.Locator, state, batchRef, reasonCode, cancellationToken)
-                .ConfigureAwait(false);
-        }
     }
 }

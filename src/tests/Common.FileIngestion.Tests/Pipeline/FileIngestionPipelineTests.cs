@@ -43,21 +43,24 @@ public sealed class FileIngestionPipelineTests
         public FileIngestionPipeline Build(int maxRecords = 2, bool lineageEnabled = true)
         {
             var instrumentation = new ObservabilityInstrumentation("test-pipeline");
+            var metrics = new IngestionMetrics(instrumentation);
+            var lineage = new RecordLineage(Lineage, TimeProvider.System, enabled: lineageEnabled);
+            var tracing = new IngestionTracing(instrumentation);
+
             return new FileIngestionPipeline(
                 Reader,
                 new FakeParser(),
                 new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
-                Publisher,
+                new ConfirmedBatchPublisher(
+                    Publisher, Checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
                 new RejectSink(Publisher, "rejects"),
                 Checkpoints,
-                new IngestionMetrics(instrumentation),
-                new RecordLineage(Lineage, TimeProvider.System, enabled: lineageEnabled),
-                new IngestionTracing(instrumentation),
-                new Heartbeat(TimeProvider.System),
+                metrics,
+                lineage,
+                tracing,
                 new IngestionOptions(
                     maxRecords, maxContentBytesPerBatch: 100_000, BatchChannelCapacity, PublisherConcurrency,
-                    PublisherConfirmWindow),
-                "batches");
+                    PublisherConfirmWindow));
         }
     }
 

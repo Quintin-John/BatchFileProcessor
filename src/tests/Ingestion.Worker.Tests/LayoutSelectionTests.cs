@@ -152,6 +152,9 @@ public sealed class LayoutSelectionTests : IDisposable
     {
         var instrumentation = new ObservabilityInstrumentation("selection");
         var keys = new InMemoryKeyProvider();
+        var metrics = new IngestionMetrics(instrumentation);
+        var lineage = new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System, enabled: true);
+        var tracing = new IngestionTracing(instrumentation);
 
         return new FileIngestionPipeline(
             new StreamRecordReader(layout.RecordLength, terminatorLength: 1, Encoding.ASCII),
@@ -159,14 +162,13 @@ public sealed class LayoutSelectionTests : IDisposable
             new RecordProtector(
                 new DefaultFieldProtector(new AesGcmCryptoProvider(), keys, LayoutProtectionPolicy.From(layout)),
                 new DefaultPayloadProtector(new AesGcmCryptoProvider(), keys)),
-            _publisher,
+            new ConfirmedBatchPublisher(
+                _publisher, _checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
             new RejectSink(_publisher, "rejects"),
             _checkpoints,
-            new IngestionMetrics(instrumentation),
-            new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System, enabled: true),
-            new IngestionTracing(instrumentation),
-            new Heartbeat(TimeProvider.System),
-            new IngestionOptions(100, 1_000_000, 64, 1, 64),
-            "batches");
+            metrics,
+            lineage,
+            tracing,
+            new IngestionOptions(100, 1_000_000, 64, 1, 64));
     }
 }

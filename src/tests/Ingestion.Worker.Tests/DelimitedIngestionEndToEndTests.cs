@@ -515,21 +515,24 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         // Reader and parser come from the format binding, exactly as the composition root builds them.
         var (reader, parser) = new DelimitedFormat().CreateFraming(layout, Encoding.GetEncoding(layout.Encoding));
 
+        var metrics = new IngestionMetrics(instrumentation);
+        var lineage = new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System, enabled: true);
+        var tracing = new IngestionTracing(instrumentation);
+
         return new FileIngestionPipeline(
             reader,
             parser,
             new RecordProtector(
                 new DefaultFieldProtector(crypto, keys, LayoutProtectionPolicy.From(layout)),
                 new DefaultPayloadProtector(crypto, keys)),
-            _publisher,
+            new ConfirmedBatchPublisher(
+                _publisher, _checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
             new RejectSink(_publisher, "rejects"),
             _checkpoints,
-            new IngestionMetrics(instrumentation),
-            new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System, enabled: true),
-            new IngestionTracing(instrumentation),
-            new Heartbeat(TimeProvider.System),
-            new IngestionOptions(1, 200_000, 64, 1, 64),
-            "batches");
+            metrics,
+            lineage,
+            tracing,
+            new IngestionOptions(1, 200_000, 64, 1, 64));
     }
 
     private sealed class RecordingCheckpointStore : ICheckpointStore

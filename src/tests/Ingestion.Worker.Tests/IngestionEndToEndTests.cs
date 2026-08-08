@@ -78,19 +78,22 @@ public sealed class IngestionEndToEndTests : IDisposable
     private FileIngestionPipeline BuildPipeline()
     {
         var instrumentation = new ObservabilityInstrumentation("e2e");
+        var metrics = new IngestionMetrics(instrumentation);
+        var lineage = new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System, enabled: true);
+        var tracing = new IngestionTracing(instrumentation);
+
         return new FileIngestionPipeline(
             new StreamRecordReader(8, terminatorLength: 1, Encoding.ASCII),
             new FakeParser(),
             new RecordProtector(new PassThroughProtector(), new StubPayloadProtector()),
-            _publisher,
+            new ConfirmedBatchPublisher(
+                _publisher, _checkpoints, metrics, lineage, tracing, new Heartbeat(TimeProvider.System), "batches"),
             new RejectSink(_publisher, "rejects"),
             _checkpoints,
-            new IngestionMetrics(instrumentation),
-            new RecordLineage(new ChannelLineageEmitter(1000), TimeProvider.System, enabled: true),
-            new IngestionTracing(instrumentation),
-            new Heartbeat(TimeProvider.System),
-            new IngestionOptions(2, 100_000, 64, 1, 64),
-            "batches");
+            metrics,
+            lineage,
+            tracing,
+            new IngestionOptions(2, 100_000, 64, 1, 64));
     }
 
     private sealed class FakeParser : IRecordParser
