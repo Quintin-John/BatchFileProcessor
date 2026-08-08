@@ -16,6 +16,8 @@ namespace Common.FileIngestion.Layouts;
 /// </summary>
 public sealed class DelimitedLayout : ILayout
 {
+    private readonly Dictionary<string, DelimitedRowDefinition> _byName;
+
     /// <summary>Layout version identifier.</summary>
     public string Version { get; }
 
@@ -125,6 +127,19 @@ public sealed class DelimitedLayout : ILayout
         Header = header;
         Trailer = trailer;
         RowTypes = new ReadOnlyCollection<DelimitedRowDefinition>(new List<DelimitedRowDefinition>(rowTypes));
+        _byName = RowTypes.ToDictionary(row => row.Name, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Resolves a row type by the name the framing assigned to it, or null if the layout declares no such
+    /// type. The delimited counterpart of resolving a fixed-width record by its discriminator value.
+    /// </summary>
+    /// <param name="name">The row type name; required.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    public DelimitedRowDefinition? ResolveByName(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return _byName.GetValueOrDefault(name);
     }
 
     /// <summary>

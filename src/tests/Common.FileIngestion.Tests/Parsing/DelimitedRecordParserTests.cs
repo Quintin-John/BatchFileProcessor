@@ -1,0 +1,235 @@
+using Common.FileIngestion.Abstractions;
+using Common.FileIngestion.Layouts;
+using Common.FileIngestion.Parsing;
+using Common.Messaging.Contracts;
+
+namespace Common.FileIngestion.Tests.Parsing;
+
+public sealed class DelimitedRecordParserTests
+{
+    private const string Version = "1.0";
+    private const string EncodingName = "ascii";
+    private const char Comma = ',';
+    private const string HeaderName = "head";
+    private const string DataName = "body";
+
+    // Three fields; 'acct' is encrypted + required, 'pad' is skipped. A skipped header type sits alongside.
+    private static DelimitedLayout Layout(char delimiter = Comma) => new(Version, delimiter, EncodingName, new[]
+    {
+        new DelimitedRowDefinition(HeaderName, RowRole.Header, 1, [], skip: true),
+        new DelimitedRowDefinition(DataName, RowRole.Data, 0, new[]
+        {
+            new DelimitedFieldDefinition("rectype", 0),
+            new DelimitedFieldDefinition("acct", 1, encrypt: true, required: true),
+            new DelimitedFieldDefinition("pad", 2, skip: true),
+        }),
+    });
+
+    private static DelimitedRecordParser Parser(char delimiter = Comma) => new(Layout(delimiter));
+
+    // The reader is the authority on both the extent and the row type; this mirrors what it emits.
+    private static FramedRecord Framed(string content, string rowType = DataName, long seq = 1, long offset = 0) =>
+        new(seq, offset, content.Length + 1, content, rowType);
+
+    // ---------- happy path ----------
+
+    [Fact]
+    public void Parse_ValidRow_SplitsEveryFieldRaw()
+    {
+        var result = Parser().Parse(Framed("DT,ACCT1234,XX"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(DataName, result.Record!.Locator.RecordType);
+        Assert.Equal(2, result.Record.Fields.Count); // 'pad' is counted but not emitted
+        Assert.Equal(new ClearFieldValue("DT"), result.Record.Fields["rectype"]);
+        Assert.Equal(new ClearFieldValue("ACCT1234"), result.Record.Fields["acct"]);
+        Assert.False(result.Record.Fields.ContainsKey("pad"));
+    }
+
+    [Fact]
+    public void Parse_CarriesFramedPositionAndExtentIntoLocator()
+    {
+        var framed = Framed("DT,ACCT1234,XX", seq: 7, offset: 60);
+
+        var locator = Parser().Parse(framed).Record!.Locator;
+
+        Assert.Equal(framed.RecordSeq, locator.RecordSeq);
+        Assert.Equal(framed.ByteOffset, locator.ByteOffset);
+        Assert.Equal(framed.ByteLength, locator.ByteLength);
+        Assert.Equal(framed.ByteOffset + framed.ByteLength, locator.EndByteOffset);
+    }
+
+    [Fact]
+    public void Parse_PreservesSpacesVerbatim_DoesNotTrimOrInterpret()
+    {
+        var result = Parser().Parse(Framed("  DT  , AC ,XX"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new ClearFieldValue("  DT  "), result.Record!.Fields["rectype"]);
+        Assert.Equal(new ClearFieldValue(" AC "), result.Record.Fields["acct"]);
+    }
+
+    [Fact]
+    public void Parse_EmptyOptionalField_IsAccepted()
+    {
+        var result = Parser().Parse(Framed(",ACCT,XX")); // rectype empty, not required
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new ClearFieldValue(string.Empty), result.Record!.Fields["rectype"]);
+    }
+
+    [Fact]
+    public void Parse_SkippedRowType_ReturnsSkipped_NotSuccessOrReject()
+    {
+        var result = Parser().Parse(Framed("col1,col2", rowType: HeaderName));
+
+        Assert.True(result.IsSkipped);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Record);
+        Assert.Equal(HeaderName, result.RecordType);
+    }
+
+    [Theory]
+    [InlineData('\t')]
+    [InlineData('|')]
+    [InlineData(';')]
+    [InlineData('~')]
+    [InlineData((char)0x1F)]
+    public void Parse_AnyDelimiter_SplitsTheSameWay(char delimiter)
+    {
+        // The delimiter is layout data, so a new one needs no code change here either.
+        var row = string.Join(delimiter, "DT", "ACCT1234", "XX");
+
+        var result = Parser(delimiter).Parse(Framed(row));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new ClearFieldValue("ACCT1234"), result.Record!.Fields["acct"]);
+    }
+
+    [Fact]
+    public void Parse_NonSkippedTrailer_IsMappedLikeAnyRow()
+    {
+        // A trailer carrying a control total is emitted, not discarded — the layout decides, not the parser.
+        const string trailerName = "foot";
+        var layout = new DelimitedLayout(Version, Comma, EncodingName, new[]
+        {
+            new DelimitedRowDefinition(DataName, RowRole.Data, 0, [new DelimitedFieldDefinition("a", 0)]),
+            new DelimitedRowDefinition(trailerName, RowRole.Trailer, 1, new[]
+            {
+                new DelimitedFieldDefinition("label", 0),
+                new DelimitedFieldDefinition("recordCount", 1, required: true),
+            }),
+        });
+
+        var result = new DelimitedRecordParser(layout).Parse(Framed("COUNT,42", rowType: trailerName));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(trailerName, result.Record!.Locator.RecordType);
+        Assert.Equal(new ClearFieldValue("42"), result.Record.Fields["recordCount"]);
+    }
+
+    // ---------- rejections ----------
+
+    [Fact]
+    public void Parse_RequiredFieldBlank_Rejects()
+    {
+        var result = Parser().Parse(Framed("DT,   ,XX"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(DataName, result.RecordType);
+        Assert.Equal("DT,   ,XX", result.RawRecord);
+        var reason = Assert.Single(result.Reasons!);
+        Assert.Equal("acct", reason.Field);
+        Assert.Equal("REQUIRED_MISSING", reason.Code);
+
+        // Offset and length are byte concepts; a delimited field has neither.
+        Assert.Null(reason.Offset);
+        Assert.Null(reason.Length);
+    }
+
+    [Theory]
+    [InlineData("DT,ACCT")]                 // too few
+    [InlineData("DT,ACCT,XX,EXTRA")]        // too many
+    [InlineData("")]                        // a blank row splits into one value
+    public void Parse_WrongFieldCount_Rejects(string row)
+    {
+        var result = Parser().Parse(Framed(row));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("WRONG_FIELD_COUNT", Assert.Single(result.Reasons!).Code);
+    }
+
+    [Fact]
+    public void Parse_WrongFieldCount_ReportsExpectedAndActual()
+    {
+        var result = Parser().Parse(Framed("DT,ACCT"));
+
+        var reason = Assert.Single(result.Reasons!);
+        Assert.Equal("3", reason.Expected);
+        Assert.Equal("2", reason.Actual);
+    }
+
+    [Fact]
+    public void Parse_QuotedDelimiterInsideAValue_FailsClosedRatherThanMisMapping()
+    {
+        // RFC 4180 quoting is not implemented. A quoted delimiter splits into an extra value, and the field
+        // count check rejects the row instead of silently shifting every field after it by one.
+        var result = Parser().Parse(Framed("DT,\"AC,CT\",XX"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("WRONG_FIELD_COUNT", Assert.Single(result.Reasons!).Code);
+    }
+
+    [Fact]
+    public void Parse_UnknownRowType_Rejects()
+    {
+        var result = Parser().Parse(Framed("DT,ACCT,XX", rowType: "no-such-type"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("no-such-type", result.RecordType);
+        Assert.Equal("UNKNOWN_ROW_TYPE", Assert.Single(result.Reasons!).Code);
+    }
+
+    // ---------- fail-closed on wiring, not data ----------
+
+    [Fact]
+    public void Parse_UntaggedRecord_Throws()
+    {
+        // An untagged record means this parser was paired with a reader that does not classify rows. That is
+        // a wiring fault affecting every row, so it must fault the run rather than quarantine one record.
+        var untagged = new FramedRecord(1, 0, 5, "DT,ACCT,XX");
+
+        Assert.Throws<ArgumentException>(() => Parser().Parse(untagged));
+    }
+
+    [Fact]
+    public void Constructor_NullLayout_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => new DelimitedRecordParser(null!));
+    }
+
+    [Theory]
+    [InlineData(0L, 0L)]
+    [InlineData(1L, -1L)]
+    public void Parse_OutOfRangePosition_Throws(long recordSeq, long byteOffset)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => Parser().Parse(Framed("DT,ACCT,XX", seq: recordSeq, offset: byteOffset)));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Parse_ByteLengthBelowOne_Throws(int byteLength)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => Parser().Parse(new FramedRecord(1, 0, byteLength, "DT,ACCT,XX", DataName)));
+    }
+
+    [Fact]
+    public void Parse_NullContent_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => Parser().Parse(new FramedRecord(1, 0, 1, null!, DataName)));
+    }
+}
