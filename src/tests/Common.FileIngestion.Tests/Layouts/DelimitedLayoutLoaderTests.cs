@@ -24,9 +24,9 @@ public sealed class DelimitedLayoutLoaderTests
         Assert.Equal("1.0", layout.Version);
         Assert.Equal(",", layout.Delimiter);
         Assert.Equal("ascii", layout.Encoding);
-        Assert.Equal(RowRole.Data, layout.Data.Role);
-        Assert.Equal(["a", "b"], layout.Data.Fields.Select(f => f.Name));
-        Assert.Equal([0, 1], layout.Data.Fields.Select(f => f.Index));
+        Assert.Equal(RowRole.Data, Assert.Single(layout.DataRows).Role);
+        Assert.Equal(["a", "b"], Assert.Single(layout.DataRows).Fields.Select(f => f.Name));
+        Assert.Equal([0, 1], Assert.Single(layout.DataRows).Fields.Select(f => f.Index));
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class DelimitedLayoutLoaderTests
                   - { name: ignored, index: 3, skip: true }
             """;
 
-        var fields = DelimitedLayoutLoader.Load(yaml).Data.Fields;
+        var fields = Assert.Single(DelimitedLayoutLoader.Load(yaml).DataRows).Fields;
 
         Assert.False(fields[0].Encrypt);
         Assert.True(fields[1].Encrypt);
@@ -179,7 +179,7 @@ public sealed class DelimitedLayoutLoaderTests
                   - { name: a, index: 0 }
             """;
 
-        Assert.Equal(RowRole.Data, DelimitedLayoutLoader.Load(yaml).Data.Role);
+        Assert.Equal(RowRole.Data, Assert.Single(DelimitedLayoutLoader.Load(yaml).DataRows).Role);
     }
 
     // ---------- fail-closed ----------
@@ -414,11 +414,57 @@ public sealed class DelimitedLayoutLoaderTests
     }
 
     [Fact]
-    public void Load_MatchOnADataRow_Throws()
+    public void Load_ABodyOfSeveralRowTypes_EachNamedByItsMarker()
     {
-        var yaml = MinimalYaml.Replace("role: data", "role: data\n    match: { index: 0, value: X }", StringComparison.Ordinal);
+        // The capability stated from YAML alone: a feed whose body mixes record types is a layout edit.
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              debit:
+                role: data
+                match: { index: 0, value: DR }
+                fields:
+                  - { name: kind, index: 0 }
+                  - { name: amount, index: 1 }
+              credit:
+                role: data
+                match: { index: 0, value: CR }
+                fields:
+                  - { name: kind, index: 0 }
+                  - { name: amount, index: 1 }
+                  - { name: reference, index: 2 }
+            """;
 
-        Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        var layout = DelimitedLayoutLoader.Load(yaml);
+
+        Assert.Equal(0, layout.DataMarkerIndex);
+        Assert.Equal(["debit", "credit"], layout.DataRows.Select(r => r.Name));
+        Assert.Equal("credit", layout.ResolveDataRow("CR,1,ref")!.Name);
+    }
+
+    [Fact]
+    public void Load_ABodyOfSeveralRowTypes_WhereOneDeclaresNoMarker_Throws()
+    {
+        const string yaml = """
+            version: "1.0"
+            delimiter: ","
+            encoding: ascii
+            rowTypes:
+              debit:
+                role: data
+                match: { index: 0, value: DR }
+                fields:
+                  - { name: kind, index: 0 }
+              plain:
+                role: data
+                fields:
+                  - { name: kind, index: 0 }
+            """;
+
+        var ex = Assert.Throws<FormatException>(() => DelimitedLayoutLoader.Load(yaml));
+        Assert.Contains("must name itself with a marker", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

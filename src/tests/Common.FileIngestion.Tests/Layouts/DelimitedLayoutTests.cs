@@ -17,6 +17,10 @@ public sealed class DelimitedLayoutTests
     private static DelimitedRowDefinition Data(int fieldCount = 3) =>
         new("data", RowRole.Data, rows: 0, Fields(fieldCount));
 
+    // A body type that names itself, so several can share the body of one file.
+    private static DelimitedRowDefinition Data(string name, string marker, int markerIndex = 0) =>
+        new(name, RowRole.Data, rows: 0, Fields(3), skip: false, new RowMatch(markerIndex, marker));
+
     private static DelimitedRowDefinition Header(int rows = 1, bool skip = true) =>
         new("header", RowRole.Header, rows, skip ? [] : Fields(2), skip);
 
@@ -37,7 +41,7 @@ public sealed class DelimitedLayoutTests
         Assert.Equal(Tab, layout.Delimiter);
         Assert.Equal(Encoding, layout.Encoding);
         Assert.Equal(3, layout.RowTypes.Count);
-        Assert.Equal(RowRole.Data, layout.Data.Role);
+        Assert.Equal(RowRole.Data, Assert.Single(layout.DataRows).Role);
         Assert.NotNull(layout.Header);
         Assert.NotNull(layout.Trailer);
     }
@@ -149,17 +153,17 @@ public sealed class DelimitedLayoutTests
 
     [Theory]
     [InlineData(RowRole.Header)]
-    [InlineData(RowRole.Data)]
     [InlineData(RowRole.Trailer)]
-    public void Constructor_DuplicateRole_Throws(RowRole role)
+    public void Constructor_DuplicatePositionalRole_Throws(RowRole role)
     {
-        // Row assignment is positional, so two types sharing a role leaves no way to say which rows are whose.
-        DelimitedRowDefinition First() => new("first", role, role == RowRole.Data ? 0 : 1, Fields(2));
-        DelimitedRowDefinition Second() => new("second", role, role == RowRole.Data ? 0 : 1, Fields(2));
-
-        var rows = role == RowRole.Data
-            ? new[] { First(), Second() }
-            : [First(), Second(), Data()];
+        // Header and trailer are assigned by position, so two types sharing one of those roles leaves no way
+        // to say which rows are whose. Data is exempt: body rows name themselves.
+        var rows = new[]
+        {
+            new DelimitedRowDefinition("first", role, 1, Fields(2)),
+            new DelimitedRowDefinition("second", role, 1, Fields(2)),
+            Data(),
+        };
 
         var ex = Assert.Throws<ArgumentException>(() => new DelimitedLayout(Version, Tab, '\n', Encoding, rows));
         Assert.Contains("ambiguous", ex.Message, StringComparison.Ordinal);
@@ -192,59 +196,103 @@ public sealed class DelimitedLayoutTests
     // ---------- positional row resolution ----------
 
     [Fact]
-    public void ResolveByPosition_WithHeaderAndTrailer_AssignsByPosition()
+    public void ASingleBodyType_NeedsNoMarker_AndEveryBodyRowIsIt()
     {
-        const int headerRows = 2;
-        const int trailerRows = 1;
-        const long totalRows = 6;
-        var layout = Layout(Header(headerRows), Data(), Trailer(trailerRows));
-
-        var roles = Enumerable.Range(0, (int)totalRows)
-            .Select(i => layout.ResolveByPosition(i, totalRows)!.Role)
-            .ToArray();
-
-        Assert.Equal(
-            [RowRole.Header, RowRole.Header, RowRole.Data, RowRole.Data, RowRole.Data, RowRole.Trailer],
-            roles);
-    }
-
-    [Fact]
-    public void ResolveByPosition_WithNoHeaderOrTrailer_IsAllData()
-    {
-        const long totalRows = 3;
+        // The ordinary shape: position identifies the body, so no column is read to classify it.
         var layout = Layout(Data());
 
-        Assert.All(
-            Enumerable.Range(0, (int)totalRows),
-            i => Assert.Equal(RowRole.Data, layout.ResolveByPosition(i, totalRows)!.Role));
+        Assert.Null(layout.DataMarkerIndex);
+        Assert.Equal("data", layout.ResolveDataRow("a\tb\tc")!.Name);
     }
 
     [Fact]
-    public void ResolveByPosition_WhenHeaderAndTrailerExceedTheFile_ReturnsNull()
+    public void SeveralBodyTypes_AreResolvedByTheMarkerTheRowCarries()
     {
-        // A file too short to hold its own declared header and trailer is malformed data, not a code fault:
-        // the caller quarantines it rather than the run faulting.
-        var layout = Layout(Header(2), Data(), Trailer(2));
+        var layout = Layout(Data("debit", "DR"), Data("credit", "CR"));
 
-        Assert.Null(layout.ResolveByPosition(0, totalRows: 3));
+        Assert.Equal(0, layout.DataMarkerIndex);
+        Assert.Equal("debit", layout.ResolveDataRow("DR\tb\tc")!.Name);
+        Assert.Equal("credit", layout.ResolveDataRow("CR\tb\tc")!.Name);
     }
 
     [Fact]
-    public void ResolveByPosition_WhenFileIsExactlyHeaderPlusTrailer_HasNoDataRows()
+    public void TheMarkerIsReadFromWhicheverColumnTheLayoutNames()
     {
-        const long totalRows = 2;
-        var layout = Layout(Header(1), Data(), Trailer(1));
+        // The column carrying the marker is a property of the feed, not a position the engine assumes.
+        var layout = Layout(Data("debit", "DR", markerIndex: 2), Data("credit", "CR", markerIndex: 2));
 
-        Assert.Equal(RowRole.Header, layout.ResolveByPosition(0, totalRows)!.Role);
-        Assert.Equal(RowRole.Trailer, layout.ResolveByPosition(1, totalRows)!.Role);
+        Assert.Equal(2, layout.DataMarkerIndex);
+        Assert.Equal("credit", layout.ResolveDataRow("a\tb\tCR")!.Name);
     }
 
-    [Theory]
-    [InlineData(-1, 3)]
-    [InlineData(3, 3)]
-    [InlineData(0, 0)]
-    public void ResolveByPosition_OutOfRange_Throws(long rowIndex, long totalRows)
+    [Fact]
+    public void ABodyRowWhoseMarkerNamesNoType_ResolvesToNull()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => Layout(Data()).ResolveByPosition(rowIndex, totalRows));
+        var layout = Layout(Data("debit", "DR"), Data("credit", "CR"));
+
+        Assert.Null(layout.ResolveDataRow("XX\tb\tc"));
+    }
+
+    [Fact]
+    public void ABodyRowTooShortToCarryTheMarker_ResolvesToNull()
+    {
+        var layout = Layout(Data("debit", "DR", markerIndex: 2), Data("credit", "CR", markerIndex: 2));
+
+        Assert.Null(layout.ResolveDataRow("a\tb"));
+    }
+
+    [Fact]
+    public void ASingleBodyTypeMayStillDeclareAMarker_AndThenEveryBodyRowIsCheckedAgainstIt()
+    {
+        var layout = Layout(Data("debit", "DR"));
+
+        Assert.Equal(0, layout.DataMarkerIndex);
+        Assert.Equal("debit", layout.ResolveDataRow("DR\tb\tc")!.Name);
+        Assert.Null(layout.ResolveDataRow("XX\tb\tc"));
+    }
+
+    [Fact]
+    public void MarkersAreComparedWhole_NotByPrefix()
+    {
+        var layout = Layout(Data("short", "D"), Data("long", "DR"));
+
+        Assert.Equal("short", layout.ResolveDataRow("D\tb\tc")!.Name);
+        Assert.Equal("long", layout.ResolveDataRow("DR\tb\tc")!.Name);
+    }
+
+    // ---------- what a body of several types must satisfy ----------
+
+    [Fact]
+    public void SeveralBodyTypes_WhereOneDeclaresNoMarker_Throws()
+    {
+        // Without a marker that type could never be identified, so the layout is unsatisfiable rather than
+        // merely unusual.
+        var ex = Assert.Throws<ArgumentException>(
+            () => Layout(Data("debit", "DR"), new DelimitedRowDefinition("plain", RowRole.Data, 0, Fields(3))));
+        Assert.Contains("must name itself with a marker", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BodyTypesCarryingMarkersInDifferentColumns_Throw()
+    {
+        // Otherwise resolution would mean trying each type in turn, and which one a row matched would depend
+        // on the order they happened to be declared in.
+        var ex = Assert.Throws<ArgumentException>(
+            () => Layout(Data("debit", "DR"), Data("credit", "CR", markerIndex: 1)));
+        Assert.Contains("identified by the same field", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TwoBodyTypesClaimingTheSameMarker_Throw()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => Layout(Data("debit", "DR"), Data("other", "DR")));
+        Assert.Contains("both claim marker", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ALayoutWithNoBodyType_Throws()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => Layout(Header(), Trailer()));
+        Assert.Contains("role 'data'", ex.Message, StringComparison.Ordinal);
     }
 }

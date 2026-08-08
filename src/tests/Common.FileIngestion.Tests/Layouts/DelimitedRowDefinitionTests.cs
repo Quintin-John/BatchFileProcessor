@@ -227,13 +227,32 @@ public sealed class DelimitedRowDefinitionTests
         Assert.Null(new DelimitedRowDefinition("r", RowRole.Trailer, 1, Fields(1)).Match);
 
     [Fact]
-    public void Row_DataRoleWithMatch_Throws()
+    public void Row_DataRoleWithMatch_IsAccepted()
     {
-        // A marker verifies a positional claim. Data rows make none, so a marker there would be a content
-        // rule — business validation this engine deliberately does not do.
+        // On a data row type the marker is what identifies it, so several body types can share one file.
+        var row = new DelimitedRowDefinition("r", RowRole.Data, 0, Fields(1), skip: false, new RowMatch(0, "X"));
+
+        Assert.Equal("X", row.Match!.Value);
+    }
+
+    [Fact]
+    public void Row_MatchBeyondItsOwnDeclaredFields_Throws()
+    {
+        // The type maps two columns but claims its marker sits in a third, so no row of that type could ever
+        // be checked against it.
         var ex = Assert.Throws<ArgumentException>(
-            () => new DelimitedRowDefinition("r", RowRole.Data, 0, Fields(1), skip: false, new RowMatch(0, "X")));
-        Assert.Contains("downstream concern", ex.Message, StringComparison.Ordinal);
+            () => new DelimitedRowDefinition("r", RowRole.Data, 0, Fields(2), skip: false, new RowMatch(2, "X")));
+        Assert.Contains("declares only 2 field(s)", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Row_SkippedTypeMayCarryAMarkerBeyondItsFields()
+    {
+        // A skipped type maps nothing, so the column carrying its marker is simply one it does not name; the
+        // physical row still has it.
+        var row = new DelimitedRowDefinition("r", RowRole.Trailer, 1, [], skip: true, new RowMatch(4, "END"));
+
+        Assert.Equal(4, row.Match!.Index);
     }
 
     [Fact]

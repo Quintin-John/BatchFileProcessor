@@ -8,10 +8,11 @@ namespace Common.FileIngestion.Layouts;
 /// format-specific detail lives entirely in the source data, not here, so a new delimited feed is a new
 /// layout file and no code change.
 /// <para>
-/// Where a fixed-width <see cref="Layout"/> identifies a record by a discriminator at a byte position, a
-/// delimited file has no guaranteed discriminator column, so row types are identified positionally: the
-/// first <see cref="DelimitedRowDefinition.Rows"/> rows belong to the header type, the last belong to the
-/// trailer type, and the data type takes the remainder.
+/// Row types are identified positionally first: the first <see cref="DelimitedRowDefinition.Rows"/> rows
+/// belong to the header type, the last belong to the trailer type, and the body takes the remainder. Where a
+/// fixed-width <see cref="Layout"/> identifies a record by a discriminator at a byte position, a delimited
+/// file has no guaranteed discriminator column — so a body of a single type needs none, and a body mixing
+/// several declares the column its rows name themselves in.
 /// </para>
 /// </summary>
 public sealed class DelimitedLayout : ILayout
@@ -44,8 +45,20 @@ public sealed class DelimitedLayout : ILayout
         RowTypes.SelectMany(row => row.Fields)
                 .Select(definition => new LayoutField(definition.Name, definition.Encrypt));
 
-    /// <summary>The row type that spans the body of the file. Exactly one always exists.</summary>
-    public DelimitedRowDefinition Data { get; }
+    /// <summary>
+    /// The row types spanning the body of the file; at least one always exists. More than one is allowed
+    /// when each names itself with a marker, so a feed whose body mixes record types needs a layout edit and
+    /// no code change.
+    /// </summary>
+    public IReadOnlyList<DelimitedRowDefinition> DataRows { get; }
+
+    /// <summary>
+    /// The field index carrying the marker that tells one body row type from another, or null when a single
+    /// data type spans the body and position alone identifies it. Shared by every data type, so a body row
+    /// resolves by reading one column rather than by trying each type in turn — which would make the answer
+    /// depend on declaration order.
+    /// </summary>
+    public int? DataMarkerIndex { get; }
 
     /// <summary>The leading row type, or null when the file has no header.</summary>
     public DelimitedRowDefinition? Header { get; }
@@ -64,7 +77,7 @@ public sealed class DelimitedLayout : ILayout
     /// <param name="delimiter">The resolved field delimiter; required, non-empty, and must contain neither a line terminator nor the row terminator.</param>
     /// <param name="rowTerminator">The resolved row terminator; must not appear in the delimiter.</param>
     /// <param name="encoding">Encoding name; required, non-blank.</param>
-    /// <param name="rowTypes">Row types; required, non-empty, unique names, exactly one data role, at most one header and one trailer.</param>
+    /// <param name="rowTypes">Row types; required, non-empty, unique names, at least one data role, at most one header and one trailer. Several data roles are allowed when each declares a match, all in the same field and with distinct values.</param>
     /// <exception cref="ArgumentException">Any string is blank, the delimiter carries a line terminator or the row terminator, row types are empty, names collide, or the role composition is invalid.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="rowTypes"/> is null.</exception>
     public DelimitedLayout(
@@ -105,7 +118,7 @@ public sealed class DelimitedLayout : ILayout
         }
 
         var names = new HashSet<string>(rowTypes.Count, StringComparer.Ordinal);
-        DelimitedRowDefinition? data = null;
+        var dataRows = new List<DelimitedRowDefinition>(rowTypes.Count);
         DelimitedRowDefinition? header = null;
         DelimitedRowDefinition? trailer = null;
 
@@ -118,13 +131,13 @@ public sealed class DelimitedLayout : ILayout
                 throw new ArgumentException($"Duplicate row type name '{row.Name}'.", nameof(rowTypes));
             }
 
-            // Roles are positional, so a second header (or trailer, or data) would make row assignment
-            // ambiguous — there would be no way to say which rows belong to which.
+            // Header and trailer are identified by position, so a second of either would leave no way to say
+            // which rows belong to which. Data is not: body rows name themselves, so several can coexist.
             var existing = row.Role switch
             {
                 RowRole.Header => header,
                 RowRole.Trailer => trailer,
-                RowRole.Data => data,
+                RowRole.Data => null,
                 _ => throw new ArgumentException($"Row type '{row.Name}' has an unknown role.", nameof(rowTypes)),
             };
 
@@ -139,13 +152,19 @@ public sealed class DelimitedLayout : ILayout
             {
                 case RowRole.Header: header = row; break;
                 case RowRole.Trailer: trailer = row; break;
-                default: data = row; break;
+                default: dataRows.Add(row); break;
             }
         }
 
         // Without a data row type the layout describes a file with no body — nothing would ever be emitted.
-        Data = data ?? throw new ArgumentException(
-            "A layout must define exactly one row type with role 'data'.", nameof(rowTypes));
+        if (dataRows.Count == 0)
+        {
+            throw new ArgumentException(
+                "A layout must define at least one row type with role 'data'.", nameof(rowTypes));
+        }
+
+        DataRows = new ReadOnlyCollection<DelimitedRowDefinition>(dataRows);
+        DataMarkerIndex = ResolveDataMarkerIndex(dataRows);
 
         Version = version;
         Delimiter = delimiter;
@@ -170,29 +189,77 @@ public sealed class DelimitedLayout : ILayout
     }
 
     /// <summary>
-    /// Resolves the row type for a row at a known position, given the file's total row count. Header rows are
-    /// counted from the start and trailer rows from the end; everything else is data. Returns null when the
-    /// header and trailer together claim more rows than the file holds, which is a malformed file rather than
-    /// a programming error — the caller quarantines it instead of faulting.
+    /// Resolves which body row type a row is, or null when its marker names no declared type — a file that
+    /// does not match its layout, which the caller reports rather than guessing past.
+    /// <para>
+    /// Splitting lives here because the delimiter does: reading the marker means knowing where fields end,
+    /// and that is the layout's own knowledge, not the reader's.
+    /// </para>
     /// </summary>
-    /// <param name="rowIndex">0-based row position within the file.</param>
-    /// <param name="totalRows">Total rows in the file.</param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="rowIndex"/> is negative or not less than <paramref name="totalRows"/>.</exception>
-    public DelimitedRowDefinition? ResolveByPosition(long rowIndex, long totalRows)
+    /// <param name="row">The row's text, without its terminator.</param>
+    public DelimitedRowDefinition? ResolveDataRow(ReadOnlySpan<char> row)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(rowIndex);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(rowIndex, totalRows);
+        // One body type identified by position: every body row is that type, and no column is read.
+        if (DataMarkerIndex is not { } index)
+        {
+            return DataRows[0];
+        }
 
-        if (HeaderRows + (long)TrailerRows > totalRows)
+        if (!DelimitedFields.TryReadAt(row, index, Delimiter, out var marker))
         {
             return null;
         }
 
-        if (rowIndex < HeaderRows)
+        // Scanned rather than hashed: markers are unique by construction, so the answer does not depend on
+        // order, and comparing spans keeps a per-row string allocation off the framing path.
+        foreach (var candidate in DataRows)
         {
-            return Header;
+            if (marker.SequenceEqual(candidate.Match!.Value))
+            {
+                return candidate;
+            }
         }
 
-        return rowIndex >= totalRows - TrailerRows ? Trailer : Data;
+        return null;
+    }
+
+    // A single body type needs no marker: position already identifies it. Several do, and all at the same
+    // column — markers spread across different columns would mean trying each type in turn, so which type a
+    // row resolved to would depend on the order they happened to be declared in.
+    private static int? ResolveDataMarkerIndex(List<DelimitedRowDefinition> dataRows)
+    {
+        if (dataRows.Count == 1 && dataRows[0].Match is null)
+        {
+            return null;
+        }
+
+        int? index = null;
+        var markers = new HashSet<string>(dataRows.Count, StringComparer.Ordinal);
+
+        foreach (var row in dataRows)
+        {
+            var match = row.Match ?? throw new ArgumentException(
+                $"Row type '{row.Name}' declares role 'data' without a match; when a layout declares more " +
+                "than one data row type each must name itself with a marker.", nameof(dataRows));
+
+            if (index is { } shared && match.Index != shared)
+            {
+                throw new ArgumentException(
+                    $"Row type '{row.Name}' carries its marker at field {match.Index} but '{dataRows[0].Name}' " +
+                    $"carries its own at field {shared}; every data row type must be identified by the same field.",
+                    nameof(dataRows));
+            }
+
+            index ??= match.Index;
+
+            if (!markers.Add(match.Value))
+            {
+                throw new ArgumentException(
+                    $"Two data row types both claim marker '{match.Value}'; a body row would match either.",
+                    nameof(dataRows));
+            }
+        }
+
+        return index;
     }
 }

@@ -65,11 +65,14 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
                 withTrailerMarker ? new RowMatch(MarkerIndex, TrailerMarker) : null),
         });
 
+    // This fixture declares one body type; a layout whose body mixes types has its own test below.
+    private static DelimitedRowDefinition Body(DelimitedLayout layout) => Assert.Single(layout.DataRows);
+
     // A value that identifies its own field, so a mis-mapped column is visible in the assertion.
     private static string ValueFor(DelimitedFieldDefinition field) => field.Name + "-value";
 
     private static string DataRow(DelimitedLayout layout, string? mandatory = null) =>
-        string.Join(layout.Delimiter, layout.Data.Fields.Select(
+        string.Join(layout.Delimiter, Body(layout).Fields.Select(
             f => f.Name == MandatoryField ? mandatory ?? ValueFor(f) : ValueFor(f)));
 
     private static string HeaderRow(DelimitedLayout layout) => string.Join(layout.Delimiter, "H", "ignored");
@@ -96,7 +99,7 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         await DispatchAsync(layout);
 
         var record = Assert.Single(_publisher.Batches.SelectMany(b => b.Records));
-        foreach (var field in layout.Data.Fields.Where(f => !f.Skip && !f.Encrypt))
+        foreach (var field in Body(layout).Fields.Where(f => !f.Skip && !f.Encrypt))
         {
             Assert.Equal(new ClearFieldValue(ValueFor(field)), record.Fields[field.Name]);
         }
@@ -111,7 +114,7 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         await DispatchAsync(layout);
 
         var record = Assert.Single(_publisher.Batches.SelectMany(b => b.Records));
-        foreach (var field in layout.Data.Fields.Where(f => !f.Skip))
+        foreach (var field in Body(layout).Fields.Where(f => !f.Skip))
         {
             Assert.True(field.Encrypt
                 ? record.Fields[field.Name] is EncryptedFieldValue
@@ -128,10 +131,10 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         await DispatchAsync(layout);
 
         var record = Assert.Single(_publisher.Batches.SelectMany(b => b.Records));
-        var emitted = layout.Data.Fields.Where(f => !f.Skip).ToList();
+        var emitted = Body(layout).Fields.Where(f => !f.Skip).ToList();
 
         Assert.Equal(emitted.Count, record.Fields.Count);
-        Assert.All(layout.Data.Fields.Where(f => f.Skip), f => Assert.False(record.Fields.ContainsKey(f.Name)));
+        Assert.All(Body(layout).Fields.Where(f => f.Skip), f => Assert.False(record.Fields.ContainsKey(f.Name)));
     }
 
     // ---------- rejection ----------
@@ -156,7 +159,7 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
     {
         // A short or long row must not shift every field after the gap; the count check rejects it whole.
         var layout = Layout();
-        var cells = Enumerable.Range(0, layout.Data.Fields.Count + delta).Select(i => "v" + i);
+        var cells = Enumerable.Range(0, Body(layout).Fields.Count + delta).Select(i => "v" + i);
         await WriteAsync(FileWith(layout, DataRow(layout), string.Join(layout.Delimiter, cells)));
 
         await DispatchAsync(layout);
@@ -281,6 +284,113 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         Assert.Empty(_publisher.Rejects);
     }
 
+    // ---------- a body of several row types ----------
+
+    // Two body types of different widths, each naming itself in the same column. Widths differ deliberately:
+    // if the engine resolved a row to the wrong type, the field count would not line up and the row would be
+    // rejected rather than silently mis-mapped.
+    private const string DebitMarker = "DR";
+    private const string CreditMarker = "CR";
+
+    private static DelimitedLayout MixedBodyLayout() =>
+        new("1.0", ",", '\n', "ascii", new[]
+        {
+            new DelimitedRowDefinition(HeaderRowType, RowRole.Header, 1, [], skip: true),
+            new DelimitedRowDefinition(
+                "debit", RowRole.Data, 0,
+                [new DelimitedFieldDefinition("kind", 0), new DelimitedFieldDefinition("amount", 1)],
+                skip: false, new RowMatch(MarkerIndex, DebitMarker)),
+            new DelimitedRowDefinition(
+                "credit", RowRole.Data, 0,
+                [
+                    new DelimitedFieldDefinition("kind", 0),
+                    new DelimitedFieldDefinition("amount", 1),
+                    new DelimitedFieldDefinition("reference", 2, encrypt: true),
+                ],
+                skip: false, new RowMatch(MarkerIndex, CreditMarker)),
+            new DelimitedRowDefinition(
+                TrailerRowType, RowRole.Trailer, 1, [], skip: true, new RowMatch(MarkerIndex, TrailerMarker)),
+        });
+
+    // Builds a row of the named type from its own declared fields, so the row's shape follows the layout.
+    private static string RowOf(DelimitedLayout layout, string typeName)
+    {
+        var type = layout.DataRows.Single(r => r.Name == typeName);
+        return string.Join(
+            layout.Delimiter,
+            type.Fields.Select(f => f.Index == MarkerIndex ? type.Match!.Value : ValueFor(f)));
+    }
+
+    [Fact]
+    public async Task EachBodyRow_IsMappedAgainstTheTypeItsOwnMarkerNames()
+    {
+        var layout = MixedBodyLayout();
+        await WriteAsync(FileWith(layout, RowOf(layout, "debit"), RowOf(layout, "credit")));
+
+        await DispatchAsync(layout);
+
+        var records = _publisher.Batches.SelectMany(b => b.Records).ToList();
+        Assert.Empty(_publisher.Rejects);
+
+        // Each record carries exactly the fields its own type declares — proof the row resolved to that type
+        // and not to the other one, whose width differs.
+        Assert.Collection(
+            records.OrderBy(r => r.Locator.RecordSeq),
+            debit => AssertMapsToType(layout, debit, "debit"),
+            credit => AssertMapsToType(layout, credit, "credit"));
+    }
+
+    private static void AssertMapsToType(DelimitedLayout layout, IngestRecord record, string typeName)
+    {
+        var type = layout.DataRows.Single(r => r.Name == typeName);
+
+        Assert.Equal(typeName, record.Locator.RecordType);
+        Assert.Equal(type.Fields.Select(f => f.Name).OrderBy(n => n), record.Fields.Keys.OrderBy(n => n));
+
+        // Per-type flags still apply: the encrypt flag lives on one type's field and not the other's.
+        foreach (var field in type.Fields.Where(f => f.Index != MarkerIndex))
+        {
+            Assert.True(field.Encrypt
+                ? record.Fields[field.Name] is EncryptedFieldValue
+                : record.Fields[field.Name] is ClearFieldValue);
+        }
+    }
+
+    [Fact]
+    public async Task ABodyRowNamingNoDeclaredType_FailsClosed_AndShipsNothing()
+    {
+        // The unknown row sits last so that everything before it would already have been published if the
+        // whole file were not framed before anything ships.
+        var layout = MixedBodyLayout();
+        var rows = Enumerable.Range(0, 50).Select(_ => RowOf(layout, "debit")).ToList();
+        rows.Add("XX,1");
+        await WriteAsync(FileWith(layout, [.. rows]));
+
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(() => DispatchAsync(layout));
+
+        AssertNothingShipped();
+
+        // The message names the column and the declared types, never the value the row carried — row content
+        // is not safe to put in a log.
+        Assert.Contains("debit", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("credit", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("XX", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ABlankBodyRow_NamesNoType_AndFailsClosed()
+    {
+        // A blank line in the body is not a free pass: it names no type, so the file does not match its
+        // layout. (A row genuinely too short to reach a marker in a later column is covered where the layout
+        // resolves it, since with the marker at column 0 no row can be too short.)
+        var layout = MixedBodyLayout();
+        await WriteAsync(FileWith(layout, RowOf(layout, "debit"), string.Empty));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => DispatchAsync(layout));
+
+        AssertNothingShipped();
+    }
+
     // ---------- framing ----------
 
     [Theory]
@@ -302,7 +412,7 @@ public sealed class DelimitedIngestionEndToEndTests : IDisposable
         var records = _publisher.Batches.SelectMany(b => b.Records).ToList();
         Assert.Empty(_publisher.Rejects);
         Assert.Equal(2, records.Count);
-        Assert.All(records, r => Assert.Equal(layout.Data.Fields.Count(f => !f.Skip), r.Fields.Count));
+        Assert.All(records, r => Assert.Equal(Body(layout).Fields.Count(f => !f.Skip), r.Fields.Count));
     }
 
     [Fact]

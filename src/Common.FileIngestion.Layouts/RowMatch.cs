@@ -1,11 +1,16 @@
 namespace Common.FileIngestion.Layouts;
 
 /// <summary>
-/// A value one of a row's fields must carry for the row to really be the type its position claims.
+/// A value one of a row's fields must carry for the row to be a given type.
 /// <para>
-/// Positional identification alone is optimistic: the last row of a truncated file looks exactly like a
-/// trailer row. A declared match turns that into a verifiable claim, so a short file fails closed instead of
-/// silently swallowing its final data row as a control row.
+/// On a header or trailer it verifies what position already claimed, because positional identification alone
+/// is optimistic: the last row of a truncated file looks exactly like a trailer row. A declared match turns
+/// that into a verifiable claim, so a short file fails closed instead of silently swallowing its final data
+/// row as a control row.
+/// </para>
+/// <para>
+/// On a data row type it does the identifying, since position says only that a row is part of the body. That
+/// is what lets one file's body carry several record types, each naming itself.
 /// </para>
 /// The field is addressed by index rather than assumed to be the first, because the column carrying the
 /// marker is a property of the feed, not of the engine.

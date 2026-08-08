@@ -36,9 +36,13 @@ public sealed class DelimitedRowDefinition
     public IReadOnlyList<DelimitedFieldDefinition> Fields { get; }
 
     /// <summary>
-    /// An optional marker verifying that a row really is this type, or null when position alone is trusted.
-    /// Only a positional row type can declare one: on a data row it would be a content rule, which is
-    /// downstream's concern, not the engine's.
+    /// An optional marker naming which rows are this type, or null when position alone is trusted.
+    /// <para>
+    /// It plays a different part per role, and both are framing rather than business validation. On a header
+    /// or trailer, which position already identifies, it verifies that claim. On a data row type it is the
+    /// identification: several body row types can coexist, each named by its own marker, exactly as a
+    /// fixed-width layout distinguishes record types by discriminator.
+    /// </para>
     /// </summary>
     public RowMatch? Match { get; }
 
@@ -48,8 +52,8 @@ public sealed class DelimitedRowDefinition
     /// <param name="rows">Rows spanned; at least 1 for header/trailer, exactly 0 for data.</param>
     /// <param name="fields">Ordered fields; required, no null elements, non-empty unless <paramref name="skip"/>. Copied defensively. Indexes must cover 0..n-1 with no gap, overlap, or duplicate name.</param>
     /// <param name="skip">Whether the row type is consumed but not emitted; defaults to false.</param>
-    /// <param name="match">Optional marker verifying a row really is this type; only valid on a positional role.</param>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is blank, <paramref name="fields"/> is empty when not skipped or contains a null, indexes do not cover 0..n-1, a field name repeats, or <paramref name="match"/> is declared on a data row type.</exception>
+    /// <param name="match">Optional marker: verification on a header or trailer, identification on a data row type. Must fall within the declared fields when the type declares any.</param>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is blank, <paramref name="fields"/> is empty when not skipped or contains a null, indexes do not cover 0..n-1, a field name repeats, or <paramref name="match"/> falls outside the declared fields.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="rows"/> disagrees with <paramref name="role"/>, or <paramref name="role"/> is not a declared value.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="fields"/> is null.</exception>
     public DelimitedRowDefinition(
@@ -76,15 +80,6 @@ public sealed class DelimitedRowDefinition
                 throw new ArgumentOutOfRangeException(
                     nameof(rows), rows, "A data row type spans the remainder of the file and must not declare a row count.");
             }
-
-            // A marker exists to verify a positional claim. Data rows make no positional claim, so a marker
-            // there would be a content rule — business validation, which this engine deliberately does not do.
-            if (match is not null)
-            {
-                throw new ArgumentException(
-                    "A data row type must not declare a match; verifying row content is a downstream concern.",
-                    nameof(match));
-            }
         }
         else
         {
@@ -108,6 +103,16 @@ public sealed class DelimitedRowDefinition
         }
 
         ValidateContiguousIndexes(name, copy);
+
+        // A row type that maps its own columns must reach far enough to include its marker, or it declares a
+        // marker no row of that type could ever be checked against. A skipped type maps nothing, so the
+        // column carrying its marker is simply one it does not name — the physical row still has it.
+        if (match is not null && copy.Count > 0 && match.Index >= copy.Count)
+        {
+            throw new ArgumentException(
+                $"Row type '{name}': match is at field {match.Index} but the type declares only {copy.Count} field(s).",
+                nameof(match));
+        }
 
         Name = name;
         Role = role;

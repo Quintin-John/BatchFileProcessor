@@ -43,8 +43,8 @@ public sealed class DelimitedRecordParser : IRecordParser
 
     /// <inheritdoc />
     /// <exception cref="ArgumentException">
-    /// The framed record carries no row type. Delimited rows are classified by position, which only the
-    /// reader knows, so an untagged record means this parser was paired with a reader that does not classify
+    /// The framed record carries no row type. Delimited rows are classified during framing, which only the
+    /// reader does, so an untagged record means this parser was paired with a reader that does not classify
     /// — a wiring fault, not bad data, and it must not be quarantined as if one row were at fault.
     /// </exception>
     public RecordParseResult Parse(FramedRecord framed)

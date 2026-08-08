@@ -12,12 +12,14 @@ namespace Common.FileIngestion.Reading;
 /// pass, classifying each row against the layout's row types. Rows vary in length, so every framed record
 /// reports its own extent; consecutive extents tile the file exactly, which is what a resume point relies on.
 /// <para>
-/// Row classification is positional, so it belongs here rather than in the parser: only the reader knows
-/// where a row sits. Header rows are identified from the start of the file and can be classified as they
-/// arrive. Trailer rows can only be identified once the end is in sight, so rows are held in a queue of the
-/// declared trailer length and released once they are known not to be trailer rows — memory stays O(trailer
-/// rows), never O(file). Every row is emitted carrying the type it resolved to; acting on that type,
-/// including honouring <c>skip</c>, is the parser's job, so this class only frames and classifies.
+/// Row classification belongs here rather than in the parser because it starts from position, and only the
+/// reader knows where a row sits. Header rows are identified from the start of the file and can be classified
+/// as they arrive. Trailer rows can only be identified once the end is in sight, so rows are held in a queue
+/// of the declared trailer length and released once they are known not to be trailer rows — memory stays
+/// O(trailer rows), never O(file). Position settles only that a row is part of the body; which body type it
+/// is, the layout resolves from the row's own marker when it declares more than one. Every row is emitted
+/// carrying the type it resolved to; acting on that type, including honouring <c>skip</c>, is the parser's
+/// job, so this class only frames and classifies.
 /// </para>
 /// </summary>
 public sealed class DelimitedLineReader : IRecordReader
@@ -126,7 +128,8 @@ public sealed class DelimitedLineReader : IRecordReader
     }
 
     // Releases every row that can no longer turn out to be a trailer row: once more than TrailerRows rows are
-    // queued, the oldest is settled. Its position alone then decides header versus data.
+    // queued, the oldest is settled. Its position then decides header versus body, and the layout resolves
+    // which body type it is.
     private async ValueTask ReleaseSettledRowsAsync(
         Queue<FramedRecord> pending,
         Func<FramedRecord, CancellationToken, ValueTask> onRecord,
@@ -136,10 +139,21 @@ public sealed class DelimitedLineReader : IRecordReader
         {
             var row = pending.Dequeue();
             var rowIndex = row.RecordSeq - 1;
-            var rowType = rowIndex < _layout.HeaderRows ? _layout.Header : _layout.Data;
+            var rowType = rowIndex < _layout.HeaderRows ? _layout.Header : ResolveDataRow(row);
             await EmitAsync(row, rowType, onRecord, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    // Position settles that a row belongs to the body; which body type it is, the row itself says. A row
+    // naming no declared type is a file that does not match its layout, so it stops the read rather than
+    // being guessed at. The message names the column and the declared types, never the value found — a row's
+    // content is not safe to put in a log.
+    private DelimitedRowDefinition ResolveDataRow(FramedRecord row) =>
+        _layout.ResolveDataRow(row.Content)
+        ?? throw new InvalidDataException(
+            $"Row {row.RecordSeq} carries no value at field {_layout.DataMarkerIndex} matching any declared " +
+            $"data row type ({string.Join(", ", _layout.DataRows.Select(type => type.Name))}); " +
+            "the file does not match its layout.");
 
     // At end of stream whatever remains queued is, by construction, the last TrailerRows rows.
     private async ValueTask FlushTrailerAsync(
@@ -177,13 +191,19 @@ public sealed class DelimitedLineReader : IRecordReader
             return ValueTask.CompletedTask;
         }
 
-        VerifyMatch(row, rowType);
+        // Only a positional claim needs verifying. A body row was resolved by reading its marker, so reading
+        // it a second time could only confirm what selection already established.
+        if (rowType.Role != RowRole.Data)
+        {
+            VerifyPositionalClaim(row, rowType);
+        }
+
         return onRecord(row with { RowType = rowType.Name }, cancellationToken);
     }
 
     // Positional classification is a claim; a declared marker is what makes it checkable. Without this, the
     // last row of a truncated file passes as the trailer and its data is silently discarded.
-    private void VerifyMatch(FramedRecord row, DelimitedRowDefinition rowType)
+    private void VerifyPositionalClaim(FramedRecord row, DelimitedRowDefinition rowType)
     {
         if (rowType.Match is not { } expected)
         {
