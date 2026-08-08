@@ -112,7 +112,7 @@ public sealed class AesGcmCryptoProviderTests
         var key = Key();
         var envelope = Provider.Encrypt(Plain(), key, Aad("file-abc:101:amount"));
 
-        Assert.ThrowsAny<CryptographicException>(() => Provider.Decrypt(envelope, key, Aad("file-abc:101:pan")));
+        Assert.ThrowsAny<CryptographicException>(() => Provider.Decrypt(envelope, key, Aad("file-abc:101:encrypted")));
     }
 
     [Fact]

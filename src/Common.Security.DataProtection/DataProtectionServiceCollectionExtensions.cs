@@ -23,9 +23,7 @@ public static class DataProtectionServiceCollectionExtensions
 
         services.AddSingleton(policy);
         services.AddSingleton<ICryptoProvider, AesGcmCryptoProvider>();
-        services.AddSingleton<IMasker, PanMasker>();
         services.AddSingleton<IFieldProtector, DefaultFieldProtector>();
-        services.AddSingleton<IFieldMasker, DefaultFieldMasker>();
         services.AddSingleton<IPayloadProtector, DefaultPayloadProtector>();
         return services;
     }

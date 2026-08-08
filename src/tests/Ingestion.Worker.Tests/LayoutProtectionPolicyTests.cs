@@ -6,44 +6,43 @@ namespace Ingestion.Worker.Tests;
 
 public sealed class LayoutProtectionPolicyTests
 {
+    // Named for the flag the layout carries, so nothing here implies what a field holds.
+    private const string FlaggedField = "flagged";
+    private const string UnflaggedField = "unflagged";
+
     private static Layout Layout() => new("1.0", 10, "ascii", 0, 1, 2, new[]
     {
         new RecordDefinition("r", "M", new[]
         {
-            new FieldDefinition("clearField", 1, 4),
-            new FieldDefinition("pan", 5, 6, encrypt: true),
+            new FieldDefinition(UnflaggedField, 1, 4),
+            new FieldDefinition(FlaggedField, 5, 6, encrypt: true),
         }),
     });
 
     [Fact]
-    public void From_FlaggedField_EncryptsAndRedacts_OthersClear()
+    public void From_TheEncryptFlag_DecidesWhetherAFieldIsEncrypted()
     {
         var policy = LayoutProtectionPolicy.From(Layout());
 
-        var pan = policy.Fields["pan"];
-        Assert.Equal(ProtectionAction.Encrypt, pan.Action);
-        Assert.True(pan.RedactInLogs);
-
-        var clear = policy.Fields["clearField"];
-        Assert.Equal(ProtectionAction.Clear, clear.Action);
-        Assert.False(clear.RedactInLogs);
+        Assert.Equal(ProtectionAction.Encrypt, policy.Fields[FlaggedField]);
+        Assert.Equal(ProtectionAction.Clear, policy.Fields[UnflaggedField]);
     }
 
     [Fact]
-    public void From_ClassifiesEveryLayoutField_SoLookupNeverThrows()
+    public void From_CoversEveryLayoutField_SoLookupNeverThrows()
     {
         var policy = LayoutProtectionPolicy.From(Layout());
 
         Assert.Equal(2, policy.Fields.Count);
-        Assert.Equal(ProtectionAction.Clear, policy.GetProtection("clearField").Action);
-        Assert.Equal(ProtectionAction.Encrypt, policy.GetProtection("pan").Action);
+        Assert.Equal(ProtectionAction.Clear, policy.GetProtection(UnflaggedField));
+        Assert.Equal(ProtectionAction.Encrypt, policy.GetProtection(FlaggedField));
     }
 
     [Fact]
-    public void From_SameFieldName_ConsistentClassification_AcrossRecordTypes_IsAllowed()
+    public void From_SameFieldName_FlaggedTheSameWayEverywhere_IsAllowed()
     {
-        // The same name may legitimately recur across record types as long as it classifies identically
-        // (e.g. a shared FILLER). Collapsing consistent duplicates is safe and must not throw.
+        // The same name may legitimately recur across record types as long as the flag agrees (e.g. a
+        // shared filler). Collapsing consistent duplicates is safe and must not throw.
         var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
         {
             new RecordDefinition("a", "AA", new[]
@@ -60,14 +59,14 @@ public sealed class LayoutProtectionPolicyTests
 
         var policy = LayoutProtectionPolicy.From(layout);
 
-        Assert.Equal(ProtectionAction.Clear, policy.GetProtection("shared").Action);
+        Assert.Equal(ProtectionAction.Clear, policy.GetProtection("shared"));
     }
 
     [Fact]
-    public void From_SameFieldName_ConflictingClassification_AcrossRecordTypes_Throws()
+    public void From_SameFieldName_FlaggedInOnePlaceButNotAnother_Throws()
     {
-        // 'dup' is encrypted in one record type and clear in another. Collapsing it would silently
-        // declassify the encrypted side, so construction must fail closed.
+        // 'dup' is flagged in one record type and not the other. Collapsing it would silently stop
+        // encrypting one side, so construction must fail closed.
         var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
         {
             new RecordDefinition("a", "AA", new[]
@@ -93,32 +92,30 @@ public sealed class LayoutProtectionPolicyTests
     }
 
     [Fact]
-    public void From_DelimitedLayout_ClassifiesTheSameWay()
+    public void From_DelimitedLayout_IsDecidedTheSameWay()
     {
-        // Classification is framing-agnostic: the policy reads the shared ILayout surface, so a delimited
-        // profile protects its fields without any delimited-specific branch here.
+        // Framing-agnostic: the policy reads the shared ILayout surface, so a delimited profile protects
+        // its fields without any delimited-specific branch here.
         var layout = new DelimitedLayout("1.0", "\t", '\n', "ascii", new[]
         {
             new DelimitedRowDefinition("body", RowRole.Data, 0, new[]
             {
-                new DelimitedFieldDefinition("clearField", 0),
-                new DelimitedFieldDefinition("pan", 1, encrypt: true),
+                new DelimitedFieldDefinition(UnflaggedField, 0),
+                new DelimitedFieldDefinition(FlaggedField, 1, encrypt: true),
             }),
         });
 
         var policy = LayoutProtectionPolicy.From(layout);
 
-        Assert.Equal(ProtectionAction.Encrypt, policy.Fields["pan"].Action);
-        Assert.True(policy.Fields["pan"].RedactInLogs);
-        Assert.Equal(ProtectionAction.Clear, policy.Fields["clearField"].Action);
-        Assert.False(policy.Fields["clearField"].RedactInLogs);
+        Assert.Equal(ProtectionAction.Encrypt, policy.Fields[FlaggedField]);
+        Assert.Equal(ProtectionAction.Clear, policy.Fields[UnflaggedField]);
     }
 
     [Fact]
-    public void From_DelimitedLayout_ConflictingClassificationAcrossRowTypes_FailsClosed()
+    public void From_DelimitedLayout_FlaggedInOneRowTypeButNotAnother_FailsClosed()
     {
-        // Same fail-closed rule as fixed-width: one name must not resolve to two classifications, or the
-        // last one written would silently declassify the other.
+        // Same fail-closed rule as fixed-width: one name must not carry two different flags, or the last
+        // one written would silently stop encrypting the other.
         var layout = new DelimitedLayout("1.0", "\t", '\n', "ascii", new[]
         {
             new DelimitedRowDefinition("head", RowRole.Header, 1, new[]

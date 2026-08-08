@@ -5,9 +5,11 @@ namespace Common.Security.DataProtection.Tests;
 
 public sealed class DataProtectionServiceCollectionExtensionsTests
 {
-    private static DataProtectionPolicy Policy() => new(new Dictionary<string, FieldProtection>
+    private const string EncryptedField = "encrypted";
+
+    private static DataProtectionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
     {
-        ["token"] = new(ProtectionAction.Encrypt, null, RedactInLogs: true),
+        [EncryptedField] = ProtectionAction.Encrypt,
     });
 
     [Fact]
@@ -18,7 +20,7 @@ public sealed class DataProtectionServiceCollectionExtensionsTests
         using var provider = services.BuildServiceProvider();
 
         var protector = provider.GetRequiredService<IFieldProtector>();
-        var context = new FieldProtectionContext("file-abc", 1, "token");
+        var context = new FieldProtectionContext("file-abc", 1, EncryptedField);
 
         var encrypted = protector.Protect(context, new ClearFieldValue("secret"));
         var recovered = protector.Unprotect(context, encrypted);
@@ -36,7 +38,9 @@ public sealed class DataProtectionServiceCollectionExtensionsTests
 
         Assert.IsType<AesGcmCryptoProvider>(provider.GetRequiredService<ICryptoProvider>());
         Assert.IsType<InMemoryKeyProvider>(provider.GetRequiredService<IKeyProvider>());
-        Assert.True(provider.GetRequiredService<DataProtectionPolicy>().TryGetProtection("token", out _));
+        Assert.Equal(
+            ProtectionAction.Encrypt,
+            provider.GetRequiredService<DataProtectionPolicy>().GetProtection(EncryptedField));
     }
 
     [Fact]

@@ -9,7 +9,6 @@ namespace Common.Security.DataProtection;
 /// configured <see cref="ICryptoProvider"/>, binding each ciphertext to its
 /// <see cref="FieldProtectionContext"/>. Clear values are serialized through the messaging
 /// contract's JSON so typed values (string, number, boolean, null) round-trip losslessly.
-/// Masking is a separate concern handled by <see cref="DefaultFieldMasker"/>.
 /// </summary>
 public sealed class DefaultFieldProtector : IFieldProtector
 {
@@ -40,7 +39,7 @@ public sealed class DefaultFieldProtector : IFieldProtector
         ArgumentNullException.ThrowIfNull(value);
 
         var protection = _policy.GetProtection(context.Field);
-        if (protection.Action != ProtectionAction.Encrypt || value is EncryptedFieldValue)
+        if (protection != ProtectionAction.Encrypt || value is EncryptedFieldValue)
         {
             return value;
         }

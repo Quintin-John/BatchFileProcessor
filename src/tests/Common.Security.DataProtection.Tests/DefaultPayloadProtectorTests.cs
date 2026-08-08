@@ -5,6 +5,9 @@ namespace Common.Security.DataProtection.Tests;
 
 public sealed class DefaultPayloadProtectorTests
 {
+    // Stands for a record that failed to parse, so nothing said which of its values were sensitive.
+    private const string UnparsedRecordText = "some unparsed record text";
+
     private static (DefaultPayloadProtector Protector, InMemoryKeyProvider Keys) Build()
     {
         var keys = new InMemoryKeyProvider();
@@ -18,7 +21,7 @@ public sealed class DefaultPayloadProtectorTests
     {
         var (protector, keys) = Build();
 
-        var result = protector.Protect(Ctx(), "HEAD...raw...4111111111111111");
+        var result = protector.Protect(Ctx(), UnparsedRecordText);
 
         Assert.Equal("AES-256-GCM", result.Value.Algorithm);
         Assert.Equal(keys.GetActiveKey().KeyId, result.Value.KeyId);
@@ -28,7 +31,7 @@ public sealed class DefaultPayloadProtectorTests
     public void RoundTrip_RecoversPayload()
     {
         var (protector, _) = Build();
-        const string payload = "raw record with a PAN 4111111111111111";
+        const string payload = UnparsedRecordText;
 
         var recovered = protector.Unprotect(Ctx(), protector.Protect(Ctx(), payload));
 

@@ -2,36 +2,38 @@ namespace Common.Security.DataProtection.Tests;
 
 public sealed class DataProtectionPolicyTests
 {
-    private static DataProtectionPolicy Policy() => new(new Dictionary<string, FieldProtection>
+    // Field names state only what the policy does with them; nothing here knows what a field holds.
+    private const string EncryptedField = "encrypted";
+    private const string ClearField = "clear";
+
+    private static DataProtectionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
     {
-        ["pan"] = new(ProtectionAction.Encrypt, "first6last4", RedactInLogs: true),
-        ["amount"] = new(ProtectionAction.Clear, null, RedactInLogs: false),
+        [EncryptedField] = ProtectionAction.Encrypt,
+        [ClearField] = ProtectionAction.Clear,
     });
 
-    [Fact]
-    public void GetProtection_ForClassifiedField_ReturnsIt()
+    [Theory]
+    [InlineData(EncryptedField, ProtectionAction.Encrypt)]
+    [InlineData(ClearField, ProtectionAction.Clear)]
+    public void GetProtection_ForAClassifiedField_ReturnsItsAction(string field, ProtectionAction expected)
     {
-        var protection = Policy().GetProtection("pan");
-
-        Assert.Equal(ProtectionAction.Encrypt, protection.Action);
-        Assert.Equal("first6last4", protection.MaskStrategy);
-        Assert.True(protection.RedactInLogs);
+        Assert.Equal(expected, Policy().GetProtection(field));
     }
 
     [Fact]
-    public void GetProtection_ForUnclassifiedField_ThrowsFailClosed()
+    public void GetProtection_ForAnUnclassifiedField_ThrowsFailClosed()
     {
-        Assert.Throws<KeyNotFoundException>(() => Policy().GetProtection("unknown"));
+        // Returning a default here would hand back Clear, which is the leak this is guarding.
+        Assert.Throws<KeyNotFoundException>(() => Policy().GetProtection("unclassified"));
     }
 
-    [Fact]
-    public void TryGetProtection_ReflectsClassification()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void GetProtection_ForABlankFieldName_Throws(string? field)
     {
-        var policy = Policy();
-
-        Assert.True(policy.TryGetProtection("amount", out var found));
-        Assert.Equal(ProtectionAction.Clear, found!.Action);
-        Assert.False(policy.TryGetProtection("nope", out _));
+        Assert.ThrowsAny<ArgumentException>(() => Policy().GetProtection(field!));
     }
 
     [Fact]
@@ -43,13 +45,10 @@ public sealed class DataProtectionPolicyTests
     [Fact]
     public void Fields_AreDefensivelyCopied()
     {
-        var source = new Dictionary<string, FieldProtection>
-        {
-            ["a"] = new(ProtectionAction.Clear, null, false),
-        };
+        var source = new Dictionary<string, ProtectionAction> { [ClearField] = ProtectionAction.Clear };
         var policy = new DataProtectionPolicy(source);
 
-        source["b"] = new(ProtectionAction.Encrypt, null, false);
+        source[EncryptedField] = ProtectionAction.Encrypt;
 
         Assert.Single(policy.Fields);
     }

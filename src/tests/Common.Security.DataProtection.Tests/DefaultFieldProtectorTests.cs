@@ -5,11 +5,18 @@ namespace Common.Security.DataProtection.Tests;
 
 public sealed class DefaultFieldProtectorTests
 {
-    private static DataProtectionPolicy DefaultPolicy() => new(new Dictionary<string, FieldProtection>
+    private const string FieldText = "some field value";
+
+    // Named for what the policy does with them, so nothing here implies what a field holds.
+    private const string EncryptedField = "encrypted";
+    private const string ClearField = "clear";
+    private const string OtherEncryptedField = "encrypted-too";
+
+    private static DataProtectionPolicy DefaultPolicy() => new(new Dictionary<string, ProtectionAction>
     {
-        ["pan"] = new(ProtectionAction.Encrypt, "first6last4", RedactInLogs: true),
-        ["amount"] = new(ProtectionAction.Clear, null, RedactInLogs: false),
-        ["token"] = new(ProtectionAction.Encrypt, null, RedactInLogs: true),
+        [EncryptedField] = ProtectionAction.Encrypt,
+        [ClearField] = ProtectionAction.Clear,
+        [OtherEncryptedField] = ProtectionAction.Encrypt,
     });
 
     private static (DefaultFieldProtector Protector, InMemoryKeyProvider Keys) Build(DataProtectionPolicy? policy = null)
@@ -26,7 +33,7 @@ public sealed class DefaultFieldProtectorTests
     {
         var (protector, keys) = Build();
 
-        var result = protector.Protect(Ctx("pan"), new ClearFieldValue("1234567890123456"));
+        var result = protector.Protect(Ctx(EncryptedField), new ClearFieldValue(FieldText));
 
         var encrypted = Assert.IsType<EncryptedFieldValue>(result);
         Assert.Equal("AES-256-GCM", encrypted.Value.Algorithm);
@@ -34,7 +41,7 @@ public sealed class DefaultFieldProtectorTests
     }
 
     [Theory]
-    [InlineData("token")]
+    [InlineData(OtherEncryptedField)]
     public void RoundTrip_EncryptField_RecoversValue(string field)
     {
         var (protector, _) = Build();
@@ -59,7 +66,7 @@ public sealed class DefaultFieldProtectorTests
                      new ClearFieldValue("plain"),
                  })
         {
-            var roundTripped = protector.Unprotect(Ctx("token"), protector.Protect(Ctx("token"), original));
+            var roundTripped = protector.Unprotect(Ctx(OtherEncryptedField), protector.Protect(Ctx(OtherEncryptedField), original));
             Assert.Equal(original, roundTripped);
         }
     }
@@ -70,7 +77,7 @@ public sealed class DefaultFieldProtectorTests
         var (protector, _) = Build();
         var value = new ClearFieldValue(221.73m);
 
-        Assert.Same(value, protector.Protect(Ctx("amount"), value));
+        Assert.Same(value, protector.Protect(Ctx(ClearField), value));
     }
 
     [Fact]
@@ -80,7 +87,7 @@ public sealed class DefaultFieldProtectorTests
         var already = new EncryptedFieldValue(
             new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn"));
 
-        Assert.Same(already, protector.Protect(Ctx("pan"), already));
+        Assert.Same(already, protector.Protect(Ctx(EncryptedField), already));
     }
 
     [Fact]
@@ -89,16 +96,16 @@ public sealed class DefaultFieldProtectorTests
         var (protector, _) = Build();
         var value = new ClearFieldValue(1m);
 
-        Assert.Same(value, protector.Unprotect(Ctx("amount"), value));
+        Assert.Same(value, protector.Unprotect(Ctx(ClearField), value));
     }
 
     [Fact]
     public void Unprotect_WithWrongContext_FailsAssociatedDataBinding()
     {
         var (protector, _) = Build();
-        var protectedValue = protector.Protect(Ctx("pan", 101), new ClearFieldValue("1234567890123456"));
+        var protectedValue = protector.Protect(Ctx(EncryptedField, 101), new ClearFieldValue(FieldText));
 
-        Assert.ThrowsAny<CryptographicException>(() => protector.Unprotect(Ctx("pan", 102), protectedValue));
+        Assert.ThrowsAny<CryptographicException>(() => protector.Unprotect(Ctx(EncryptedField, 102), protectedValue));
     }
 
     [Fact]
@@ -106,9 +113,9 @@ public sealed class DefaultFieldProtectorTests
     {
         var (producer, _) = Build();
         var (consumer, _) = Build(); // different key provider instance
-        var protectedValue = producer.Protect(Ctx("token"), new ClearFieldValue("x"));
+        var protectedValue = producer.Protect(Ctx(OtherEncryptedField), new ClearFieldValue("x"));
 
-        Assert.Throws<KeyNotFoundException>(() => consumer.Unprotect(Ctx("token"), protectedValue));
+        Assert.Throws<KeyNotFoundException>(() => consumer.Unprotect(Ctx(OtherEncryptedField), protectedValue));
     }
 
     [Fact]

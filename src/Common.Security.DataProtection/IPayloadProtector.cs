@@ -3,9 +3,9 @@ using Common.Messaging.Contracts;
 namespace Common.Security.DataProtection;
 
 /// <summary>
-/// Encrypts an opaque payload that has no field-level classification — e.g. the raw content of a
-/// record that failed parsing, which cannot be decomposed into policy-classified fields yet may hold
-/// sensitive data (PAN/PII) and so must never travel in clear. Protection is unconditional (there is
+/// Encrypts an opaque payload that was never split into fields — e.g. the raw content of a record that
+/// failed parsing. Nothing has said which of its values are sensitive, so it must never travel in clear.
+/// Encryption is unconditional (there is
 /// nothing to classify); the ciphertext is bound to its context like any field. Distinct from
 /// <see cref="IFieldProtector"/>, which is policy-driven per field.
 /// </summary>

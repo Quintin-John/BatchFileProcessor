@@ -110,8 +110,8 @@ public sealed class StreamRecordReader : IRecordReader
         }
         finally
         {
-            // Zero on return: the scratch buffer held cleartext record bytes (PAN/PII) and goes back to a
-            // shared pool that any other component can rent.
+            // Zero on return: the scratch buffer held cleartext record bytes and goes back to a shared
+            // pool that any other component can rent.
             ArrayPool<byte>.Shared.Return(scratch, clearArray: true);
             await pipe.CompleteAsync().ConfigureAwait(false);
         }

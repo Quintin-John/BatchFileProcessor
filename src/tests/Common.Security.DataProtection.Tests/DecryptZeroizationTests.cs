@@ -11,9 +11,15 @@ namespace Common.Security.DataProtection.Tests;
 /// </summary>
 public sealed class DecryptZeroizationTests
 {
-    private static DataProtectionPolicy Policy() => new(new Dictionary<string, FieldProtection>
+    // Arbitrary text: the crypto path does not interpret its input, so nothing about a payment record
+    // makes this test any stronger.
+    private const string RoundTrippedText = "some record text";
+
+    private const string EncryptedField = "encrypted";
+
+    private static DataProtectionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
     {
-        ["token"] = new(ProtectionAction.Encrypt, null, RedactInLogs: true),
+        [EncryptedField] = ProtectionAction.Encrypt,
     });
 
     private static (EncryptedFieldValue Envelope, InMemoryKeyProvider Keys) ResolvableEnvelope()
@@ -35,7 +41,7 @@ public sealed class DecryptZeroizationTests
         Assert.Contains(plaintext, b => b != 0); // precondition: the buffer really holds cleartext
         var protector = new DefaultFieldProtector(new BufferStubCrypto(plaintext), keys, Policy());
 
-        var recovered = protector.Unprotect(Ctx("token"), envelope);
+        var recovered = protector.Unprotect(Ctx(EncryptedField), envelope);
 
         Assert.Equal(new ClearFieldValue("secret"), recovered);
         Assert.DoesNotContain(plaintext, b => b != 0); // transient cleartext zeroed after use
@@ -49,7 +55,7 @@ public sealed class DecryptZeroizationTests
         Assert.Contains(plaintext, b => b != 0);
         var protector = new DefaultFieldProtector(new BufferStubCrypto(plaintext), keys, Policy());
 
-        Assert.ThrowsAny<JsonException>(() => protector.Unprotect(Ctx("token"), envelope));
+        Assert.ThrowsAny<JsonException>(() => protector.Unprotect(Ctx(EncryptedField), envelope));
         Assert.DoesNotContain(plaintext, b => b != 0); // zeroed on the failure path too (finally)
     }
 
@@ -57,13 +63,13 @@ public sealed class DecryptZeroizationTests
     public void PayloadProtector_Unprotect_RecoversPayload_AndZeroesCleartext()
     {
         var (envelope, keys) = ResolvableEnvelope();
-        var plaintext = Encoding.UTF8.GetBytes("raw record with a PAN 4111111111111111");
+        var plaintext = Encoding.UTF8.GetBytes(RoundTrippedText);
         Assert.Contains(plaintext, b => b != 0);
         var protector = new DefaultPayloadProtector(new BufferStubCrypto(plaintext), keys);
 
         var recovered = protector.Unprotect(Ctx("__raw_record__"), envelope);
 
-        Assert.Equal("raw record with a PAN 4111111111111111", recovered);
+        Assert.Equal(RoundTrippedText, recovered);
         Assert.DoesNotContain(plaintext, b => b != 0);
     }
 

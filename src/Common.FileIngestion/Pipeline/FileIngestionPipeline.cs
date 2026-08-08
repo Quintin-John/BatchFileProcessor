@@ -312,8 +312,8 @@ public sealed class FileIngestionPipeline
             return;
         }
 
-        // Encrypt the raw record before it reaches the reject queue: a failed-parse line can still carry
-        // PAN/PII and must never travel in clear.
+        // Encrypt the raw record before it reaches the reject queue: a line that failed to parse was never
+        // classified, so nothing rules out its carrying sensitive values, and it must not travel in clear.
         var rawRecord = _protector.ProtectRaw(run.Provenance.FileId, framed.RecordSeq, parseResult.RawRecord!);
         await _rejectSink.RejectAsync(run.Provenance, locator, rawRecord, parseResult.Reasons!, cancellationToken)
             .ConfigureAwait(false);

@@ -286,7 +286,7 @@ public sealed class DelimitedLineReader : IRecordReader
         }
         finally
         {
-            // Zero on return: the buffer held cleartext row bytes (PAN/PII) and goes back to a shared pool.
+            // Zero on return: the buffer held cleartext row bytes and goes back to a shared pool.
             ArrayPool<byte>.Shared.Return(rented, clearArray: true);
         }
     }
