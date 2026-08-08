@@ -13,8 +13,8 @@ public sealed class LayoutLoaderTests
           head:
             match: "HD"
             fields:
-              - { name: rectype, start: 1, length: 2 }
-              - { name: acct, start: 3, length: 8, encrypt: true, required: true }
+              - { name: marker, start: 1, length: 2 }
+              - { name: secret, start: 3, length: 8, encrypt: true, required: true }
         """;
 
     [Fact]

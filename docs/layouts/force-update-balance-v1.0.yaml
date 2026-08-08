@@ -1,57 +1,25 @@
-# =============================================================================
-# Force Update Balance — layout v1.0
-# Transcribed from GBOS-BAT-BatchFeedImporter:
-#   BatchFeedImporter.Logic/Parsers/ForceUpdateBalanceFileParser.cs
-#   BatchFeedImporter.Logic/Services/ForceUpdateBalanceHandler.cs
-#   BatchFeedImporter.Model/Data/ForceUpdateBalanceDataModel.cs
-#   BatchFeedImporter.Model/Constants.cs (lines 442-457)
-#
-# The pump does NOT interpret values — it slices each field and emits raw text.
-# This layout carries only what the DelimitedRecordParser needs:
-#   - delimiter, encoding, row structure (header / data / trailer)
-#   - every field's NAME and INDEX (0-based)
-#   - optional per-field flags:
-#       encrypt: true   -> field is encrypted before publish (PCI-adjacent)
-#       required: true  -> record is rejected if this field is blank
-# Field types, date formats, and CPM API routing are NOT here — downstream concern.
-#
-# NOTE: Files are only considered for processing if created within the last 1 day
-# (FileLookBackDays = 1). This is an operational/scheduling concern, not a layout concern.
-#
-# NOTE: Date fields use format MM/dd/yyyy HH:mm:ss (invariant culture) in the source file.
-# =============================================================================
 version: "1.0"
-delimiter: tab         # TAB character. Any delimiter is expressible: write it literally
-                       # (, | ;), as \x1F, or use the aliases tab / space for the
-                       # separators that are invisible in a text editor.
+delimiter: tab
 encoding: ascii
 
-# Row structure. Rows are assigned to a type by position, because a delimited file has no
-# guaranteed discriminator column: the first `rows` rows are the header, the last `rows` are
-# the trailer, and everything between is data. A row type declares its own fields, so a
-# header or trailer carrying real values can be mapped and emitted rather than discarded —
-# set `skip: false` and give it fields. This file's header is a column-caption line with no
-# data value, so it is consumed for framing and never emitted. There is no trailer.
 rowTypes:
 
   header:
     role: header
     rows: 1
-    skip: true         # ParseHeader returns null in the importer: consumed, never emitted
+    skip: true
 
   data:
-    role: data         # spans every row the header and trailer do not claim
-    # 16 fields; the count is derived from this list, never declared separately, so the two
-    # can never disagree. A row that does not split into exactly this many values is rejected.
+    role: data
     fields:
-      - { name: ACIProductID,                index: 0,  required: true }   # used for BIN+product routing
-      - { name: AccountBalanceKey,           index: 1,  required: true }   # DB update key; cast to long downstream
+      - { name: ACIProductID,                index: 0,  required: true }
+      - { name: AccountBalanceKey,           index: 1,  required: true }
       - { name: GDAccountKey,                index: 2 }
-      - { name: ACIExternalID,               index: 3,  encrypt: true }    # ACI account-level external identifier
-      - { name: ACICardExternalID,           index: 4,  encrypt: true }    # card-level external identifier — PCI-adjacent
-      - { name: BIN,                         index: 5,  required: true }   # used for BIN routing
-      - { name: AccountIdentifier,           index: 6,  encrypt: true, required: true }  # GUID; CPM API account key downstream
-      - { name: ProgramCode,                 index: 7,  required: true }   # used for CPM API call routing downstream
+      - { name: ACIExternalID,               index: 3,  encrypt: true }
+      - { name: ACICardExternalID,           index: 4,  encrypt: true }
+      - { name: BIN,                         index: 5,  required: true }
+      - { name: AccountIdentifier,           index: 6,  encrypt: true, required: true }
+      - { name: ProgramCode,                 index: 7,  required: true }
       - { name: ACIAvailableBalance,         index: 8,  required: true }
       - { name: ACIAvailableBalanceAsOfDate, index: 9,  required: true }   # format: MM/dd/yyyy HH:mm:ss
       - { name: ACICurrentBalance,           index: 10, required: true }

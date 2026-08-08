@@ -14,8 +14,8 @@ public sealed class IngestRecordJsonConverterTests
         new(new RecordLocator(7, 70, RecordExtent, "TRAN"),
             new Dictionary<string, FieldValue>
             {
-                ["amount"] = new ClearFieldValue(221.73m),
-                ["pan"] = new EncryptedFieldValue(new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn")),
+                ["plain"] = new ClearFieldValue(221.73m),
+                ["encrypted"] = new EncryptedFieldValue(new EncryptedValue("AES-256-GCM", "k", "v", "bm9uY2U=", "Y2lwaGVy", "dGFn")),
             });
 
     [Fact]
@@ -28,8 +28,8 @@ public sealed class IngestRecordJsonConverterTests
         Assert.Equal(7, back.Locator.RecordSeq);
         Assert.Equal(70, back.Locator.ByteOffset);
         Assert.Equal("TRAN", back.Locator.RecordType);
-        Assert.Equal(new ClearFieldValue(221.73m), back.Fields["amount"]);
-        Assert.IsType<EncryptedFieldValue>(back.Fields["pan"]);
+        Assert.Equal(new ClearFieldValue(221.73m), back.Fields["plain"]);
+        Assert.IsType<EncryptedFieldValue>(back.Fields["encrypted"]);
     }
 
     [Fact]
@@ -42,13 +42,13 @@ public sealed class IngestRecordJsonConverterTests
         // string. Note the absence of endByteOffset: it is derived and deliberately kept off the wire.
         var record = new IngestRecord(
             new RecordLocator(7, 70, RecordExtent, "TRAN"),
-            new Dictionary<string, FieldValue> { ["amount"] = new ClearFieldValue(221.73m) });
+            new Dictionary<string, FieldValue> { ["plain"] = new ClearFieldValue(221.73m) });
 
         var json = JsonSerializer.Serialize(record, Options);
 
         Assert.Equal(
             "{\"locator\":{\"recordSeq\":7,\"byteOffset\":70,\"byteLength\":10,\"recordType\":\"TRAN\"}," +
-            "\"fields\":{\"amount\":221.73}}",
+            "\"fields\":{\"plain\":221.73}}",
             json);
     }
 

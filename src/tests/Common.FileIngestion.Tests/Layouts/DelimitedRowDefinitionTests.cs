@@ -12,9 +12,9 @@ public sealed class DelimitedRowDefinitionTests
     [Fact]
     public void Field_WithValidArguments_SetsProperties()
     {
-        var field = new DelimitedFieldDefinition("acct", 3, encrypt: true, required: true);
+        var field = new DelimitedFieldDefinition("secret", 3, encrypt: true, required: true);
 
-        Assert.Equal("acct", field.Name);
+        Assert.Equal("secret", field.Name);
         Assert.Equal(3, field.Index);
         Assert.True(field.Encrypt);
         Assert.True(field.Required);

@@ -13,15 +13,20 @@ public sealed class DelimitedRecordParserTests
     private const string HeaderName = "head";
     private const string DataName = "body";
 
-    // Three fields; 'acct' is encrypted + required, 'pad' is skipped. A skipped header type sits alongside.
+    // Fields are named for the flags they carry, so the fixture states what the parser must do and nothing
+    // about what a field might hold. A skipped header type sits alongside.
+    private const string MarkerField = "marker";
+    private const string SecretField = "secret";
+    private const string IgnoredField = "ignored";
+
     private static DelimitedLayout Layout(string delimiter = Comma) => new(Version, delimiter, '\n', EncodingName, new[]
     {
         new DelimitedRowDefinition(HeaderName, RowRole.Header, 1, [], skip: true),
         new DelimitedRowDefinition(DataName, RowRole.Data, 0, new[]
         {
-            new DelimitedFieldDefinition("rectype", 0),
-            new DelimitedFieldDefinition("acct", 1, encrypt: true, required: true),
-            new DelimitedFieldDefinition("pad", 2, skip: true),
+            new DelimitedFieldDefinition(MarkerField, 0),
+            new DelimitedFieldDefinition(SecretField, 1, encrypt: true, required: true),
+            new DelimitedFieldDefinition(IgnoredField, 2, skip: true),
         }),
     });
 
@@ -36,20 +41,20 @@ public sealed class DelimitedRecordParserTests
     [Fact]
     public void Parse_ValidRow_SplitsEveryFieldRaw()
     {
-        var result = Parser().Parse(Framed("DT,ACCT1234,XX"));
+        var result = Parser().Parse(Framed("DT,AAAA,XX"));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(DataName, result.Record!.Locator.RecordType);
-        Assert.Equal(2, result.Record.Fields.Count); // 'pad' is counted but not emitted
-        Assert.Equal(new ClearFieldValue("DT"), result.Record.Fields["rectype"]);
-        Assert.Equal(new ClearFieldValue("ACCT1234"), result.Record.Fields["acct"]);
-        Assert.False(result.Record.Fields.ContainsKey("pad"));
+        Assert.Equal(2, result.Record.Fields.Count); // the skipped field is counted but not emitted
+        Assert.Equal(new ClearFieldValue("DT"), result.Record.Fields[MarkerField]);
+        Assert.Equal(new ClearFieldValue("AAAA"), result.Record.Fields[SecretField]);
+        Assert.False(result.Record.Fields.ContainsKey(IgnoredField));
     }
 
     [Fact]
     public void Parse_CarriesFramedPositionAndExtentIntoLocator()
     {
-        var framed = Framed("DT,ACCT1234,XX", seq: 7, offset: 60);
+        var framed = Framed("DT,AAAA,XX", seq: 7, offset: 60);
 
         var locator = Parser().Parse(framed).Record!.Locator;
 
@@ -65,17 +70,17 @@ public sealed class DelimitedRecordParserTests
         var result = Parser().Parse(Framed("  DT  , AC ,XX"));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new ClearFieldValue("  DT  "), result.Record!.Fields["rectype"]);
-        Assert.Equal(new ClearFieldValue(" AC "), result.Record.Fields["acct"]);
+        Assert.Equal(new ClearFieldValue("  DT  "), result.Record!.Fields[MarkerField]);
+        Assert.Equal(new ClearFieldValue(" AC "), result.Record.Fields[SecretField]);
     }
 
     [Fact]
     public void Parse_EmptyOptionalField_IsAccepted()
     {
-        var result = Parser().Parse(Framed(",ACCT,XX")); // rectype empty, not required
+        var result = Parser().Parse(Framed(",AAAA,XX")); // the marker field is empty, and not required
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new ClearFieldValue(string.Empty), result.Record!.Fields["rectype"]);
+        Assert.Equal(new ClearFieldValue(string.Empty), result.Record!.Fields[MarkerField]);
     }
 
     [Fact]
@@ -100,12 +105,12 @@ public sealed class DelimitedRecordParserTests
     public void Parse_AnyDelimiter_SplitsTheSameWay(string delimiter)
     {
         // The delimiter is layout data, so a new one needs no code change here either.
-        var row = string.Join(delimiter, "DT", "ACCT1234", "XX");
+        var row = string.Join(delimiter, "DT", "AAAA", "XX");
 
         var result = Parser(delimiter).Parse(Framed(row));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new ClearFieldValue("ACCT1234"), result.Record!.Fields["acct"]);
+        Assert.Equal(new ClearFieldValue("AAAA"), result.Record!.Fields[SecretField]);
     }
 
     [Fact]
@@ -141,7 +146,7 @@ public sealed class DelimitedRecordParserTests
         Assert.Equal(DataName, result.RecordType);
         Assert.Equal("DT,   ,XX", result.RawRecord);
         var reason = Assert.Single(result.Reasons!);
-        Assert.Equal("acct", reason.Field);
+        Assert.Equal(SecretField, reason.Field);
         Assert.Equal("REQUIRED_MISSING", reason.Code);
 
         // Offset and length are byte concepts; a delimited field has neither.
@@ -150,8 +155,8 @@ public sealed class DelimitedRecordParserTests
     }
 
     [Theory]
-    [InlineData("DT,ACCT")]                 // too few
-    [InlineData("DT,ACCT,XX,EXTRA")]        // too many
+    [InlineData("DT,AAAA")]                 // too few
+    [InlineData("DT,AAAA,XX,EXTRA")]        // too many
     [InlineData("")]                        // a blank row splits into one value
     public void Parse_WrongFieldCount_Rejects(string row)
     {
@@ -164,7 +169,7 @@ public sealed class DelimitedRecordParserTests
     [Fact]
     public void Parse_WrongFieldCount_ReportsExpectedAndActual()
     {
-        var result = Parser().Parse(Framed("DT,ACCT"));
+        var result = Parser().Parse(Framed("DT,AAAA"));
 
         var reason = Assert.Single(result.Reasons!);
         Assert.Equal("3", reason.Expected);
@@ -185,7 +190,7 @@ public sealed class DelimitedRecordParserTests
     [Fact]
     public void Parse_UnknownRowType_Rejects()
     {
-        var result = Parser().Parse(Framed("DT,ACCT,XX", rowType: "no-such-type"));
+        var result = Parser().Parse(Framed("DT,AAAA,XX", rowType: "no-such-type"));
 
         Assert.False(result.IsSuccess);
         Assert.Equal("no-such-type", result.RecordType);
@@ -199,7 +204,7 @@ public sealed class DelimitedRecordParserTests
     {
         // An untagged record means this parser was paired with a reader that does not classify rows. That is
         // a wiring fault affecting every row, so it must fault the run rather than quarantine one record.
-        var untagged = new FramedRecord(1, 0, 5, "DT,ACCT,XX");
+        var untagged = new FramedRecord(1, 0, 5, "DT,AAAA,XX");
 
         Assert.Throws<ArgumentException>(() => Parser().Parse(untagged));
     }
@@ -216,7 +221,7 @@ public sealed class DelimitedRecordParserTests
     public void Parse_OutOfRangePosition_Throws(long recordSeq, long byteOffset)
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => Parser().Parse(Framed("DT,ACCT,XX", seq: recordSeq, offset: byteOffset)));
+            () => Parser().Parse(Framed("DT,AAAA,XX", seq: recordSeq, offset: byteOffset)));
     }
 
     [Theory]
@@ -225,7 +230,7 @@ public sealed class DelimitedRecordParserTests
     public void Parse_ByteLengthBelowOne_Throws(int byteLength)
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => Parser().Parse(new FramedRecord(1, 0, byteLength, "DT,ACCT,XX", DataName)));
+            () => Parser().Parse(new FramedRecord(1, 0, byteLength, "DT,AAAA,XX", DataName)));
     }
 
     [Fact]

@@ -6,6 +6,12 @@ public sealed class RedactingLoggerTests
 {
     private const string Marker = RedactingLogger.RedactionMarker;
 
+    // The redaction set is built from the layout's encrypt flags, so the key is whatever a layout happened
+    // to name; this logger treats it as opaque. The value is arbitrary — it must not survive regardless.
+    private const string SensitiveKey = "Secret";
+    private const string SensitiveValue = "some sensitive value";
+    private const string OtherKey = "File";
+
     private static RedactingLogger Sut(CapturingLogger inner, params string[] sensitive) =>
         new(inner, new HashSet<string>(sensitive, StringComparer.Ordinal));
 
@@ -23,12 +29,12 @@ public sealed class RedactingLoggerTests
         var inner = new CapturingLogger();
 
         // The original formatter (which would render the clear value) must NOT be used.
-        Sut(inner, "Acct").Log(
-            LogLevel.Information, default, State("acct {Acct}", ("Acct", "4111111111111111")), null, (_, _) => "orig");
+        Sut(inner, SensitiveKey).Log(
+            LogLevel.Information, default, State("value {Secret}", (SensitiveKey, SensitiveValue)), null, (_, _) => "orig");
 
-        Assert.Equal(Marker, inner.LastState!.Single(k => k.Key == "Acct").Value);
-        Assert.Equal("acct " + Marker, inner.LastMessage);
-        Assert.DoesNotContain("4111111111111111", inner.LastMessage!, StringComparison.Ordinal);
+        Assert.Equal(Marker, inner.LastState!.Single(k => k.Key == SensitiveKey).Value);
+        Assert.Equal("value " + Marker, inner.LastMessage);
+        Assert.DoesNotContain(SensitiveValue, inner.LastMessage!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -36,11 +42,11 @@ public sealed class RedactingLoggerTests
     {
         var inner = new CapturingLogger();
 
-        Sut(inner, "Acct").Log(
-            LogLevel.Information, default, State("Ingested {File}", ("File", "x.dat")), null, (_, _) => "Ingested x.dat");
+        Sut(inner, SensitiveKey).Log(
+            LogLevel.Information, default, State("Ingested {File}", (OtherKey, "x.dat")), null, (_, _) => "Ingested x.dat");
 
         Assert.Equal("Ingested x.dat", inner.LastMessage);
-        Assert.Equal("x.dat", inner.LastState!.Single(k => k.Key == "File").Value);
+        Assert.Equal("x.dat", inner.LastState!.Single(k => k.Key == OtherKey).Value);
     }
 
     [Fact]
@@ -48,11 +54,11 @@ public sealed class RedactingLoggerTests
     {
         var inner = new CapturingLogger();
 
-        Sut(inner, "Acct").Log(
-            LogLevel.Information, default, State("{File} acct {Acct}", ("File", "x.dat"), ("Acct", "555")), null, (_, _) => "orig");
+        Sut(inner, SensitiveKey).Log(
+            LogLevel.Information, default, State("{File} value {Secret}", (OtherKey, "x.dat"), (SensitiveKey, SensitiveValue)), null, (_, _) => "orig");
 
-        Assert.Equal("x.dat acct " + Marker, inner.LastMessage);
-        Assert.DoesNotContain("555", inner.LastMessage!, StringComparison.Ordinal);
+        Assert.Equal("x.dat value " + Marker, inner.LastMessage);
+        Assert.DoesNotContain(SensitiveValue, inner.LastMessage!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -60,12 +66,12 @@ public sealed class RedactingLoggerTests
     {
         var inner = new CapturingLogger();
         IReadOnlyList<KeyValuePair<string, object?>> state =
-            [new("Acct", "555"), new("File", "x.dat")];
+            [new(SensitiveKey, SensitiveValue), new(OtherKey, "x.dat")];
 
-        Sut(inner, "Acct").Log(LogLevel.Information, default, state, null, (_, _) => "orig");
+        Sut(inner, SensitiveKey).Log(LogLevel.Information, default, state, null, (_, _) => "orig");
 
-        Assert.Contains("Acct=" + Marker, inner.LastMessage!, StringComparison.Ordinal);
-        Assert.DoesNotContain("555", inner.LastMessage!, StringComparison.Ordinal);
+        Assert.Contains(SensitiveKey + "=" + Marker, inner.LastMessage!, StringComparison.Ordinal);
+        Assert.DoesNotContain(SensitiveValue, inner.LastMessage!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -73,9 +79,13 @@ public sealed class RedactingLoggerTests
     {
         var inner = new CapturingLogger();
 
-        Sut(inner).Log(LogLevel.Information, default, State("acct {Acct}", ("Acct", "555")), null, (_, _) => "acct 555");
+        const string rendered = "value " + SensitiveValue;
 
-        Assert.Equal("acct 555", inner.LastMessage);
+        Sut(inner).Log(
+            LogLevel.Information, default, State("value {Secret}", (SensitiveKey, SensitiveValue)), null,
+            (_, _) => rendered);
+
+        Assert.Equal(rendered, inner.LastMessage);
     }
 
     [Fact]
@@ -83,7 +93,7 @@ public sealed class RedactingLoggerTests
     {
         var inner = new CapturingLogger();
 
-        Sut(inner, "Acct").Log(LogLevel.Information, default, "plain message", null, (s, _) => s);
+        Sut(inner, SensitiveKey).Log(LogLevel.Information, default, "plain message", null, (s, _) => s);
 
         Assert.Equal("plain message", inner.LastMessage);
     }
@@ -93,25 +103,25 @@ public sealed class RedactingLoggerTests
     {
         var inner = new CapturingLogger();
 
-        Sut(inner, "Acct").BeginScope(State("scope {Acct}", ("Acct", "555")));
+        Sut(inner, SensitiveKey).BeginScope(State("scope {Secret}", (SensitiveKey, SensitiveValue)));
 
         var scope = (IReadOnlyList<KeyValuePair<string, object?>>)inner.Scopes.Single()!;
-        Assert.Equal(Marker, scope.Single(k => k.Key == "Acct").Value);
+        Assert.Equal(Marker, scope.Single(k => k.Key == SensitiveKey).Value);
     }
 
     [Fact]
     public void BeginScope_NoSensitiveKey_PassesThrough()
     {
         var inner = new CapturingLogger();
-        var state = State("scope {File}", ("File", "x.dat"));
+        var state = State("scope {File}", (OtherKey, "x.dat"));
 
-        Sut(inner, "Acct").BeginScope(state);
+        Sut(inner, SensitiveKey).BeginScope(state);
 
         Assert.Same(state, inner.Scopes.Single());
     }
 
     [Fact]
-    public void IsEnabled_Delegates() => Assert.True(Sut(new CapturingLogger(), "Acct").IsEnabled(LogLevel.Warning));
+    public void IsEnabled_Delegates() => Assert.True(Sut(new CapturingLogger(), SensitiveKey).IsEnabled(LogLevel.Warning));
 
     [Fact]
     public void Constructor_NullArgs_Throw()
@@ -123,7 +133,7 @@ public sealed class RedactingLoggerTests
     [Fact]
     public void Factory_CreateLogger_ReturnsRedactingLogger() =>
         Assert.IsType<RedactingLogger>(
-            new RedactingLoggerFactory(new CapturingLoggerFactory(), new HashSet<string> { "Acct" }).CreateLogger("cat"));
+            new RedactingLoggerFactory(new CapturingLoggerFactory(), new HashSet<string> { SensitiveKey }).CreateLogger("cat"));
 
     [Fact]
     public void Factory_AddProviderAndDispose_Delegate()

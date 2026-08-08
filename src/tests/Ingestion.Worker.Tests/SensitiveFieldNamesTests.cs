@@ -60,12 +60,12 @@ public sealed class SensitiveFieldNamesTests
     [Fact]
     public void From_UnionsAcrossMixedFramings()
     {
-        // Redaction keys come from every profile's layout regardless of framing — a delimited profile's
-        // PCI-adjacent fields must be redacted in logs just as a fixed-width profile's are.
+        // Redaction keys come from every profile's layout regardless of framing. Distinct names per framing
+        // so the union is visible; what the flagged fields hold is the layout's business, not this test's.
         var fixedWidth = Layout(new RecordDefinition("r", "MM", new[]
         {
             new FieldDefinition("plain", 1, 2),
-            new FieldDefinition("pan", 3, 8, encrypt: true),
+            new FieldDefinition("secretA", 3, 8, encrypt: true),
         }));
 
         var delimited = new DelimitedLayout("1.0", "\t", '\n', "ascii", new[]
@@ -73,15 +73,15 @@ public sealed class SensitiveFieldNamesTests
             new DelimitedRowDefinition("body", RowRole.Data, 0, new[]
             {
                 new DelimitedFieldDefinition("plain", 0),
-                new DelimitedFieldDefinition("accountIdentifier", 1, encrypt: true),
+                new DelimitedFieldDefinition("secretB", 1, encrypt: true),
             }),
         });
 
         var names = SensitiveFieldNames.From(new ILayout[] { fixedWidth, delimited });
 
         Assert.Equal(2, names.Count);
-        Assert.Contains("pan", names);
-        Assert.Contains("accountIdentifier", names);
+        Assert.Contains("secretA", names);
+        Assert.Contains("secretB", names);
         Assert.DoesNotContain("plain", names);
     }
 }

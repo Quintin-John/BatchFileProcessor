@@ -109,11 +109,11 @@ public sealed class SerializationTests
     {
         var fields = new Dictionary<string, FieldValue>
         {
-            ["amount"] = new ClearFieldValue(221.73m),
+            ["plain"] = new ClearFieldValue(221.73m),
             ["postDate"] = new ClearFieldValue("2022-11-07"),
             ["active"] = new ClearFieldValue(true),
             ["memo"] = new ClearFieldValue(null),
-            ["pan"] = new EncryptedFieldValue(Envelope()),
+            ["encrypted"] = new EncryptedFieldValue(Envelope()),
         };
         var record = new IngestRecord(new RecordLocator(101, 121200, RecordExtent, "TRAN"), fields);
         var provenance = new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
@@ -139,11 +139,11 @@ public sealed class SerializationTests
         var originalFields = original.Records[0].Fields;
         var resultFields = result.Records[0].Fields;
         Assert.Equal(originalFields.Count, resultFields.Count);
-        Assert.Equal(originalFields["amount"], resultFields["amount"]);
+        Assert.Equal(originalFields["plain"], resultFields["plain"]);
         Assert.Equal(originalFields["postDate"], resultFields["postDate"]);
         Assert.Equal(originalFields["active"], resultFields["active"]);
         Assert.Equal(originalFields["memo"], resultFields["memo"]);
-        Assert.Equal(originalFields["pan"], resultFields["pan"]);
+        Assert.Equal(originalFields["encrypted"], resultFields["encrypted"]);
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public sealed class SerializationTests
             new ClearFieldValue("cmF3"),
             new[]
             {
-                new RejectReason("amount", "decimal", "NON_NUMERIC", expected: "numeric", actual: "ABC", offset: 84, length: 17),
+                new RejectReason("plain", "decimal", "NON_NUMERIC", expected: "numeric", actual: "ABC", offset: 84, length: 17),
                 new RejectReason("postDate", "date", "BAD_DATE"),
             });
 
@@ -226,9 +226,9 @@ public sealed class SerializationTests
         Assert.Contains("\"recordSeq\":101", json, StringComparison.Ordinal);
         Assert.Contains("\"recordType\":\"TRAN\"", json, StringComparison.Ordinal);
         // clear scalar is bare; encrypted is a nested object
-        Assert.Contains("\"amount\":221.73", json, StringComparison.Ordinal);
+        Assert.Contains("\"plain\":221.73", json, StringComparison.Ordinal);
         Assert.Contains("\"active\":true", json, StringComparison.Ordinal);
-        Assert.Contains("\"pan\":{", json, StringComparison.Ordinal);
+        Assert.Contains("\"encrypted\":{", json, StringComparison.Ordinal);
         // no PascalCase leakage
         Assert.DoesNotContain("\"MessageId\"", json, StringComparison.Ordinal);
     }

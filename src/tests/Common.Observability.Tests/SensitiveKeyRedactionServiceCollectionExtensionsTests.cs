@@ -12,7 +12,7 @@ public sealed class SensitiveKeyRedactionServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<ILoggerFactory, FakeLoggerFactory>();
 
-        services.AddSensitiveKeyRedaction(new HashSet<string> { "Acct" });
+        services.AddSensitiveKeyRedaction(new HashSet<string> { "Secret" });
 
         using var provider = services.BuildServiceProvider();
         Assert.IsType<RedactingLoggerFactory>(provider.GetRequiredService<ILoggerFactory>());

@@ -7,21 +7,31 @@ namespace Common.FileIngestion.Tests.Parsing;
 
 public sealed class FixedLengthRecordParserTests
 {
-    // Two record types, each tiling a 10-char record. 'acct' is encrypted + required.
+    // Two record types, each tiling a 10-char record. Fields are named for the flags they carry, so the
+    // fixture states what the parser must do and nothing about what a field might hold.
+    private const string MarkerField = "marker";
+    private const string SecretField = "secret";
+    private const string PlainField = "plain";
+    private const string OptionalField = "optional";
+
     private static Layout Layout() => new("1.0", 10, "ascii", 0, 1, 2, new[]
     {
         new RecordDefinition("hd", "HD", new[]
         {
-            new FieldDefinition("rectype", 1, 2),
-            new FieldDefinition("acct", 3, 4, encrypt: true, required: true),
-            new FieldDefinition("rest", 7, 4),
+            new FieldDefinition(MarkerField, 1, 2),
+            new FieldDefinition(SecretField, 3, 4, encrypt: true, required: true),
+            new FieldDefinition(PlainField, 7, 4),
         }),
         new RecordDefinition("dt", "DT", new[]
         {
-            new FieldDefinition("rectype", 1, 2),
-            new FieldDefinition("pad", 3, 8),
+            new FieldDefinition(MarkerField, 1, 2),
+            new FieldDefinition(OptionalField, 3, 8),
         }),
     });
+
+    // One record of the "hd" type: marker, then the required+encrypted field, then the plain one. Values
+    // are arbitrary and distinct so a mis-tiled field shows up in the assertion.
+    private const string ValidRecord = "HDAAAABBBB";
 
     private static FixedLengthRecordParser Parser() => new(Layout());
 
@@ -33,49 +43,50 @@ public sealed class FixedLengthRecordParserTests
     [Fact]
     public void Parse_ValidRecord_SlicesEveryFieldRaw()
     {
-        var result = Parser().Parse(Framed(7, 60, "HDACCT1234"));
+        var result = Parser().Parse(Framed(7, 60, ValidRecord));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(7, result.Record!.Locator.RecordSeq);
         Assert.Equal(60, result.Record.Locator.ByteOffset);
         Assert.Equal("HD", result.Record.Locator.RecordType);
         Assert.Equal(3, result.Record.Fields.Count); // every field emitted; nothing skipped or interpreted
-        Assert.Equal(new ClearFieldValue("HD"), result.Record.Fields["rectype"]);
-        Assert.Equal(new ClearFieldValue("ACCT"), result.Record.Fields["acct"]);   // raw, not encrypted here
-        Assert.Equal(new ClearFieldValue("1234"), result.Record.Fields["rest"]);
+        Assert.Equal(new ClearFieldValue("HD"), result.Record.Fields[MarkerField]);
+        Assert.Equal(new ClearFieldValue("AAAA"), result.Record.Fields[SecretField]); // raw, not encrypted here
+        Assert.Equal(new ClearFieldValue("BBBB"), result.Record.Fields[PlainField]);
     }
 
     [Fact]
     public void Parse_PreservesSpacesVerbatim_DoesNotTrimOrInterpret()
     {
-        // 'rest' is all spaces (accepted); 'acct' has trailing spaces but a non-blank value (required is satisfied).
+        // The plain field is all spaces (accepted); the required one has trailing spaces but a non-blank
+        // value, which satisfies required.
         var result = Parser().Parse(Framed(1, 0, "HDAB      "));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new ClearFieldValue("AB  "), result.Record!.Fields["acct"]); // spaces kept, not trimmed
-        Assert.Equal(new ClearFieldValue("    "), result.Record.Fields["rest"]);  // empty value accepted
+        Assert.Equal(new ClearFieldValue("AB  "), result.Record!.Fields[SecretField]); // spaces kept, not trimmed
+        Assert.Equal(new ClearFieldValue("    "), result.Record.Fields[PlainField]);   // empty value accepted
     }
 
     [Fact]
     public void Parse_RequiredFieldBlank_Rejects()
     {
-        var result = Parser().Parse(Framed(1, 0, "HD    1234")); // acct is blank
+        var result = Parser().Parse(Framed(1, 0, "HD    BBBB")); // the required field is blank
 
         Assert.False(result.IsSuccess);
         Assert.Equal("HD", result.RecordType);
-        Assert.Equal("HD    1234", result.RawRecord);
+        Assert.Equal("HD    BBBB", result.RawRecord);
         var reason = Assert.Single(result.Reasons!);
-        Assert.Equal("acct", reason.Field);
+        Assert.Equal(SecretField, reason.Field);
         Assert.Equal("REQUIRED_MISSING", reason.Code);
     }
 
     [Fact]
     public void Parse_OptionalFieldBlank_IsAccepted()
     {
-        var result = Parser().Parse(Framed(1, 0, "DT        ")); // pad blank, not required
+        var result = Parser().Parse(Framed(1, 0, "DT        ")); // blank, and not required
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new ClearFieldValue("        "), result.Record!.Fields["pad"]);
+        Assert.Equal(new ClearFieldValue("        "), result.Record!.Fields[OptionalField]);
     }
 
     [Fact]
@@ -85,7 +96,7 @@ public sealed class FixedLengthRecordParserTests
         {
             new RecordDefinition("r", "MX", new[]
             {
-                new FieldDefinition("rectype", 1, 2),
+                new FieldDefinition(MarkerField, 1, 2),
                 new FieldDefinition("data", 3, 4),
                 new FieldDefinition("filler", 7, 4, skip: true),
             }),
@@ -104,7 +115,7 @@ public sealed class FixedLengthRecordParserTests
     {
         var layout = new Layout("1.0", 10, "ascii", 0, 1, 2, new[]
         {
-            new RecordDefinition("dt", "DT", new[] { new FieldDefinition("rectype", 1, 2), new FieldDefinition("body", 3, 8) }),
+            new RecordDefinition("dt", "DT", new[] { new FieldDefinition(MarkerField, 1, 2), new FieldDefinition("body", 3, 8) }),
             new RecordDefinition("hd", "HD", Array.Empty<FieldDefinition>(), skip: true),
         });
 
@@ -157,7 +168,7 @@ public sealed class FixedLengthRecordParserTests
     [InlineData(1L, -1L)]
     public void Parse_OutOfRangePosition_Throws(long recordSeq, long byteOffset)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => Parser().Parse(Framed(recordSeq, byteOffset, "HDACCT1234")));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Parser().Parse(Framed(recordSeq, byteOffset, ValidRecord)));
     }
 
     [Fact]
@@ -165,7 +176,7 @@ public sealed class FixedLengthRecordParserTests
     {
         // The parser must not re-derive the extent from the layout: the reader owns it, so a resume point
         // stays correct when framing is variable-length.
-        var framed = Framed(7, 60, "HDACCT1234");
+        var framed = Framed(7, 60, ValidRecord);
 
         var result = Parser().Parse(framed);
 
@@ -179,7 +190,7 @@ public sealed class FixedLengthRecordParserTests
     [InlineData(-1)]
     public void Parse_ByteLengthBelowOne_Throws(int byteLength)
     {
-        const string content = "HDACCT1234";
+        const string content = ValidRecord;
         Assert.Throws<ArgumentOutOfRangeException>(
             () => Parser().Parse(new FramedRecord(1, 0, byteLength, content)));
     }

@@ -33,7 +33,7 @@ public sealed class LayoutModelTests
     [Fact]
     public void FieldDefinition_CarriesEncryptAndRequiredFlags()
     {
-        var field = new FieldDefinition("pan", 1, 16, encrypt: true, required: true);
+        var field = new FieldDefinition("secret", 1, 16, encrypt: true, required: true);
 
         Assert.True(field.Encrypt);
         Assert.True(field.Required);

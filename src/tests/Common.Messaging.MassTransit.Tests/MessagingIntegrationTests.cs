@@ -47,8 +47,8 @@ public sealed class MessagingIntegrationTests : IAsyncLifetime
     {
         var fields = new Dictionary<string, FieldValue>
         {
-            ["amount"] = new ClearFieldValue(221.73m),
-            ["pan"] = new EncryptedFieldValue(
+            ["plain"] = new ClearFieldValue(221.73m),
+            ["encrypted"] = new EncryptedFieldValue(
                 new EncryptedValue("AES-256-GCM", "key-id", "v1", "bm9uY2U=", "Y2lwaGVy", "dGFn")),
         };
         var provenance = new MessageProvenance("run-xyz", "file-abc", "source.dat", "feed-a", "1.0");
@@ -70,8 +70,8 @@ public sealed class MessagingIntegrationTests : IAsyncLifetime
         Assert.Equal(batch.MessageId, received.MessageId);
         Assert.Equal(batch.Provenance, received.Provenance);
         Assert.Equal(batch.Records[0].Locator, received.Records[0].Locator);
-        Assert.Equal(batch.Records[0].Fields["amount"], received.Records[0].Fields["amount"]);
-        Assert.Equal(batch.Records[0].Fields["pan"], received.Records[0].Fields["pan"]);
+        Assert.Equal(batch.Records[0].Fields["plain"], received.Records[0].Fields["plain"]);
+        Assert.Equal(batch.Records[0].Fields["encrypted"], received.Records[0].Fields["encrypted"]);
 
         Assert.True(context.Headers.TryGetHeader(MassTransitPublisher.CorrelationIdHeader, out var correlation));
         Assert.Equal(batch.Provenance.CorrelationId, correlation?.ToString());

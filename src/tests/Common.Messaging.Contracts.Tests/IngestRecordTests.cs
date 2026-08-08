@@ -11,7 +11,7 @@ public sealed class IngestRecordTests
 
     private static Dictionary<string, FieldValue> SampleFields() => new()
     {
-        ["amount"] = new ClearFieldValue(221.73m),
+        ["plain"] = new ClearFieldValue(221.73m),
         ["postDate"] = new ClearFieldValue("2022-11-07"),
     };
 
@@ -22,7 +22,7 @@ public sealed class IngestRecordTests
 
         Assert.Equal(Locator(), record.Locator);
         Assert.Equal(2, record.Fields.Count);
-        Assert.Equal(new ClearFieldValue(221.73m), record.Fields["amount"]);
+        Assert.Equal(new ClearFieldValue(221.73m), record.Fields["plain"]);
     }
 
     [Fact]
@@ -32,11 +32,11 @@ public sealed class IngestRecordTests
         var record = new IngestRecord(Locator(), source);
 
         source["injected"] = new ClearFieldValue("x");
-        source["amount"] = new ClearFieldValue(999m);
+        source["plain"] = new ClearFieldValue(999m);
 
         Assert.Equal(2, record.Fields.Count);
         Assert.False(record.Fields.ContainsKey("injected"));
-        Assert.Equal(new ClearFieldValue(221.73m), record.Fields["amount"]);
+        Assert.Equal(new ClearFieldValue(221.73m), record.Fields["plain"]);
     }
 
     [Fact]

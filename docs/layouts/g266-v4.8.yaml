@@ -1,29 +1,14 @@
-# =============================================================================
-# G266 fixed-width layout — version 4.8 (ACI EPS-ISSUER / CMM)
-# Transcribed 2026-07-30 from the ACI mapping workbook, sheet "G266_4.8.2".
-#
-# The pump does NOT interpret values — it slices each field's bytes and emits them raw. This layout
-# therefore carries only what the slicer needs, all soft-coded (swap this file = new format, zero code):
-#   - record types (FHR / PER / AER / FTR), each exactly 1200 bytes; discriminator at start 1, length 4
-#     (HEAD -> fhr, TRAN -> per, AUTH -> aer, TRAI -> ftr)
-#   - every field's NAME, START (1-based), LENGTH — fields must tile each record with no gaps
-#   - optional per-field flags:
-#       encrypt: true   -> the field is encrypted before publish (e.g. PAN / account number)
-#       required: true  -> the record is rejected if this field is blank
-# Field data types, scale, sign, and date/time formats are deliberately NOT here — they are a
-# downstream concern; this component ships the raw bytes with their field names.
-# =============================================================================
 version: "4.8"
 recordLength: 1200
 encoding: ascii
-terminator: 1          # bytes per record terminator (1 = LF); part of the framing spec, like recordLength/encoding
+terminator: 1
 discriminator: { start: 1, length: 4 }
 
 recordTypes:
 
   fhr:                       # File Header Record
     match: "HEAD"            # observed in sample
-    skip: true               # control record: consumed for framing, never emitted upstream
+    skip: true
     fields:
       - { name: W136-ECT-HDR-IDN-CDE, start: 1,  length: 4 }
       - { name: W136-ECT-HDR-DTE,     start: 5,  length: 10 }
@@ -173,7 +158,7 @@ recordTypes:
 
   ftr:                       # File Trailer Record
     match: "TRAI"            # confirmed
-    skip: true               # control record: consumed for framing, never emitted upstream
+    skip: true
     fields:
       - { name: W136-ECT-TLR-IDN-CDE, start: 1,  length: 4 }  # "TRAI"
       - { name: FILLER-1,             start: 5,  length: 5 }

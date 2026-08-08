@@ -2,6 +2,9 @@ namespace Common.Messaging.Contracts.Tests;
 
 public sealed class FieldValueTests
 {
+    // Arbitrary text: ToString must never emit whatever it was handed, regardless of what that is.
+    private const string SomeValue = "some field value";
+
     private static EncryptedValue Envelope() =>
         new("AES-256-GCM", "key-id", "v1", "bm9uY2U=", "Y2lwaGVy", "dGFn");
 
@@ -102,7 +105,7 @@ public sealed class FieldValueTests
     [Fact]
     public void ClearFieldValue_ToString_RedactsValue_NeverEmitsIt()
     {
-        Assert.DoesNotContain("4111111111111111", new ClearFieldValue("4111111111111111").ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(SomeValue, new ClearFieldValue(SomeValue).ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("221.73", new ClearFieldValue(221.73m).ToString(), StringComparison.Ordinal);
         Assert.Contains("redacted", new ClearFieldValue("secret").ToString(), StringComparison.Ordinal);
     }
