@@ -8,7 +8,7 @@
 #
 # The pump does NOT interpret values — it slices each field and emits raw text.
 # This layout carries only what the DelimitedRecordParser needs:
-#   - delimiter, encoding, row structure (header/data)
+#   - delimiter, encoding, row structure (header / data / trailer)
 #   - every field's NAME and INDEX (0-based)
 #   - optional per-field flags:
 #       encrypt: true   -> field is encrypted before publish (PCI-adjacent)
@@ -21,30 +21,42 @@
 # NOTE: Date fields use format MM/dd/yyyy HH:mm:ss (invariant culture) in the source file.
 # =============================================================================
 version: "1.0"
-format: delimited
-delimiter: tab         # TAB (\t) character separates fields
+delimiter: tab         # TAB character. Any delimiter is expressible: write it literally
+                       # (, | ;), as \x1F, or use the aliases tab / space for the
+                       # separators that are invisible in a text editor.
 encoding: ascii
 
-# Row structure
-# Header: first line is silently skipped (ParseHeader returns null in the importer)
-# Data:   all remaining lines; exactly 16 tab-separated fields per record
-header: { rows: 1 }
-fieldCount: 16
+# Row structure. Rows are assigned to a type by position, because a delimited file has no
+# guaranteed discriminator column: the first `rows` rows are the header, the last `rows` are
+# the trailer, and everything between is data. A row type declares its own fields, so a
+# header or trailer carrying real values can be mapped and emitted rather than discarded —
+# set `skip: false` and give it fields. This file's header is a column-caption line with no
+# data value, so it is consumed for framing and never emitted. There is no trailer.
+rowTypes:
 
-fields:
-  - { name: ACIProductID,                index: 0,  required: true }   # used for BIN+product routing
-  - { name: AccountBalanceKey,           index: 1,  required: true }   # DB update key; cast to long downstream
-  - { name: GDAccountKey,                index: 2 }
-  - { name: ACIExternalID,               index: 3,  encrypt: true }    # ACI account-level external identifier
-  - { name: ACICardExternalID,           index: 4,  encrypt: true }    # card-level external identifier — PCI-adjacent
-  - { name: BIN,                         index: 5,  required: true }   # used for BIN routing
-  - { name: AccountIdentifier,           index: 6,  encrypt: true, required: true }  # GUID; used as CPM API account key downstream
-  - { name: ProgramCode,                 index: 7,  required: true }   # used for CPM API call routing downstream
-  - { name: ACIAvailableBalance,         index: 8,  required: true }
-  - { name: ACIAvailableBalanceAsOfDate, index: 9,  required: true }   # format: MM/dd/yyyy HH:mm:ss
-  - { name: ACICurrentBalance,           index: 10, required: true }
-  - { name: ACICurrentBalanceAsOfDate,   index: 11, required: true }   # format: MM/dd/yyyy HH:mm:ss
-  - { name: GDAvailableBalance,          index: 12, required: true }
-  - { name: GDAvailableBalanceAsOfDate,  index: 13, required: true }   # format: MM/dd/yyyy HH:mm:ss
-  - { name: GDCurrentBalance,            index: 14, required: true }
-  - { name: GDCurrentBalanceAsOfDate,    index: 15, required: true }   # format: MM/dd/yyyy HH:mm:ss
+  header:
+    role: header
+    rows: 1
+    skip: true         # ParseHeader returns null in the importer: consumed, never emitted
+
+  data:
+    role: data         # spans every row the header and trailer do not claim
+    # 16 fields; the count is derived from this list, never declared separately, so the two
+    # can never disagree. A row that does not split into exactly this many values is rejected.
+    fields:
+      - { name: ACIProductID,                index: 0,  required: true }   # used for BIN+product routing
+      - { name: AccountBalanceKey,           index: 1,  required: true }   # DB update key; cast to long downstream
+      - { name: GDAccountKey,                index: 2 }
+      - { name: ACIExternalID,               index: 3,  encrypt: true }    # ACI account-level external identifier
+      - { name: ACICardExternalID,           index: 4,  encrypt: true }    # card-level external identifier — PCI-adjacent
+      - { name: BIN,                         index: 5,  required: true }   # used for BIN routing
+      - { name: AccountIdentifier,           index: 6,  encrypt: true, required: true }  # GUID; CPM API account key downstream
+      - { name: ProgramCode,                 index: 7,  required: true }   # used for CPM API call routing downstream
+      - { name: ACIAvailableBalance,         index: 8,  required: true }
+      - { name: ACIAvailableBalanceAsOfDate, index: 9,  required: true }   # format: MM/dd/yyyy HH:mm:ss
+      - { name: ACICurrentBalance,           index: 10, required: true }
+      - { name: ACICurrentBalanceAsOfDate,   index: 11, required: true }   # format: MM/dd/yyyy HH:mm:ss
+      - { name: GDAvailableBalance,          index: 12, required: true }
+      - { name: GDAvailableBalanceAsOfDate,  index: 13, required: true }   # format: MM/dd/yyyy HH:mm:ss
+      - { name: GDCurrentBalance,            index: 14, required: true }
+      - { name: GDCurrentBalanceAsOfDate,    index: 15, required: true }   # format: MM/dd/yyyy HH:mm:ss
