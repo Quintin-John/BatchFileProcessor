@@ -18,6 +18,20 @@ internal sealed class DelimitedFormat : IRecordFormat
     public ILayout LoadLayout(string path) => DelimitedLayoutLoader.LoadFromFile(path);
 
     /// <inheritdoc />
+    public bool CanFrame(ILayout layout, Stream file)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        ArgumentNullException.ThrowIfNull(file);
+
+        // Rows vary in length, so nothing structural separates one delimited layout from another: there is
+        // no stride to divide by, and two layouts over the same feed can accept the same bytes. Every
+        // delimited layout is therefore a possible fit, which leaves a profile declaring one working
+        // exactly as before and a profile declaring several failing closed on the caller's unique-fit rule
+        // — the honest answer until this format has a test that can actually tell them apart.
+        return layout is DelimitedLayout;
+    }
+
+    /// <inheritdoc />
     public RecordFraming CreateFraming(ILayout layout, Encoding encoding)
     {
         ArgumentNullException.ThrowIfNull(layout);

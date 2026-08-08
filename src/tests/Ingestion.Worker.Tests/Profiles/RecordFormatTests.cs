@@ -18,6 +18,131 @@ public sealed class RecordFormatTests
         new DelimitedRowDefinition("body", RowRole.Data, 0, new[] { new DelimitedFieldDefinition("f", 0) }),
     });
 
+    // ---------- which layout could frame a file ----------
+
+    private static MemoryStream FileOf(int bytes) => new(new byte[bytes]);
+
+    [Fact]
+    public void CanFrame_FixedWidth_AcceptsAWholeNumberOfRecords()
+    {
+        // The stride is the layout's own record length plus its terminator; a file it describes is some
+        // whole number of those and nothing else needs declaring.
+        var layout = FixedWidthLayout();
+        var stride = layout.RecordLength + layout.TerminatorLength;
+
+        Assert.True(RecordFormats.Resolve("fixed-length")!.CanFrame(layout, FileOf(stride)));
+        Assert.True(RecordFormats.Resolve("fixed-length")!.CanFrame(layout, FileOf(stride * 7)));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public void CanFrame_FixedWidth_RejectsAPartialRecord(int delta)
+    {
+        var layout = FixedWidthLayout();
+        var stride = layout.RecordLength + layout.TerminatorLength;
+
+        Assert.False(RecordFormats.Resolve("fixed-length")!.CanFrame(layout, FileOf(stride * 3 + delta)));
+    }
+
+    [Fact]
+    public void CanFrame_FixedWidth_RejectsAnEmptyFile()
+    {
+        // Zero divides by every stride, so an empty file would fit every candidate and decide nothing.
+        Assert.False(RecordFormats.Resolve("fixed-length")!.CanFrame(FixedWidthLayout(), FileOf(0)));
+    }
+
+    [Fact]
+    public void CanFrame_FixedWidth_TellsTwoRecordLengthsApart()
+    {
+        // The point of the whole mechanism: two versions of one format, distinguished by nothing but the
+        // record length each already declares.
+        var shortRecords = new Layout("a", 1200, "ascii", 1, 1, 2, new[]
+        {
+            new RecordDefinition("r", "M", new[] { new FieldDefinition("f", 1, 1200) }),
+        });
+        var longRecords = new Layout("b", 2400, "ascii", 1, 1, 2, new[]
+        {
+            new RecordDefinition("r", "M", new[] { new FieldDefinition("f", 1, 2400) }),
+        });
+        var format = RecordFormats.Resolve("fixed-length")!;
+
+        using var fileOfLongRecords = FileOf((2400 + 1) * 4);
+
+        Assert.True(format.CanFrame(longRecords, fileOfLongRecords));
+        Assert.False(format.CanFrame(shortRecords, fileOfLongRecords));
+    }
+
+    [Fact]
+    public void CanFrame_FixedWidth_AdmitsBothWhenTheStridesShareAMultiple()
+    {
+        // Not a defect to hide: strides that share a common multiple both divide such a file, and the
+        // caller is what makes that safe by demanding a unique fit. Pinned so nobody later "fixes" this
+        // into picking one.
+        var a = new Layout("a", 1200, "ascii", 1, 1, 2, new[]
+        {
+            new RecordDefinition("r", "M", new[] { new FieldDefinition("f", 1, 1200) }),
+        });
+        var b = new Layout("b", 2400, "ascii", 1, 1, 2, new[]
+        {
+            new RecordDefinition("r", "M", new[] { new FieldDefinition("f", 1, 2400) }),
+        });
+        var format = RecordFormats.Resolve("fixed-length")!;
+        using var shared = FileOf(1201 * 2401); // the first size both strides divide
+
+        Assert.True(format.CanFrame(a, shared));
+        Assert.True(format.CanFrame(b, shared));
+    }
+
+    [Fact]
+    public void CanFrame_Delimited_AdmitsAnyDelimitedLayout()
+    {
+        // Rows vary in length, so there is nothing structural to divide by. Saying yes to all of them is
+        // what makes a profile declaring several delimited layouts fail closed instead of guessing.
+        Assert.True(RecordFormats.Resolve("delimited")!.CanFrame(DelimitedLayout(), FileOf(37)));
+        Assert.True(RecordFormats.Resolve("delimited")!.CanFrame(DelimitedLayout(), FileOf(0)));
+    }
+
+    [Theory]
+    [InlineData("fixed-length")]
+    [InlineData("delimited")]
+    public void CanFrame_AnotherFormatsLayout_NeverFits(string token)
+    {
+        // Total rather than throwing: the test is asked of every candidate, so the wrong layout type is an
+        // answer of "no", not a fault.
+        var format = RecordFormats.Resolve(token)!;
+        ILayout foreign = token == "fixed-length" ? DelimitedLayout() : FixedWidthLayout();
+
+        Assert.False(format.CanFrame(foreign, FileOf(11)));
+    }
+
+    [Theory]
+    [InlineData("fixed-length")]
+    [InlineData("delimited")]
+    public void CanFrame_NullArgument_Throws(string token)
+    {
+        var format = RecordFormats.Resolve(token)!;
+
+        Assert.Throws<ArgumentNullException>(() => format.CanFrame(null!, FileOf(11)));
+        Assert.Throws<ArgumentNullException>(() => format.CanFrame(FixedWidthLayout(), null!));
+    }
+
+    [Theory]
+    [InlineData("fixed-length")]
+    [InlineData("delimited")]
+    public void CanFrame_LeavesTheStreamWhereItFoundIt(string token)
+    {
+        // The selector asks every candidate in turn and then hands the file to the pipeline; a test that
+        // consumed the stream would break the next question or the read that follows.
+        var format = RecordFormats.Resolve(token)!;
+        using var file = FileOf(24);
+        file.Position = 6;
+
+        format.CanFrame(token == "fixed-length" ? FixedWidthLayout() : DelimitedLayout(), file);
+
+        Assert.Equal(6, file.Position);
+    }
+
     // ---------- registry ----------
 
     [Theory]

@@ -18,6 +18,28 @@ internal sealed class FixedLengthFormat : IRecordFormat
     public ILayout LoadLayout(string path) => LayoutLoader.LoadFromFile(path);
 
     /// <inheritdoc />
+    public bool CanFrame(ILayout layout, Stream file)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        ArgumentNullException.ThrowIfNull(file);
+
+        // Another format's layout never fits; the profile pairs them, but the test must be total.
+        if (layout is not Layout fixedWidth)
+        {
+            return false;
+        }
+
+        // Every record occupies the same stride, so a file this layout describes is a whole number of them.
+        // A file written to a different version of the format has a different stride and will not divide —
+        // unless the two strides share a multiple, which is exactly why the caller demands a unique fit
+        // rather than taking the first that says yes.
+        var stride = (long)fixedWidth.RecordLength + fixedWidth.TerminatorLength;
+
+        // An empty file divides by every stride, so it would fit all candidates and decide nothing.
+        return file.Length > 0 && file.Length % stride == 0;
+    }
+
+    /// <inheritdoc />
     public RecordFraming CreateFraming(ILayout layout, Encoding encoding)
     {
         ArgumentNullException.ThrowIfNull(layout);

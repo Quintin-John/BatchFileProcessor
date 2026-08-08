@@ -23,6 +23,24 @@ internal interface IRecordFormat
     /// <exception cref="FormatException">The layout is malformed or violates an invariant.</exception>
     ILayout LoadLayout(string path);
 
+    /// <summary>
+    /// Whether this layout could frame the given file.
+    /// <para>
+    /// This is how a profile that declares several layouts decides which one a file belongs to, and the
+    /// test is the format's own — nothing outside knows what makes a file fit, so a new format brings its
+    /// own answer and the selection never grows a branch per format.
+    /// </para>
+    /// <para>
+    /// A format that cannot yet tell its own layouts apart says yes to all of them. That is not a guess:
+    /// the caller requires exactly one candidate to fit, so an undecidable set reads as an ambiguous file
+    /// and fails closed, rather than being attributed to whichever layout happened to be declared first.
+    /// </para>
+    /// </summary>
+    /// <param name="layout">A layout produced by <see cref="LoadLayout"/>; required.</param>
+    /// <param name="file">The file to test; required, readable and seekable. Left positioned as found.</param>
+    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    bool CanFrame(ILayout layout, Stream file);
+
     /// <summary>Builds the reader and parser that frame and map this format's records.</summary>
     /// <param name="layout">A layout produced by <see cref="LoadLayout"/>; required.</param>
     /// <param name="encoding">The encoding the layout declares.</param>
