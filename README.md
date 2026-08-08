@@ -77,7 +77,7 @@ single-implementation support libraries are concrete references (no speculative 
 | `Common.Observability` | OpenTelemetry wiring, run/correlation context |
 | `Ingestion.Worker` | Composition root: loads profiles, builds one worker + pipeline per profile |
 
-Each `src` project has a matching mocked-unit-test project under `tests/`.
+Each `src` project has a matching mocked-unit-test project under `src/tests/`.
 
 ## Configuration — three layers, three owners
 

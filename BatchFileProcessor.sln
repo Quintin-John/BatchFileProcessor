@@ -9,27 +9,27 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.Contracts"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{93DE55B5-161C-4A97-B921-2A27DAE602B4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.Contracts.Tests", "tests\Common.Messaging.Contracts.Tests\Common.Messaging.Contracts.Tests.csproj", "{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.Contracts.Tests", "src\tests\Common.Messaging.Contracts.Tests\Common.Messaging.Contracts.Tests.csproj", "{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.DataProtection", "src\Common.Security.DataProtection\Common.Security.DataProtection.csproj", "{F29E2D56-CBD7-4365-8B9D-C9FE022A603A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.DataProtection.Tests", "tests\Common.Security.DataProtection.Tests\Common.Security.DataProtection.Tests.csproj", "{5F1459A8-714F-4457-95B7-45A37BB55F14}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.DataProtection.Tests", "src\tests\Common.Security.DataProtection.Tests\Common.Security.DataProtection.Tests.csproj", "{5F1459A8-714F-4457-95B7-45A37BB55F14}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Observability", "src\Common.Observability\Common.Observability.csproj", "{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Observability.Tests", "tests\Common.Observability.Tests\Common.Observability.Tests.csproj", "{9B74FB76-8333-4104-A441-15C89415D8A4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Observability.Tests", "src\tests\Common.Observability.Tests\Common.Observability.Tests.csproj", "{9B74FB76-8333-4104-A441-15C89415D8A4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.MassTransit", "src\Common.Messaging.MassTransit\Common.Messaging.MassTransit.csproj", "{8BCD819A-CB15-4552-AD96-6DCA52FB0F3F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.MassTransit.Tests", "tests\Common.Messaging.MassTransit.Tests\Common.Messaging.MassTransit.Tests.csproj", "{9F3FC301-0CA7-4D4B-941A-F4E8CEA0255D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.MassTransit.Tests", "src\tests\Common.Messaging.MassTransit.Tests\Common.Messaging.MassTransit.Tests.csproj", "{9F3FC301-0CA7-4D4B-941A-F4E8CEA0255D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion", "src\Common.FileIngestion\Common.FileIngestion.csproj", "{66550F15-5AD6-457A-AF8B-68E47346A4E4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Tests", "tests\Common.FileIngestion.Tests\Common.FileIngestion.Tests.csproj", "{AE2F3AEC-6571-43B0-9656-1167AF16CA34}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Tests", "src\tests\Common.FileIngestion.Tests\Common.FileIngestion.Tests.csproj", "{AE2F3AEC-6571-43B0-9656-1167AF16CA34}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ingestion.Worker", "src\Ingestion.Worker\Ingestion.Worker.csproj", "{B72FC060-7D46-48E3-BA14-4CE3D39BF178}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ingestion.Worker.Tests", "tests\Ingestion.Worker.Tests\Ingestion.Worker.Tests.csproj", "{E670C4D3-E5F8-4BEB-A7A7-01AC119D0CC3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ingestion.Worker.Tests", "src\tests\Ingestion.Worker.Tests\Ingestion.Worker.Tests.csproj", "{E670C4D3-E5F8-4BEB-A7A7-01AC119D0CC3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.FileIngestion.Abstractions", "src\Common.FileIngestion.Abstractions\Common.FileIngestion.Abstractions.csproj", "{39C2AB3D-4220-46F9-8BA7-FBD34974AE29}"
 EndProject
@@ -165,5 +165,6 @@ Global
 		{9D907A0B-5FDC-4E67-9AFE-C76B84F9FAAE} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{BC594C77-93C7-45F7-AE9B-225597A8DFC8} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 		{0F804251-1E78-473C-8E10-D3E5F1734964} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
+		{93DE55B5-161C-4A97-B921-2A27DAE602B4} = {6FD848B6-E7B7-4EB5-A833-40796DCC22FC}
 	EndGlobalSection
 EndGlobal

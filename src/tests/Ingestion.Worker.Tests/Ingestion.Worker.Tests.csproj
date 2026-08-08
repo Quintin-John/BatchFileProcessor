@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- TargetFramework, coverage gate, and common test packages come from tests/Directory.Build.props +
+  <!-- TargetFramework, coverage gate, and common test packages come from src/tests/Directory.Build.props +
        Directory.Packages.props. Only this project's coverage scope + extra packages stay here. -->
   <PropertyGroup>
     <!-- 90% line-coverage gate for the host logic; the composition root (Program) is wiring-only. -->
@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Ingestion.Worker\Ingestion.Worker.csproj" />
+    <ProjectReference Include="..\..\..\src\Ingestion.Worker\Ingestion.Worker.csproj" />
   </ItemGroup>
 
 </Project>

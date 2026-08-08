@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- TargetFramework, coverage gate, and common test packages come from tests/Directory.Build.props +
+  <!-- TargetFramework, coverage gate, and common test packages come from src/tests/Directory.Build.props +
        Directory.Packages.props. Only this project's coverage scope + extra packages stay here. -->
   <PropertyGroup>
-    <Include>[Common.Messaging.MassTransit]*</Include>
+    <Include>[Common.Security.DataProtection]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Common.Messaging.MassTransit\Common.Messaging.MassTransit.csproj" />
+    <ProjectReference Include="..\..\..\src\Common.Security.DataProtection\Common.Security.DataProtection.csproj" />
   </ItemGroup>
 
 </Project>
