@@ -1,11 +1,11 @@
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
 /// DI registration for the data-protection library.
 /// </summary>
-public static class DataProtectionServiceCollectionExtensions
+public static class EncryptionServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the crypto provider, maskers, and field protector against the given policy.
@@ -16,7 +16,7 @@ public static class DataProtectionServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="policy">The data-protection policy to enforce.</param>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    public static IServiceCollection AddDataProtection(this IServiceCollection services, DataProtectionPolicy policy)
+    public static IServiceCollection AddEncryption(this IServiceCollection services, EncryptionPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(policy);

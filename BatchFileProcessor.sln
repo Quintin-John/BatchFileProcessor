@@ -11,9 +11,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{93DE55B5
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Messaging.Contracts.Tests", "src\tests\Common.Messaging.Contracts.Tests\Common.Messaging.Contracts.Tests.csproj", "{FC077102-5A2D-4E19-8D1C-A40486D7DFAC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.DataProtection", "src\Common.Security.DataProtection\Common.Security.DataProtection.csproj", "{F29E2D56-CBD7-4365-8B9D-C9FE022A603A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.Encryption", "src\Common.Security.Encryption\Common.Security.Encryption.csproj", "{F29E2D56-CBD7-4365-8B9D-C9FE022A603A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.DataProtection.Tests", "src\tests\Common.Security.DataProtection.Tests\Common.Security.DataProtection.Tests.csproj", "{5F1459A8-714F-4457-95B7-45A37BB55F14}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Security.Encryption.Tests", "src\tests\Common.Security.Encryption.Tests\Common.Security.Encryption.Tests.csproj", "{5F1459A8-714F-4457-95B7-45A37BB55F14}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common.Observability", "src\Common.Observability\Common.Observability.csproj", "{B5B2D0DA-E073-4AB9-92C1-7EB11FF722E5}"
 EndProject

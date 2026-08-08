@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Which fields are encrypted on the wire. That is the whole question it answers: a value is encrypted or it
@@ -8,7 +8,7 @@ namespace Common.Security.DataProtection;
 /// it. Lookup is fail-closed — a field the policy has never heard of throws rather than defaulting to clear,
 /// so a newly added field cannot leak by being forgotten.
 /// </summary>
-public sealed class DataProtectionPolicy
+public sealed class EncryptionPolicy
 {
     /// <summary>Per-field action, keyed by layout field name (ordinal). Read-only.</summary>
     public IReadOnlyDictionary<string, ProtectionAction> Fields { get; }
@@ -16,7 +16,7 @@ public sealed class DataProtectionPolicy
     /// <summary>Creates a policy from a per-field map. The map is defensively copied.</summary>
     /// <param name="fields">Field-name to action; required, non-null.</param>
     /// <exception cref="ArgumentNullException"><paramref name="fields"/> is null.</exception>
-    public DataProtectionPolicy(IReadOnlyDictionary<string, ProtectionAction> fields)
+    public EncryptionPolicy(IReadOnlyDictionary<string, ProtectionAction> fields)
     {
         ArgumentNullException.ThrowIfNull(fields);
 

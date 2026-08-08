@@ -1,12 +1,12 @@
-namespace Common.Security.DataProtection.Tests;
+namespace Common.Security.Encryption.Tests;
 
-public sealed class DataProtectionPolicyTests
+public sealed class EncryptionPolicyTests
 {
     // Field names state only what the policy does with them; nothing here knows what a field holds.
     private const string EncryptedField = "encrypted";
     private const string ClearField = "clear";
 
-    private static DataProtectionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
+    private static EncryptionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
     {
         [EncryptedField] = ProtectionAction.Encrypt,
         [ClearField] = ProtectionAction.Clear,
@@ -39,14 +39,14 @@ public sealed class DataProtectionPolicyTests
     [Fact]
     public void Constructor_WithNullFields_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new DataProtectionPolicy(null!));
+        Assert.Throws<ArgumentNullException>(() => new EncryptionPolicy(null!));
     }
 
     [Fact]
     public void Fields_AreDefensivelyCopied()
     {
         var source = new Dictionary<string, ProtectionAction> { [ClearField] = ProtectionAction.Clear };
-        var policy = new DataProtectionPolicy(source);
+        var policy = new EncryptionPolicy(source);
 
         source[EncryptedField] = ProtectionAction.Encrypt;
 

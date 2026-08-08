@@ -1,5 +1,5 @@
 using Common.FileIngestion.Layouts;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 using Ingestion.Worker;
 
 namespace Ingestion.Worker.Tests;

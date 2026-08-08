@@ -1,4 +1,4 @@
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Supplies and resolves data-encryption keys (Option A envelope model): producers encrypt with

@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection.Tests;
+namespace Common.Security.Encryption.Tests;
 
 public sealed class AesGcmCryptoProviderTests
 {

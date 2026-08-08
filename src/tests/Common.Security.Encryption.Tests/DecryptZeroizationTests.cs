@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection.Tests;
+namespace Common.Security.Encryption.Tests;
 
 /// <summary>
 /// Proves the decrypt paths zero the transient cleartext buffer (symmetric with the encrypt paths),
@@ -17,7 +17,7 @@ public sealed class DecryptZeroizationTests
 
     private const string EncryptedField = "encrypted";
 
-    private static DataProtectionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
+    private static EncryptionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
     {
         [EncryptedField] = ProtectionAction.Encrypt,
     });

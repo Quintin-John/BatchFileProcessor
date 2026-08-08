@@ -1,6 +1,6 @@
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// A pluggable authenticated-encryption algorithm. Encrypts plaintext with a <see cref="DataKey"/>

@@ -12,7 +12,7 @@ using Common.FileIngestion.Rejecting;
 using Common.FileIngestion.Telemetry;
 using Common.Messaging.Contracts;
 using Common.Observability;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 using Ingestion.Worker.Messages;
 using Ingestion.Worker.Profiles;
 

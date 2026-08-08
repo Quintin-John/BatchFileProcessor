@@ -1,4 +1,4 @@
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// A symmetric data-encryption key (DEK) plus the identity by which it is resolved.

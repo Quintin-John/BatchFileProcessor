@@ -3,7 +3,7 @@
   <!-- TargetFramework, coverage gate, and common test packages come from src/tests/Directory.Build.props +
        Directory.Packages.props. Only this project's coverage scope + extra packages stay here. -->
   <PropertyGroup>
-    <Include>[Common.Security.DataProtection]*</Include>
+    <Include>[Common.Security.Encryption]*</Include>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Common.Security.DataProtection\Common.Security.DataProtection.csproj" />
+    <ProjectReference Include="..\..\..\src\Common.Security.Encryption\Common.Security.Encryption.csproj" />
   </ItemGroup>
 
 </Project>

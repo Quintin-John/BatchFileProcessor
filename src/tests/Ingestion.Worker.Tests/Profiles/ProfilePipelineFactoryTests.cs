@@ -6,7 +6,7 @@ using Common.FileIngestion.Parsing;
 using Common.FileIngestion.Telemetry;
 using Common.Messaging.Contracts;
 using Common.Observability;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 using Ingestion.Worker.Profiles;
 
 namespace Ingestion.Worker.Tests.Profiles;

@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Builds the additional authenticated data (AAD) that binds a ciphertext to its

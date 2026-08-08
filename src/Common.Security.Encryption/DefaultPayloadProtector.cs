@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Default <see cref="IPayloadProtector"/>. Encrypts the UTF-8 bytes of a payload with the active key

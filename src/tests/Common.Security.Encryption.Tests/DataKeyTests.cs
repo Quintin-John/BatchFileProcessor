@@ -1,4 +1,4 @@
-namespace Common.Security.DataProtection.Tests;
+namespace Common.Security.Encryption.Tests;
 
 public sealed class DataKeyTests
 {

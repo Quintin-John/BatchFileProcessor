@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection.Tests;
+namespace Common.Security.Encryption.Tests;
 
 public sealed class DefaultPayloadProtectorTests
 {

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// In-memory <see cref="IKeyProvider"/> for development and testing. Generates a single random

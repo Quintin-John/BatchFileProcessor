@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection.Tests;
+namespace Common.Security.Encryption.Tests;
 
 public sealed class DefaultFieldProtectorTests
 {
@@ -12,14 +12,14 @@ public sealed class DefaultFieldProtectorTests
     private const string ClearField = "clear";
     private const string OtherEncryptedField = "encrypted-too";
 
-    private static DataProtectionPolicy DefaultPolicy() => new(new Dictionary<string, ProtectionAction>
+    private static EncryptionPolicy DefaultPolicy() => new(new Dictionary<string, ProtectionAction>
     {
         [EncryptedField] = ProtectionAction.Encrypt,
         [ClearField] = ProtectionAction.Clear,
         [OtherEncryptedField] = ProtectionAction.Encrypt,
     });
 
-    private static (DefaultFieldProtector Protector, InMemoryKeyProvider Keys) Build(DataProtectionPolicy? policy = null)
+    private static (DefaultFieldProtector Protector, InMemoryKeyProvider Keys) Build(EncryptionPolicy? policy = null)
     {
         var keys = new InMemoryKeyProvider();
         var protector = new DefaultFieldProtector(new AesGcmCryptoProvider(), keys, policy ?? DefaultPolicy());

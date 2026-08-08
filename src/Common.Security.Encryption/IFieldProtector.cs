@@ -1,6 +1,6 @@
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Reversible encryption of individual field values: encrypting or passing through per the policy, and

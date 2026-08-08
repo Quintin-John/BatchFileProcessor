@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Default <see cref="IFieldProtector"/>. Encrypts clear values with the active key via the
@@ -14,14 +14,14 @@ public sealed class DefaultFieldProtector : IFieldProtector
 {
     private readonly ICryptoProvider _crypto;
     private readonly IKeyProvider _keys;
-    private readonly DataProtectionPolicy _policy;
+    private readonly EncryptionPolicy _policy;
 
     /// <summary>Creates the protector.</summary>
     /// <param name="crypto">Crypto provider.</param>
     /// <param name="keys">Key provider.</param>
     /// <param name="policy">Data-protection policy.</param>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    public DefaultFieldProtector(ICryptoProvider crypto, IKeyProvider keys, DataProtectionPolicy policy)
+    public DefaultFieldProtector(ICryptoProvider crypto, IKeyProvider keys, EncryptionPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(crypto);
         ArgumentNullException.ThrowIfNull(keys);

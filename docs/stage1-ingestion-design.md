@@ -448,7 +448,7 @@ Banking context: **all data — in transit and at rest — is encrypted with str
 - **Chosen algorithm: AES-256-GCM — single, committed choice** (secure-at-field-level **and** fast). FIPS 197 / NIST SP 800-38D **AEAD** (confidentiality + integrity in one pass), HSM/Key Vault-native, AES-NI accelerated (multi-GB/s per core). **AAD** binds each ciphertext to `fileId + recordSeq + field` (anti-replay). GCM-SIV / post-quantum are **future plugin slots only**, not competing choices.
 - **Field-level *and* fast** — the per-batch **DEK is unwrapped from Key Vault once per batch, never per field**; all per-field encryption then runs **locally in-process** (nanoseconds/field), so field-level protection carries **no per-field network cost**. This is the mechanism that makes field-level viable at tens-of-millions-of-records scale.
 - **Nonce discipline** — per-batch DEK + unique 96-bit nonce bounds encryptions per key, eliminating GCM's nonce-reuse risk. Misuse-resistant drop-in if ever needed: **AES-256-GCM-SIV** (RFC 8452). *(ChaCha20-Poly1305 excluded — not FIPS-approved.)*
-- **Plugin seam** — `ICryptoProvider` port in `*.Security.DataProtection`; `AesGcmCryptoProvider` ships now, GCM-SIV / post-quantum are additional plugins in the same slot. Algorithm selected by config (data-protection policy), **never hardcoded**.
+- **Plugin seam** — `ICryptoProvider` port in `*.Security.Encryption`; `AesGcmCryptoProvider` ships now, GCM-SIV / post-quantum are additional plugins in the same slot. Algorithm selected by config, **never hardcoded**.
 - **Self-describing ciphertext** — every value carries `{ alg, keyId, keyVersion, nonce, tag }`, so **algorithm/key rotation is non-breaking**: a consumer reads the tag and selects the right plugin/key to decrypt old and new data side by side. This is what makes crypto-agility real, not aspirational.
 - **Never home-grown** — each plugin is a thin adapter over `System.Security.Cryptography.AesGcm` / Key Vault crypto, not a custom cipher.
 
@@ -584,14 +584,14 @@ Cross-cutting concerns are extracted into **focused, single-responsibility share
 | Library | Responsibility | Shared because |
 |---|---|---|
 | `*.Messaging.Contracts` | **generic** envelope + open name→value field bag + `EncryptedValue` + reject DTOs — **no G266-typed fields** (those stay in the versioned layout YAML, §5) | producer & all consumers bind the **same** format-agnostic contract; new file types add YAML, not code |
-| `*.Security.DataProtection` | `IFieldProtector`, AES-256-GCM envelope crypto, classification-policy loader, Key Vault/KMS client | producer encrypts / consumers decrypt — **must** share the exact scheme (§8.2/§8.3) |
+| `*.Security.Encryption` | `IFieldProtector`, AES-256-GCM envelope crypto, encryption-policy loader, Key Vault/KMS client | producer encrypts / consumers decrypt — **must** share the exact scheme (§8.2/§8.3) |
 | `*.Observability` | OTel wiring (traces/metrics/logs), identity/correlation propagation, structured-log conventions | every service emits consistent, correlated telemetry |
 | `*.Messaging.MassTransit` | MassTransit conventions — publisher, resilience (retry/CB/rate-limit), serialization bridge, bus registration | uniform transport behaviour across producers/consumers |
 | `*.FileIngestion.Core` *(candidate)* | the generic fixed-length/delimited engine + layout/profile model | **only** promoted to a shared library if sibling **deployables** appear; today it is this component's core — not a premature library |
 
-**Final count: 4 shared libraries** (Contracts, DataProtection, Observability, MassTransit). A `*.Configuration` library was **considered and rejected** — options binding + Key-Vault-secret access is a thin composition-root concern loaded per component from Helm values → env/appsettings → a Key Vault config provider, not shared behaviour. Making it a library risked exactly the `Common`/utils grab-bag §13 forbids. Each library already binds its own options directly from `IConfiguration`.
+**Final count: 4 shared libraries** (Contracts, Encryption, Observability, MassTransit). A `*.Configuration` library was **considered and rejected** — options binding + Key-Vault-secret access is a thin composition-root concern loaded per component from Helm values → env/appsettings → a Key Vault config provider, not shared behaviour. Making it a library risked exactly the `Common`/utils grab-bag §13 forbids. Each library already binds its own options directly from `IConfiguration`.
 
-Dependency direction: `Contracts` ← `DataProtection` / `Observability`\* / `MassTransit` ← app (\*Observability is independent of Contracts — see §1.2). No cycles (§1.1-D).
+Dependency direction: `Contracts` ← `Encryption` / `Observability`\* / `MassTransit` ← app (\*Observability is independent of Contracts — see §1.2). No cycles (§1.1-D).
 
 **Enforced by the build, not by review (DRY/SOLID as gates):**
 - **Architecture tests** (NetArchTest / ArchUnitNET) fail the build on: a dependency-direction violation (any library referencing the app), a **cycle** between libraries, or a forbidden cross-reference. SOLID-D and acyclicity become CI gates.

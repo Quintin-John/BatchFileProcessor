@@ -1,4 +1,4 @@
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>What to do with a field's value on the wire.</summary>
 public enum ProtectionAction

@@ -1,6 +1,6 @@
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Encrypts an opaque payload that was never split into fields — e.g. the raw content of a record that

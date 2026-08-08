@@ -8,7 +8,7 @@ using Common.FileIngestion.Sources;
 using Common.FileIngestion.Telemetry;
 using Common.Messaging.MassTransit;
 using Common.Observability;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 using Ingestion.Worker;
 using Ingestion.Worker.Health;
 using Ingestion.Worker.Profiles;

@@ -11,7 +11,7 @@ using Common.FileIngestion.Reading;
 using Common.FileIngestion.Rejecting;
 using Common.FileIngestion.Telemetry;
 using Common.Observability;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 using Common.Messaging.Contracts;
 using Ingestion.Worker.Messages;
 using Ingestion.Worker.Profiles;

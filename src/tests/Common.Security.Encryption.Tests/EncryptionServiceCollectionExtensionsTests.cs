@@ -1,22 +1,22 @@
 using Common.Messaging.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Common.Security.DataProtection.Tests;
+namespace Common.Security.Encryption.Tests;
 
-public sealed class DataProtectionServiceCollectionExtensionsTests
+public sealed class EncryptionServiceCollectionExtensionsTests
 {
     private const string EncryptedField = "encrypted";
 
-    private static DataProtectionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
+    private static EncryptionPolicy Policy() => new(new Dictionary<string, ProtectionAction>
     {
         [EncryptedField] = ProtectionAction.Encrypt,
     });
 
     [Fact]
-    public void AddDataProtection_ResolvesFieldProtector_ThatRoundTrips()
+    public void AddEncryption_ResolvesFieldProtector_ThatRoundTrips()
     {
         var services = new ServiceCollection();
-        services.AddDataProtection(Policy()).AddInMemoryKeyProvider();
+        services.AddEncryption(Policy()).AddInMemoryKeyProvider();
         using var provider = services.BuildServiceProvider();
 
         var protector = provider.GetRequiredService<IFieldProtector>();
@@ -30,39 +30,39 @@ public sealed class DataProtectionServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddDataProtection_RegistersCoreServices()
+    public void AddEncryption_RegistersCoreServices()
     {
         var services = new ServiceCollection();
-        services.AddDataProtection(Policy()).AddInMemoryKeyProvider();
+        services.AddEncryption(Policy()).AddInMemoryKeyProvider();
         using var provider = services.BuildServiceProvider();
 
         Assert.IsType<AesGcmCryptoProvider>(provider.GetRequiredService<ICryptoProvider>());
         Assert.IsType<InMemoryKeyProvider>(provider.GetRequiredService<IKeyProvider>());
         Assert.Equal(
             ProtectionAction.Encrypt,
-            provider.GetRequiredService<DataProtectionPolicy>().GetProtection(EncryptedField));
+            provider.GetRequiredService<EncryptionPolicy>().GetProtection(EncryptedField));
     }
 
     [Fact]
-    public void AddDataProtection_WithoutKeyProvider_CannotResolveProtector()
+    public void AddEncryption_WithoutKeyProvider_CannotResolveProtector()
     {
         var services = new ServiceCollection();
-        services.AddDataProtection(Policy()); // no key provider registered
+        services.AddEncryption(Policy()); // no key provider registered
         using var provider = services.BuildServiceProvider();
 
         Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IFieldProtector>());
     }
 
     [Fact]
-    public void AddDataProtection_NullServices_Throws()
+    public void AddEncryption_NullServices_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => ((IServiceCollection)null!).AddDataProtection(Policy()));
+        Assert.Throws<ArgumentNullException>(() => ((IServiceCollection)null!).AddEncryption(Policy()));
     }
 
     [Fact]
-    public void AddDataProtection_NullPolicy_Throws()
+    public void AddEncryption_NullPolicy_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => new ServiceCollection().AddDataProtection(null!));
+        Assert.Throws<ArgumentNullException>(() => new ServiceCollection().AddEncryption(null!));
     }
 
     [Fact]

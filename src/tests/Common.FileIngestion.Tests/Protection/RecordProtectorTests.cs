@@ -1,6 +1,6 @@
 using Common.FileIngestion.Protection;
 using Common.Messaging.Contracts;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 
 namespace Common.FileIngestion.Tests.Protection;
 

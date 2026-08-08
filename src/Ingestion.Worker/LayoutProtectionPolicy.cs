@@ -1,5 +1,5 @@
 using Common.FileIngestion.Layouts;
-using Common.Security.DataProtection;
+using Common.Security.Encryption;
 
 namespace Ingestion.Worker;
 
@@ -13,10 +13,10 @@ namespace Ingestion.Worker;
 /// </summary>
 public static class LayoutProtectionPolicy
 {
-    /// <summary>Derives a <see cref="DataProtectionPolicy"/> from a layout's <c>encrypt</c> flags.</summary>
+    /// <summary>Derives a <see cref="EncryptionPolicy"/> from a layout's <c>encrypt</c> flags.</summary>
     /// <param name="layout">The layout whose fields carry the encrypt flags; required. Any framing.</param>
     /// <exception cref="ArgumentNullException"><paramref name="layout"/> is null.</exception>
-    public static DataProtectionPolicy From(ILayout layout)
+    public static EncryptionPolicy From(ILayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
 
@@ -38,6 +38,6 @@ public static class LayoutProtectionPolicy
             fields[field.Name] = protection;
         }
 
-        return new DataProtectionPolicy(fields);
+        return new EncryptionPolicy(fields);
     }
 }

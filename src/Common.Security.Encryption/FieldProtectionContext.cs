@@ -1,4 +1,4 @@
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// Identifies the field being protected. Its parts form the authenticated associated data that

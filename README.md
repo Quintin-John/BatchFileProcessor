@@ -200,7 +200,7 @@ single-implementation support libraries are concrete references (no speculative 
 | `Common.FileIngestion` | The engine: pipeline, batching, lineage, health, rejecting |
 | `Common.Messaging.Contracts` | Message contracts + `IMessagePublisher` port |
 | `Common.Messaging.MassTransit` | MassTransit adapter, send-retry, deterministic envelope ids |
-| `Common.Security.DataProtection` | AES-256-GCM crypto, field/payload protectors, key providers |
+| `Common.Security.Encryption` | AES-256-GCM crypto, field/payload protectors, key providers |
 | `Common.Observability` | OpenTelemetry wiring, run/correlation context, log redaction |
 | `Ingestion.Worker` | Composition root: loads profiles, builds one worker + pipeline per profile |
 

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using Common.Messaging.Contracts;
 
-namespace Common.Security.DataProtection;
+namespace Common.Security.Encryption;
 
 /// <summary>
 /// AES-256-GCM authenticated encryption (FIPS 197 / NIST SP 800-38D). Confidentiality and
