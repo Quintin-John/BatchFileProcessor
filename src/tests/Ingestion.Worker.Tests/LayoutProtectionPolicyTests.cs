@@ -91,4 +91,47 @@ public sealed class LayoutProtectionPolicyTests
     {
         Assert.Throws<ArgumentNullException>(() => LayoutProtectionPolicy.From(null!));
     }
+
+    [Fact]
+    public void From_DelimitedLayout_ClassifiesTheSameWay()
+    {
+        // Classification is framing-agnostic: the policy reads the shared ILayout surface, so a delimited
+        // profile protects its fields without any delimited-specific branch here.
+        var layout = new DelimitedLayout("1.0", '\t', "ascii", new[]
+        {
+            new DelimitedRowDefinition("body", RowRole.Data, 0, new[]
+            {
+                new DelimitedFieldDefinition("clearField", 0),
+                new DelimitedFieldDefinition("pan", 1, encrypt: true),
+            }),
+        });
+
+        var policy = LayoutProtectionPolicy.From(layout);
+
+        Assert.Equal(ProtectionAction.Encrypt, policy.Fields["pan"].Action);
+        Assert.True(policy.Fields["pan"].RedactInLogs);
+        Assert.Equal(ProtectionAction.Clear, policy.Fields["clearField"].Action);
+        Assert.False(policy.Fields["clearField"].RedactInLogs);
+    }
+
+    [Fact]
+    public void From_DelimitedLayout_ConflictingClassificationAcrossRowTypes_FailsClosed()
+    {
+        // Same fail-closed rule as fixed-width: one name must not resolve to two classifications, or the
+        // last one written would silently declassify the other.
+        var layout = new DelimitedLayout("1.0", '\t', "ascii", new[]
+        {
+            new DelimitedRowDefinition("head", RowRole.Header, 1, new[]
+            {
+                new DelimitedFieldDefinition("dup", 0, encrypt: true),
+            }),
+            new DelimitedRowDefinition("body", RowRole.Data, 0, new[]
+            {
+                new DelimitedFieldDefinition("dup", 0),
+            }),
+        });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => LayoutProtectionPolicy.From(layout));
+        Assert.Contains("dup", ex.Message, StringComparison.Ordinal);
+    }
 }

@@ -7,7 +7,7 @@ namespace Common.FileIngestion.Layouts;
 /// types. Construction is fail-closed — a <see cref="Layout"/> cannot exist in an invalid state.
 /// Generic: the format-specific detail lives entirely in the source data, not here.
 /// </summary>
-public sealed class Layout
+public sealed class Layout : ILayout
 {
     private readonly Dictionary<string, RecordDefinition> _byMatch;
 
@@ -34,6 +34,11 @@ public sealed class Layout
 
     /// <summary>The record types. Defensively copied; read-only.</summary>
     public IReadOnlyList<RecordDefinition> RecordTypes { get; }
+
+    /// <inheritdoc />
+    public IEnumerable<LayoutField> DeclaredFields =>
+        RecordTypes.SelectMany(record => record.Fields)
+                   .Select(definition => new LayoutField(definition.Name, definition.Encrypt));
 
     /// <summary>Creates a validated layout. All structural invariants are enforced here.</summary>
     /// <param name="version">Version identifier; required, non-blank.</param>

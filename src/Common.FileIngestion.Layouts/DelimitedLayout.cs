@@ -14,7 +14,7 @@ namespace Common.FileIngestion.Layouts;
 /// trailer type, and the data type takes the remainder.
 /// </para>
 /// </summary>
-public sealed class DelimitedLayout
+public sealed class DelimitedLayout : ILayout
 {
     /// <summary>Layout version identifier.</summary>
     public string Version { get; }
@@ -27,6 +27,11 @@ public sealed class DelimitedLayout
 
     /// <summary>The row types. Defensively copied; read-only.</summary>
     public IReadOnlyList<DelimitedRowDefinition> RowTypes { get; }
+
+    /// <inheritdoc />
+    public IEnumerable<LayoutField> DeclaredFields =>
+        RowTypes.SelectMany(row => row.Fields)
+                .Select(definition => new LayoutField(definition.Name, definition.Encrypt));
 
     /// <summary>The row type that spans the body of the file. Exactly one always exists.</summary>
     public DelimitedRowDefinition Data { get; }

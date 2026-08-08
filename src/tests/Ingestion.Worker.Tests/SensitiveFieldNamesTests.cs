@@ -56,4 +56,32 @@ public sealed class SensitiveFieldNamesTests
     [Fact]
     public void From_NullLayoutElement_Throws() =>
         Assert.Throws<ArgumentNullException>(() => SensitiveFieldNames.From(new Layout[] { null! }));
+
+    [Fact]
+    public void From_UnionsAcrossMixedFramings()
+    {
+        // Redaction keys come from every profile's layout regardless of framing — a delimited profile's
+        // PCI-adjacent fields must be redacted in logs just as a fixed-width profile's are.
+        var fixedWidth = Layout(new RecordDefinition("r", "MM", new[]
+        {
+            new FieldDefinition("plain", 1, 2),
+            new FieldDefinition("pan", 3, 8, encrypt: true),
+        }));
+
+        var delimited = new DelimitedLayout("1.0", '\t', "ascii", new[]
+        {
+            new DelimitedRowDefinition("body", RowRole.Data, 0, new[]
+            {
+                new DelimitedFieldDefinition("plain", 0),
+                new DelimitedFieldDefinition("accountIdentifier", 1, encrypt: true),
+            }),
+        });
+
+        var names = SensitiveFieldNames.From(new ILayout[] { fixedWidth, delimited });
+
+        Assert.Equal(2, names.Count);
+        Assert.Contains("pan", names);
+        Assert.Contains("accountIdentifier", names);
+        Assert.DoesNotContain("plain", names);
+    }
 }

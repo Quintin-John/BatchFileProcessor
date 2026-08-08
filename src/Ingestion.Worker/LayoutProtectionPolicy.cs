@@ -14,33 +14,30 @@ namespace Ingestion.Worker;
 public static class LayoutProtectionPolicy
 {
     /// <summary>Derives a <see cref="DataProtectionPolicy"/> from a layout's <c>encrypt</c> flags.</summary>
-    /// <param name="layout">The layout whose fields carry the encrypt classification; required.</param>
+    /// <param name="layout">The layout whose fields carry the encrypt classification; required. Any framing.</param>
     /// <exception cref="ArgumentNullException"><paramref name="layout"/> is null.</exception>
-    public static DataProtectionPolicy From(Layout layout)
+    public static DataProtectionPolicy From(ILayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
 
         var fields = new Dictionary<string, FieldProtection>(StringComparer.Ordinal);
-        foreach (var record in layout.RecordTypes)
+        foreach (var field in layout.DeclaredFields)
         {
-            foreach (var field in record.Fields)
+            var protection = field.Encrypt
+                ? new FieldProtection(ProtectionAction.Encrypt, MaskStrategy: null, RedactInLogs: true)
+                : new FieldProtection(ProtectionAction.Clear, MaskStrategy: null, RedactInLogs: false);
+
+            // Protection is keyed by field name across every record or row type. If one name is classified
+            // two different ways, collapsing it would silently declassify one side (last write wins) —
+            // fail closed at composition time rather than pick a winner.
+            if (fields.TryGetValue(field.Name, out var existing) && existing != protection)
             {
-                var protection = field.Encrypt
-                    ? new FieldProtection(ProtectionAction.Encrypt, MaskStrategy: null, RedactInLogs: true)
-                    : new FieldProtection(ProtectionAction.Clear, MaskStrategy: null, RedactInLogs: false);
-
-                // Protection is keyed by field name across every record type. If one name is classified
-                // two different ways, collapsing it would silently declassify one side (last write wins) —
-                // fail closed at composition time rather than pick a winner.
-                if (fields.TryGetValue(field.Name, out var existing) && existing != protection)
-                {
-                    throw new InvalidOperationException(
-                        $"Field '{field.Name}' has conflicting data-protection classifications across record " +
-                        "types; a field name must resolve to a single classification.");
-                }
-
-                fields[field.Name] = protection;
+                throw new InvalidOperationException(
+                    $"Field '{field.Name}' has conflicting data-protection classifications across record " +
+                    "types; a field name must resolve to a single classification.");
             }
+
+            fields[field.Name] = protection;
         }
 
         return new DataProtectionPolicy(fields);
