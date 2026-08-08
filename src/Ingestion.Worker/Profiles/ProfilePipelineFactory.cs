@@ -87,7 +87,7 @@ internal sealed class ProfilePipelineFactory
 
         // Reader and parser come from the profile's format as a pair, so framing and mapping cannot disagree
         // about the file. Nothing here knows which format that is.
-        var (reader, parser) = profile.Format.CreateFraming(layout, Encoding.GetEncoding(layout.Encoding));
+        var (reader, parser) = profile.Format.CreateFraming(layout, LayoutEncoding.Resolve(layout.Encoding));
 
         // Field protection is derived from this profile's own layout, so each profile encrypts its own set.
         var fieldProtector = new DefaultFieldProtector(_crypto, _keys, LayoutProtectionPolicy.From(layout));

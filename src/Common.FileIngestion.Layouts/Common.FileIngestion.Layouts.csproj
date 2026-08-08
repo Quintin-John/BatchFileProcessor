@@ -2,6 +2,7 @@
 
 
   <ItemGroup>
+    <PackageReference Include="System.Text.Encoding.CodePages" />
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
